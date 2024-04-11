@@ -1,11 +1,13 @@
 ''' Base module '''
 __version__ = '0.1.5'
 
+import io
 import re
 import logging
 from datetime import datetime
 import requests
 import pytz
+import csv
 
 from akips.exceptions import AkipsError
 
@@ -28,7 +30,7 @@ class AKIPS:
         if not verify:
             requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
 
-    def get_devices(self):
+    def get_devices(self, group_filter='any', groups=[]):
         ''' Pull a list of key attributes for all devices in akips '''
         attributes = [
             'ip4addr',
@@ -40,6 +42,10 @@ class AKIPS:
         params = {
             'cmds': f'mget text * sys /{cmd_attributes}/',
         }
+        if groups:
+            ''' [any|all|not group {group name} ...] '''
+            group_list = " ".join(groups)
+            params['cmds'] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
             data = {}
@@ -223,6 +229,36 @@ class AKIPS:
             logger.debug("Found {} events of type {} in akips".format(len(data), type))
             return data
         return None
+
+    ### Time-series commands
+
+    def get_series(self, period='last1h', device='*', attribute='*', group_filter='any', groups=[], get_dict=True):
+        ''' Pull a series of values.  Command syntax:
+            cseries avg 
+            time {time filter] type parent child attribute
+            [any|all|not group {group name} ...] '''
+        params = {
+            'cmds': f'cseries avg time {period} * {device} * {attribute}'
+        }
+        if groups:
+            group_list = " ".join(groups)
+            params['cmds'] += f" {group_filter} group {group_list}"
+        text = self._get(params=params)
+        if text:
+            # Parse output in CSV format
+            buff = io.StringIO(text)
+            if get_dict:
+                # parse each row as a dictionary, key will be column header
+                reader = csv.DictReader(buff)
+            else:
+                # parse each row as a list, will have a column header row
+                reader = csv.reader(buff)
+            csv_to_list = [row for row in reader]
+            logger.debug("Found {} series entries".format(len(csv_to_list)))
+            return csv_to_list
+        return None
+
+    ### Base operations
 
     def _get(self, section='/api-db/', params=None, timeout=30):
         ''' Call HTTP GET against the AKiPS server '''
