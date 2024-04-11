@@ -163,54 +163,59 @@ class AKIPS:
             return data
         return None
 
-    def get_unreachable(self):
+    def get_unreachable(self, exclude_maintenance=True):
         ''' Pull a list of unreachable IPv4 ping devices '''
         params = {
             'cmds': 'mget * * * /PING.icmpState|SNMP.snmpState/ value /down/',
         }
+        if exclude_maintenance:
+            params['cmds'] += " not group maintenance_mode"
         text = self._get(params=params)
         data = {}
         if text:
             lines = text.split('\n')
             for line in lines:
-                match = re.match(r'^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$', line)
+                # match = re.match(r'^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$', line)
+                match = re.match(r'^(\S+)\s(\S+)\s(\S+)\s=\s(\S+)$', line)
                 if match:
                     # epoch fields are in the server's timezone
                     name = match.group(1)
                     attribute = match.group(3)
-                    event_start = datetime.fromtimestamp(int(match.group(7)),
-                                                         tz=pytz.timezone(self.server_timezone))
+                    values = self._parse_enum(match.group(4))
+
                     if name not in data:
                         # populate a starting point for this device
                         data[name] = {
-                            'name': name,
+                            'device': name,
                             'ping_state': 'n/a',
+                            'ping_address': '',
                             'snmp_state': 'n/a',
-                            'event_start': event_start  # epoch in local timezone
+                            'snmp_address': '',
+                            'last_change': values['modified'],
+                            'location': None,
+                            'description': None
                         }
                     if attribute == 'PING.icmpState':
-                        data[name]['child'] = match.group(2),
-                        data[name]['ping_state'] = match.group(5)
-                        data[name]['index'] = match.group(4)
-                        data[name]['device_added'] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name]['event_start'] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                        data[name]['ip4addr'] = match.group(8)
+                        data[name]['ping_state'] = values['value']
+                        data[name]['ping_address'] = values['description']
+                        if data[name]['last_change'] < values['modified']:
+                            data[name]['last_change'] = values['modified']
                     elif attribute == 'SNMP.snmpState':
-                        data[name]['child'] = match.group(2),
-                        data[name]['snmp_state'] = match.group(5)
-                        data[name]['index'] = match.group(4)
-                        data[name]['device_added'] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name]['event_start'] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                        data[name]['ip4addr'] = None
-                    if event_start < data[name]['event_start']:
-                        data[name]['event_start'] = event_start
+                        data[name]['snmp_state'] = values['value']
+                        data[name]['snmp_address'] = values['description']
+                        if data[name]['last_change'] < values['modified']:
+                            data[name]['last_change'] = values['modified']
             logger.debug("Found {} devices in akips".format(len(data)))
             logger.debug("data: {}".format(data))
 
-        # for name in data:
-        #     # Fill in the unreported gaps so we have ping4 and snmp up/down data
-        #     if data[name]['ping_state'] == 'n/a':
-        #         ping_status = self.get_status(device=name, child='ping4', attribute='PING.icmpState')
+        for name in data:
+            # Fill in the unreported gaps so we have ping4 and snmp up/down data
+            if data[name]['ping_state'] == 'n/a':
+                ping = self.get_device_attribute(name, 'ping4', 'PING.icmpState')
+                if ping:
+                    values = self._parse_enum(ping)
+                    data['name']['ping_state'] = values['value']
+                    data['name']['ping_address'] = values['description']
 
         #     if data[name]['snmp_state'] == 'n/a':
         #         snmp_status = self.get_status(device=name, child='sys', attribute='SNMP.snmpState')
@@ -314,6 +319,36 @@ class AKIPS:
         return None
 
     ### Time-series commands
+
+    def get_series(self, period='last1h', attribute=None, group=None):
+        ''' Pull a series of values.  Command syntax:
+            cseries avg 
+            time {time filter] type parent child attribute
+            [any|all|not group {group name} ...] '''
+
+        params = {
+            'cmds': f'cseries avg time {period} * * * {attribute}'
+        }
+        text = self._get(params=params)
+        if text:
+            data = []
+            lines = text.split('\n')
+            for line in lines:
+                match = re.match(r'^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$', line)
+                if match:
+                    entry = {
+                        'parent': match.group(1),
+                        'child': match.group(2),
+                        'child_description': match.group(3),
+                        'attribute': match.group(4),
+                        #'type': match.group(5),
+                        #'flags': match.group(6),
+                        #'details': match.group(7),
+                    }
+                    data.append(entry)
+            logger.debug("Found {} events of type {} in akips".format(len(data), type))
+            return data
+        return None
 
     def get_high_latency(self,period='last1h'):
         ''' List devices with high pint RTT times '''
