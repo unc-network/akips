@@ -230,11 +230,11 @@ class AKIPS:
             return data
         return None
 
-    ### Time-series commands
+    # Time-series commands
 
     def get_series(self, period='last1h', device='*', attribute='*', group_filter='any', groups=[], get_dict=True):
         ''' Pull a series of values.  Command syntax:
-            cseries avg 
+            cseries avg
             time {time filter} type parent child attribute
             [any|all|not group {group name} ...] '''
         params = {
@@ -278,7 +278,7 @@ class AKIPS:
             return values
         return None
 
-    ### Base operations
+    # Base operations
 
     def _get(self, section='/api-db/', params=None, timeout=30):
         ''' Call HTTP GET against the AKiPS server '''
