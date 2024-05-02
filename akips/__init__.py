@@ -1,5 +1,5 @@
 ''' Base module '''
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 
 import io
 import re
@@ -235,7 +235,7 @@ class AKIPS:
     def get_series(self, period='last1h', device='*', attribute='*', group_filter='any', groups=[], get_dict=True):
         ''' Pull a series of values.  Command syntax:
             cseries avg 
-            time {time filter] type parent child attribute
+            time {time filter} type parent child attribute
             [any|all|not group {group name} ...] '''
         params = {
             'cmds': f'cseries avg time {period} * {device} * {attribute}'
@@ -258,6 +258,26 @@ class AKIPS:
             return csv_to_list
         return None
 
+    def get_aggregate(self, operator='avg', interval='300', period='last1h', device='*', attribute='*', group_filter='any', groups=[]):
+        ''' Aggregate stats in intervals over a period of time. Command syntax:
+            aggregate interval {avg|total seconds}
+            time {time filter} type parent child attribute
+            [any|all|not group {group name} ...] '''
+        params = {
+            'cmds': f'aggregate interval {operator} {interval} time {period} * {device} * {attribute}'
+        }
+        if groups:
+            group_list = " ".join(groups)
+            params['cmds'] += f" {group_filter} group {group_list}"
+        text = self._get(params=params)
+        if text:
+            # Text should be one CSV line followed by one blank line
+            lines = text.split('\n')
+            values = lines[0].split(',')
+            logger.debug("Found {} aggregate values".format(len(values)))
+            return values
+        return None
+
     ### Base operations
 
     def _get(self, section='/api-db/', params=None, timeout=30):
@@ -266,6 +286,8 @@ class AKIPS:
         params['username'] = self.username
         params['password'] = self.password
 
+        if 'cmds' in params:
+            logger.debug("akips command: {}".format(params['cmds']))
         try:
             r = self.session.get(server_url, params=params, verify=self.verify, timeout=timeout)
             r.raise_for_status()
@@ -287,4 +309,5 @@ class AKIPS:
             logger.error("Web API request failed: {}".format(r.text))
             raise AkipsError(message=r.text)
         else:
+            logger.debug("akips output: {}".format(r.text))
             return r.text
