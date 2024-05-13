@@ -39,6 +39,9 @@ for name, fields in devices.items():
 
 ```
 
+## API Documentation
+[API Documentation](https://wwhitaker.github.io/akips/docs/akips/index.html)
+
 ## Bugs/Requests
 
 Please use the [GitHub issue tracker](https://github.com/wwhitaker/akips/issues) 

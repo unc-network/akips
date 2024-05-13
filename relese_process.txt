@@ -1,10 +1,15 @@
 # Use dev machine
 
-# Make sure you have rolled the version in pyproject.toml and __init__.py
-
-# Run poetry steps
+# Start poetry shell
 poetry shell
 poetry install
+
+# Update docs
+pdoc3 --html --output-dir docs akips --force
+
+# Make sure you have rolled the version in pyproject.toml and __init__.py
+
+# Run poetry tests
 poetry run pytest -v -s tests
 
 # Proceed if no errors
@@ -12,6 +17,7 @@ poetry run pytest -v -s tests
 # Merge into master
 
 # Publish to pypi
+poetry build
 poetry publish
 
 # Create a tag for the version

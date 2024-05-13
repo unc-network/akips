@@ -1,0 +1,1091 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.10.0" />
+<title>akips API documentation</title>
+<meta name="description" content="Base module" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Package <code>akips</code></h1>
+</header>
+<section id="section-intro">
+<p>Base module</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#39;&#39;&#39; Base module &#39;&#39;&#39;
+__version__ = &#39;0.2.2&#39;
+
+import io
+import re
+import logging
+from datetime import datetime
+import requests
+import pytz
+import csv
+
+from akips.exceptions import AkipsError
+
+# Logging configuration
+logger = logging.getLogger(__name__)
+
+
+class AKIPS:
+    &#39;&#39;&#39; Class to handle interactions with AKiPS API &#39;&#39;&#39;
+    server_timezone = &#39;America/New_York&#39;
+
+    def __init__(self, server, username=&#39;api-ro&#39;, password=None, verify=True):
+        &#39;&#39;&#39; Connect to the AKiPS instance &#39;&#39;&#39;
+        self.server = server
+        self.username = username
+        self.password = password
+        self.verify = verify
+        self.session = requests.Session()
+
+        if not verify:
+            requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
+
+    def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
+        &#39;&#39;&#39; Pull a list of key attributes for all devices in akips &#39;&#39;&#39;
+        attributes = [
+            &#39;ip4addr&#39;,
+            &#39;SNMPv2-MIB.sysName&#39;,
+            &#39;SNMPv2-MIB.sysDescr&#39;,
+            &#39;SNMPv2-MIB.sysLocation&#39;
+        ]
+        cmd_attributes = &#34;|&#34;.join(attributes)
+        params = {
+            &#39;cmds&#39;: f&#39;mget text * sys /{cmd_attributes}/&#39;,
+        }
+        if groups:
+            &#39;&#39;&#39; [any|all|not group {group name} ...] &#39;&#39;&#39;
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            data = {}
+            # Data comes back as &#39;plain/text&#39; type so we have to parse it
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#39;, line)
+                if match:
+                    if match.group(1) not in data:
+                        # Populate a default entry for all desired fields
+                        data[match.group(1)] = dict.fromkeys(attributes)
+                    # Save this attribute value to data
+                    data[match.group(1)][match.group(3)] = match.group(4)
+            logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
+            return data
+        return None
+
+    def get_device(self, name):
+        &#39;&#39;&#39; Pull the entire configuration for a single device &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
+        }
+        text = self._get(params=params)
+        if text:
+            data = {}
+            # Data comes back as &#39;plain/text&#39; type so we have to parse it.  Example:
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#39;, line)
+                if match:
+                    name = match.group(1)
+                    if match.group(2) not in data:
+                        # initialize the dict of attributes
+                        data[match.group(2)] = {}
+                    if match.group(5):
+                        # Save this attribute value to data
+                        data[match.group(2)][match.group(3)] = match.group(5)
+                    else:
+                        # save a blank string if there was nothing after equals
+                        data[match.group(2)][match.group(3)] = &#39;&#39;
+            if name:
+                data[&#39;name&#39;] = name
+            logger.debug(&#34;Found device {} in akips&#34;.format(data))
+            return data
+        return None
+
+    def get_device_by_ip(self, ipaddr, use_cache=True):
+        &#39;&#39;&#39; Search for a device by an alternate IP address
+        This makes use of a special site script and not the normal api &#39;&#39;&#39;
+        # params = {
+        #     &#39;function&#39;: &#39;web_find_device_by_ip&#39;,
+        #     &#39;ipaddr&#39;: ipaddr
+        # }
+        # section = &#39;/api-script/&#39;
+        pass
+
+    def get_unreachable(self):
+        &#39;&#39;&#39; Pull a list of unreachable IPv4 ping devices &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
+        }
+        text = self._get(params=params)
+        data = {}
+        if text:
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#39;, line)
+                if match:
+                    # epoch fields are in the server&#39;s timezone
+                    name = match.group(1)
+                    attribute = match.group(3)
+                    event_start = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    if name not in data:
+                        # populate a starting point for this device
+                        data[name] = {
+                            &#39;name&#39;: name,
+                            &#39;ping_state&#39;: &#39;n/a&#39;,
+                            &#39;snmp_state&#39;: &#39;n/a&#39;,
+                            &#39;event_start&#39;: event_start  # epoch in local timezone
+                        }
+                    if attribute == &#39;PING.icmpState&#39;:
+                        data[name][&#39;child&#39;] = match.group(2),
+                        data[name][&#39;ping_state&#39;] = match.group(5)
+                        data[name][&#39;index&#39;] = match.group(4)
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;ip4addr&#39;] = match.group(8)
+                    elif attribute == &#39;SNMP.snmpState&#39;:
+                        data[name][&#39;child&#39;] = match.group(2),
+                        data[name][&#39;snmp_state&#39;] = match.group(5)
+                        data[name][&#39;index&#39;] = match.group(4)
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;ip4addr&#39;] = None
+                    if event_start &lt; data[name][&#39;event_start&#39;]:
+                        data[name][&#39;event_start&#39;] = event_start
+            logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
+            logger.debug(&#34;data: {}&#34;.format(data))
+
+        # for name in data:
+        #     # Fill in the unreported gaps so we have ping4 and snmp up/down data
+        #     if data[name][&#39;ping_state&#39;] == &#39;n/a&#39;:
+        #         ping_status = self.get_status(device=name, child=&#39;ping4&#39;, attribute=&#39;PING.icmpState&#39;)
+
+        #     if data[name][&#39;snmp_state&#39;] == &#39;n/a&#39;:
+        #         snmp_status = self.get_status(device=name, child=&#39;sys&#39;, attribute=&#39;SNMP.snmpState&#39;)
+
+        # ideal data return based on unreachable device report
+        # Device, Ping4 (state,IPv4), SNMP (state,IP), Last Change (... ago), Location, Description
+
+        return data
+
+    def get_group_membership(self):
+        &#39;&#39;&#39; Pull a list of device to group memberships &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: &#39;mgroup device *&#39;,
+        }
+        text = self._get(params=params)
+        if text:
+            data = {}
+            # Data comes back as &#39;plain/text&#39; type so we have to parse it
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s=\s(.*)$&#39;, line)
+                if match:
+                    if match.group(1) not in data:
+                        # Populate a default entry for all desired fields
+                        data[match.group(1)] = match.group(2).split(&#39;,&#39;)
+            logger.debug(&#34;Found {} device and group mappings in akips&#34;.format(len(data.keys())))
+            return data
+        return None
+
+    def get_maintenance_mode(self):
+        &#39;&#39;&#39; Pull a list of devices in maintenance mode &#39;&#39;&#39;
+        # params = {
+        #     &#39;cmds&#39;: &#39;mget * * any group maintenance_mode&#39;,
+        # }
+        pass
+
+    def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
+        &#39;&#39;&#39; Set maintenance mode on or off for a device &#39;&#39;&#39;
+        # params = {
+        #     &#39;function&#39;: &#39;web_manual_grouping&#39;,
+        #     &#39;type&#39;: &#39;device&#39;,
+        #     &#39;group&#39;: &#39;maintenance_mode&#39;,
+        #     &#39;device&#39;: device_name
+        # }
+        pass
+
+    def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
+        &#39;&#39;&#39; Pull the status values we are most interested in &#39;&#39;&#39;
+        pass
+
+    def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
+        &#39;&#39;&#39; Pull a list of events.  Command syntax:
+            mget event {all,critical,enum,threshold,uptime}
+            time {time filter} [{parent regex} {child regex}
+            {attribute regex}] [profile {profile name}]
+            [any|all|not group {group name} ...] &#39;&#39;&#39;
+
+        params = {
+            &#39;cmds&#39;: f&#39;mget event {event_type} time {period}&#39;
+        }
+        text = self._get(params=params)
+        if text:
+            data = []
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#39;, line)
+                if match:
+                    entry = {
+                        &#39;epoch&#39;: match.group(1),
+                        &#39;parent&#39;: match.group(2),
+                        &#39;child&#39;: match.group(3),
+                        &#39;attribute&#39;: match.group(4),
+                        &#39;type&#39;: match.group(5),
+                        &#39;flags&#39;: match.group(6),
+                        &#39;details&#39;: match.group(7),
+                    }
+                    data.append(entry)
+            logger.debug(&#34;Found {} events of type {} in akips&#34;.format(len(data), type))
+            return data
+        return None
+
+    # Time-series commands
+
+    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[], get_dict=True):
+        &#39;&#39;&#39; Pull a series of values.  Command syntax:
+            cseries avg
+            time {time filter} type parent child attribute
+            [any|all|not group {group name} ...] &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: f&#39;cseries avg time {period} * {device} * {attribute}&#39;
+        }
+        if groups:
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            # Parse output in CSV format
+            buff = io.StringIO(text)
+            if get_dict:
+                # parse each row as a dictionary, key will be column header
+                reader = csv.DictReader(buff)
+            else:
+                # parse each row as a list, will have a column header row
+                reader = csv.reader(buff)
+            csv_to_list = [row for row in reader]
+            logger.debug(&#34;Found {} series entries&#34;.format(len(csv_to_list)))
+            return csv_to_list
+        return None
+
+    def get_aggregate(self, operator=&#39;avg&#39;, interval=&#39;300&#39;, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+        &#39;&#39;&#39; Aggregate stats in intervals over a period of time. Command syntax:
+            aggregate interval {avg|total seconds}
+            time {time filter} type parent child attribute
+            [any|all|not group {group name} ...] &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: f&#39;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#39;
+        }
+        if groups:
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            # Text should be one CSV line followed by one blank line
+            lines = text.split(&#39;\n&#39;)
+            values = lines[0].split(&#39;,&#39;)
+            logger.debug(&#34;Found {} aggregate values&#34;.format(len(values)))
+            return values
+        return None
+
+    # Base operations
+
+    def _get(self, section=&#39;/api-db/&#39;, params=None, timeout=30):
+        &#39;&#39;&#39; Call HTTP GET against the AKiPS server &#39;&#39;&#39;
+        server_url = &#39;https://&#39; + self.server + section
+        params[&#39;username&#39;] = self.username
+        params[&#39;password&#39;] = self.password
+
+        if &#39;cmds&#39; in params:
+            logger.debug(&#34;akips command: {}&#34;.format(params[&#39;cmds&#39;]))
+        try:
+            r = self.session.get(server_url, params=params, verify=self.verify, timeout=timeout)
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as errh:
+            logger.error(errh)
+            raise
+        except requests.exceptions.ConnectionError as errc:
+            logger.error(errc)
+            raise
+        except requests.exceptions.Timeout as errt:
+            logger.error(errt)
+            raise
+        except requests.exceptions.RequestException as err:
+            logger.error(err)
+            raise
+
+        # AKiPS can return a raw error message if something fails
+        if re.match(r&#39;^ERROR:&#39;, r.text):
+            logger.error(&#34;Web API request failed: {}&#34;.format(r.text))
+            raise AkipsError(message=r.text)
+        else:
+            logger.debug(&#34;akips output: {}&#34;.format(r.text))
+            return r.text</code></pre>
+</details>
+</section>
+<section>
+<h2 class="section-title" id="header-submodules">Sub-modules</h2>
+<dl>
+<dt><code class="name"><a title="akips.exceptions" href="exceptions.html">akips.exceptions</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="akips.AKIPS"><code class="flex name class">
+<span>class <span class="ident">AKIPS</span></span>
+<span>(</span><span>server, username='api-ro', password=None, verify=True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Class to handle interactions with AKiPS API </p>
+<p>Connect to the AKiPS instance</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AKIPS:
+    &#39;&#39;&#39; Class to handle interactions with AKiPS API &#39;&#39;&#39;
+    server_timezone = &#39;America/New_York&#39;
+
+    def __init__(self, server, username=&#39;api-ro&#39;, password=None, verify=True):
+        &#39;&#39;&#39; Connect to the AKiPS instance &#39;&#39;&#39;
+        self.server = server
+        self.username = username
+        self.password = password
+        self.verify = verify
+        self.session = requests.Session()
+
+        if not verify:
+            requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
+
+    def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
+        &#39;&#39;&#39; Pull a list of key attributes for all devices in akips &#39;&#39;&#39;
+        attributes = [
+            &#39;ip4addr&#39;,
+            &#39;SNMPv2-MIB.sysName&#39;,
+            &#39;SNMPv2-MIB.sysDescr&#39;,
+            &#39;SNMPv2-MIB.sysLocation&#39;
+        ]
+        cmd_attributes = &#34;|&#34;.join(attributes)
+        params = {
+            &#39;cmds&#39;: f&#39;mget text * sys /{cmd_attributes}/&#39;,
+        }
+        if groups:
+            &#39;&#39;&#39; [any|all|not group {group name} ...] &#39;&#39;&#39;
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            data = {}
+            # Data comes back as &#39;plain/text&#39; type so we have to parse it
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#39;, line)
+                if match:
+                    if match.group(1) not in data:
+                        # Populate a default entry for all desired fields
+                        data[match.group(1)] = dict.fromkeys(attributes)
+                    # Save this attribute value to data
+                    data[match.group(1)][match.group(3)] = match.group(4)
+            logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
+            return data
+        return None
+
+    def get_device(self, name):
+        &#39;&#39;&#39; Pull the entire configuration for a single device &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
+        }
+        text = self._get(params=params)
+        if text:
+            data = {}
+            # Data comes back as &#39;plain/text&#39; type so we have to parse it.  Example:
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#39;, line)
+                if match:
+                    name = match.group(1)
+                    if match.group(2) not in data:
+                        # initialize the dict of attributes
+                        data[match.group(2)] = {}
+                    if match.group(5):
+                        # Save this attribute value to data
+                        data[match.group(2)][match.group(3)] = match.group(5)
+                    else:
+                        # save a blank string if there was nothing after equals
+                        data[match.group(2)][match.group(3)] = &#39;&#39;
+            if name:
+                data[&#39;name&#39;] = name
+            logger.debug(&#34;Found device {} in akips&#34;.format(data))
+            return data
+        return None
+
+    def get_device_by_ip(self, ipaddr, use_cache=True):
+        &#39;&#39;&#39; Search for a device by an alternate IP address
+        This makes use of a special site script and not the normal api &#39;&#39;&#39;
+        # params = {
+        #     &#39;function&#39;: &#39;web_find_device_by_ip&#39;,
+        #     &#39;ipaddr&#39;: ipaddr
+        # }
+        # section = &#39;/api-script/&#39;
+        pass
+
+    def get_unreachable(self):
+        &#39;&#39;&#39; Pull a list of unreachable IPv4 ping devices &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
+        }
+        text = self._get(params=params)
+        data = {}
+        if text:
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#39;, line)
+                if match:
+                    # epoch fields are in the server&#39;s timezone
+                    name = match.group(1)
+                    attribute = match.group(3)
+                    event_start = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    if name not in data:
+                        # populate a starting point for this device
+                        data[name] = {
+                            &#39;name&#39;: name,
+                            &#39;ping_state&#39;: &#39;n/a&#39;,
+                            &#39;snmp_state&#39;: &#39;n/a&#39;,
+                            &#39;event_start&#39;: event_start  # epoch in local timezone
+                        }
+                    if attribute == &#39;PING.icmpState&#39;:
+                        data[name][&#39;child&#39;] = match.group(2),
+                        data[name][&#39;ping_state&#39;] = match.group(5)
+                        data[name][&#39;index&#39;] = match.group(4)
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;ip4addr&#39;] = match.group(8)
+                    elif attribute == &#39;SNMP.snmpState&#39;:
+                        data[name][&#39;child&#39;] = match.group(2),
+                        data[name][&#39;snmp_state&#39;] = match.group(5)
+                        data[name][&#39;index&#39;] = match.group(4)
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;ip4addr&#39;] = None
+                    if event_start &lt; data[name][&#39;event_start&#39;]:
+                        data[name][&#39;event_start&#39;] = event_start
+            logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
+            logger.debug(&#34;data: {}&#34;.format(data))
+
+        # for name in data:
+        #     # Fill in the unreported gaps so we have ping4 and snmp up/down data
+        #     if data[name][&#39;ping_state&#39;] == &#39;n/a&#39;:
+        #         ping_status = self.get_status(device=name, child=&#39;ping4&#39;, attribute=&#39;PING.icmpState&#39;)
+
+        #     if data[name][&#39;snmp_state&#39;] == &#39;n/a&#39;:
+        #         snmp_status = self.get_status(device=name, child=&#39;sys&#39;, attribute=&#39;SNMP.snmpState&#39;)
+
+        # ideal data return based on unreachable device report
+        # Device, Ping4 (state,IPv4), SNMP (state,IP), Last Change (... ago), Location, Description
+
+        return data
+
+    def get_group_membership(self):
+        &#39;&#39;&#39; Pull a list of device to group memberships &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: &#39;mgroup device *&#39;,
+        }
+        text = self._get(params=params)
+        if text:
+            data = {}
+            # Data comes back as &#39;plain/text&#39; type so we have to parse it
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s=\s(.*)$&#39;, line)
+                if match:
+                    if match.group(1) not in data:
+                        # Populate a default entry for all desired fields
+                        data[match.group(1)] = match.group(2).split(&#39;,&#39;)
+            logger.debug(&#34;Found {} device and group mappings in akips&#34;.format(len(data.keys())))
+            return data
+        return None
+
+    def get_maintenance_mode(self):
+        &#39;&#39;&#39; Pull a list of devices in maintenance mode &#39;&#39;&#39;
+        # params = {
+        #     &#39;cmds&#39;: &#39;mget * * any group maintenance_mode&#39;,
+        # }
+        pass
+
+    def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
+        &#39;&#39;&#39; Set maintenance mode on or off for a device &#39;&#39;&#39;
+        # params = {
+        #     &#39;function&#39;: &#39;web_manual_grouping&#39;,
+        #     &#39;type&#39;: &#39;device&#39;,
+        #     &#39;group&#39;: &#39;maintenance_mode&#39;,
+        #     &#39;device&#39;: device_name
+        # }
+        pass
+
+    def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
+        &#39;&#39;&#39; Pull the status values we are most interested in &#39;&#39;&#39;
+        pass
+
+    def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
+        &#39;&#39;&#39; Pull a list of events.  Command syntax:
+            mget event {all,critical,enum,threshold,uptime}
+            time {time filter} [{parent regex} {child regex}
+            {attribute regex}] [profile {profile name}]
+            [any|all|not group {group name} ...] &#39;&#39;&#39;
+
+        params = {
+            &#39;cmds&#39;: f&#39;mget event {event_type} time {period}&#39;
+        }
+        text = self._get(params=params)
+        if text:
+            data = []
+            lines = text.split(&#39;\n&#39;)
+            for line in lines:
+                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#39;, line)
+                if match:
+                    entry = {
+                        &#39;epoch&#39;: match.group(1),
+                        &#39;parent&#39;: match.group(2),
+                        &#39;child&#39;: match.group(3),
+                        &#39;attribute&#39;: match.group(4),
+                        &#39;type&#39;: match.group(5),
+                        &#39;flags&#39;: match.group(6),
+                        &#39;details&#39;: match.group(7),
+                    }
+                    data.append(entry)
+            logger.debug(&#34;Found {} events of type {} in akips&#34;.format(len(data), type))
+            return data
+        return None
+
+    # Time-series commands
+
+    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[], get_dict=True):
+        &#39;&#39;&#39; Pull a series of values.  Command syntax:
+            cseries avg
+            time {time filter} type parent child attribute
+            [any|all|not group {group name} ...] &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: f&#39;cseries avg time {period} * {device} * {attribute}&#39;
+        }
+        if groups:
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            # Parse output in CSV format
+            buff = io.StringIO(text)
+            if get_dict:
+                # parse each row as a dictionary, key will be column header
+                reader = csv.DictReader(buff)
+            else:
+                # parse each row as a list, will have a column header row
+                reader = csv.reader(buff)
+            csv_to_list = [row for row in reader]
+            logger.debug(&#34;Found {} series entries&#34;.format(len(csv_to_list)))
+            return csv_to_list
+        return None
+
+    def get_aggregate(self, operator=&#39;avg&#39;, interval=&#39;300&#39;, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+        &#39;&#39;&#39; Aggregate stats in intervals over a period of time. Command syntax:
+            aggregate interval {avg|total seconds}
+            time {time filter} type parent child attribute
+            [any|all|not group {group name} ...] &#39;&#39;&#39;
+        params = {
+            &#39;cmds&#39;: f&#39;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#39;
+        }
+        if groups:
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            # Text should be one CSV line followed by one blank line
+            lines = text.split(&#39;\n&#39;)
+            values = lines[0].split(&#39;,&#39;)
+            logger.debug(&#34;Found {} aggregate values&#34;.format(len(values)))
+            return values
+        return None
+
+    # Base operations
+
+    def _get(self, section=&#39;/api-db/&#39;, params=None, timeout=30):
+        &#39;&#39;&#39; Call HTTP GET against the AKiPS server &#39;&#39;&#39;
+        server_url = &#39;https://&#39; + self.server + section
+        params[&#39;username&#39;] = self.username
+        params[&#39;password&#39;] = self.password
+
+        if &#39;cmds&#39; in params:
+            logger.debug(&#34;akips command: {}&#34;.format(params[&#39;cmds&#39;]))
+        try:
+            r = self.session.get(server_url, params=params, verify=self.verify, timeout=timeout)
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as errh:
+            logger.error(errh)
+            raise
+        except requests.exceptions.ConnectionError as errc:
+            logger.error(errc)
+            raise
+        except requests.exceptions.Timeout as errt:
+            logger.error(errt)
+            raise
+        except requests.exceptions.RequestException as err:
+            logger.error(err)
+            raise
+
+        # AKiPS can return a raw error message if something fails
+        if re.match(r&#39;^ERROR:&#39;, r.text):
+            logger.error(&#34;Web API request failed: {}&#34;.format(r.text))
+            raise AkipsError(message=r.text)
+        else:
+            logger.debug(&#34;akips output: {}&#34;.format(r.text))
+            return r.text</code></pre>
+</details>
+<h3>Class variables</h3>
+<dl>
+<dt id="akips.AKIPS.server_timezone"><code class="name">var <span class="ident">server_timezone</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="akips.AKIPS.get_aggregate"><code class="name flex">
+<span>def <span class="ident">get_aggregate</span></span>(<span>self, operator='avg', interval='300', period='last1h', device='*', attribute='*', group_filter='any', groups=[])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Aggregate stats in intervals over a period of time. Command syntax:
+aggregate interval {avg|total seconds}
+time {time filter} type parent child attribute
+[any|all|not group {group name} &hellip;]</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_aggregate(self, operator=&#39;avg&#39;, interval=&#39;300&#39;, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+    &#39;&#39;&#39; Aggregate stats in intervals over a period of time. Command syntax:
+        aggregate interval {avg|total seconds}
+        time {time filter} type parent child attribute
+        [any|all|not group {group name} ...] &#39;&#39;&#39;
+    params = {
+        &#39;cmds&#39;: f&#39;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#39;
+    }
+    if groups:
+        group_list = &#34; &#34;.join(groups)
+        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+    text = self._get(params=params)
+    if text:
+        # Text should be one CSV line followed by one blank line
+        lines = text.split(&#39;\n&#39;)
+        values = lines[0].split(&#39;,&#39;)
+        logger.debug(&#34;Found {} aggregate values&#34;.format(len(values)))
+        return values
+    return None</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_device"><code class="name flex">
+<span>def <span class="ident">get_device</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull the entire configuration for a single device</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_device(self, name):
+    &#39;&#39;&#39; Pull the entire configuration for a single device &#39;&#39;&#39;
+    params = {
+        &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
+    }
+    text = self._get(params=params)
+    if text:
+        data = {}
+        # Data comes back as &#39;plain/text&#39; type so we have to parse it.  Example:
+        lines = text.split(&#39;\n&#39;)
+        for line in lines:
+            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#39;, line)
+            if match:
+                name = match.group(1)
+                if match.group(2) not in data:
+                    # initialize the dict of attributes
+                    data[match.group(2)] = {}
+                if match.group(5):
+                    # Save this attribute value to data
+                    data[match.group(2)][match.group(3)] = match.group(5)
+                else:
+                    # save a blank string if there was nothing after equals
+                    data[match.group(2)][match.group(3)] = &#39;&#39;
+        if name:
+            data[&#39;name&#39;] = name
+        logger.debug(&#34;Found device {} in akips&#34;.format(data))
+        return data
+    return None</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_device_by_ip"><code class="name flex">
+<span>def <span class="ident">get_device_by_ip</span></span>(<span>self, ipaddr, use_cache=True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Search for a device by an alternate IP address
+This makes use of a special site script and not the normal api</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_device_by_ip(self, ipaddr, use_cache=True):
+    &#39;&#39;&#39; Search for a device by an alternate IP address
+    This makes use of a special site script and not the normal api &#39;&#39;&#39;
+    # params = {
+    #     &#39;function&#39;: &#39;web_find_device_by_ip&#39;,
+    #     &#39;ipaddr&#39;: ipaddr
+    # }
+    # section = &#39;/api-script/&#39;
+    pass</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_devices"><code class="name flex">
+<span>def <span class="ident">get_devices</span></span>(<span>self, group_filter='any', groups=[])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull a list of key attributes for all devices in akips</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
+    &#39;&#39;&#39; Pull a list of key attributes for all devices in akips &#39;&#39;&#39;
+    attributes = [
+        &#39;ip4addr&#39;,
+        &#39;SNMPv2-MIB.sysName&#39;,
+        &#39;SNMPv2-MIB.sysDescr&#39;,
+        &#39;SNMPv2-MIB.sysLocation&#39;
+    ]
+    cmd_attributes = &#34;|&#34;.join(attributes)
+    params = {
+        &#39;cmds&#39;: f&#39;mget text * sys /{cmd_attributes}/&#39;,
+    }
+    if groups:
+        &#39;&#39;&#39; [any|all|not group {group name} ...] &#39;&#39;&#39;
+        group_list = &#34; &#34;.join(groups)
+        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+    text = self._get(params=params)
+    if text:
+        data = {}
+        # Data comes back as &#39;plain/text&#39; type so we have to parse it
+        lines = text.split(&#39;\n&#39;)
+        for line in lines:
+            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#39;, line)
+            if match:
+                if match.group(1) not in data:
+                    # Populate a default entry for all desired fields
+                    data[match.group(1)] = dict.fromkeys(attributes)
+                # Save this attribute value to data
+                data[match.group(1)][match.group(3)] = match.group(4)
+        logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
+        return data
+    return None</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_events"><code class="name flex">
+<span>def <span class="ident">get_events</span></span>(<span>self, event_type='all', period='last1h')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull a list of events.
+Command syntax:
+mget event {all,critical,enum,threshold,uptime}
+time {time filter} [{parent regex} {child regex}
+{attribute regex}] [profile {profile name}]
+[any|all|not group {group name} &hellip;]</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
+    &#39;&#39;&#39; Pull a list of events.  Command syntax:
+        mget event {all,critical,enum,threshold,uptime}
+        time {time filter} [{parent regex} {child regex}
+        {attribute regex}] [profile {profile name}]
+        [any|all|not group {group name} ...] &#39;&#39;&#39;
+
+    params = {
+        &#39;cmds&#39;: f&#39;mget event {event_type} time {period}&#39;
+    }
+    text = self._get(params=params)
+    if text:
+        data = []
+        lines = text.split(&#39;\n&#39;)
+        for line in lines:
+            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#39;, line)
+            if match:
+                entry = {
+                    &#39;epoch&#39;: match.group(1),
+                    &#39;parent&#39;: match.group(2),
+                    &#39;child&#39;: match.group(3),
+                    &#39;attribute&#39;: match.group(4),
+                    &#39;type&#39;: match.group(5),
+                    &#39;flags&#39;: match.group(6),
+                    &#39;details&#39;: match.group(7),
+                }
+                data.append(entry)
+        logger.debug(&#34;Found {} events of type {} in akips&#34;.format(len(data), type))
+        return data
+    return None</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_group_membership"><code class="name flex">
+<span>def <span class="ident">get_group_membership</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull a list of device to group memberships</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_group_membership(self):
+    &#39;&#39;&#39; Pull a list of device to group memberships &#39;&#39;&#39;
+    params = {
+        &#39;cmds&#39;: &#39;mgroup device *&#39;,
+    }
+    text = self._get(params=params)
+    if text:
+        data = {}
+        # Data comes back as &#39;plain/text&#39; type so we have to parse it
+        lines = text.split(&#39;\n&#39;)
+        for line in lines:
+            match = re.match(r&#39;^(\S+)\s=\s(.*)$&#39;, line)
+            if match:
+                if match.group(1) not in data:
+                    # Populate a default entry for all desired fields
+                    data[match.group(1)] = match.group(2).split(&#39;,&#39;)
+        logger.debug(&#34;Found {} device and group mappings in akips&#34;.format(len(data.keys())))
+        return data
+    return None</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_maintenance_mode"><code class="name flex">
+<span>def <span class="ident">get_maintenance_mode</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull a list of devices in maintenance mode</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_maintenance_mode(self):
+    &#39;&#39;&#39; Pull a list of devices in maintenance mode &#39;&#39;&#39;
+    # params = {
+    #     &#39;cmds&#39;: &#39;mget * * any group maintenance_mode&#39;,
+    # }
+    pass</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_series"><code class="name flex">
+<span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', device='*', attribute='*', group_filter='any', groups=[], get_dict=True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull a series of values.
+Command syntax:
+cseries avg
+time {time filter} type parent child attribute
+[any|all|not group {group name} &hellip;]</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[], get_dict=True):
+    &#39;&#39;&#39; Pull a series of values.  Command syntax:
+        cseries avg
+        time {time filter} type parent child attribute
+        [any|all|not group {group name} ...] &#39;&#39;&#39;
+    params = {
+        &#39;cmds&#39;: f&#39;cseries avg time {period} * {device} * {attribute}&#39;
+    }
+    if groups:
+        group_list = &#34; &#34;.join(groups)
+        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+    text = self._get(params=params)
+    if text:
+        # Parse output in CSV format
+        buff = io.StringIO(text)
+        if get_dict:
+            # parse each row as a dictionary, key will be column header
+            reader = csv.DictReader(buff)
+        else:
+            # parse each row as a list, will have a column header row
+            reader = csv.reader(buff)
+        csv_to_list = [row for row in reader]
+        logger.debug(&#34;Found {} series entries&#34;.format(len(csv_to_list)))
+        return csv_to_list
+    return None</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_status"><code class="name flex">
+<span>def <span class="ident">get_status</span></span>(<span>self, device='*', child='*', attribute='*')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull the status values we are most interested in</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
+    &#39;&#39;&#39; Pull the status values we are most interested in &#39;&#39;&#39;
+    pass</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_unreachable"><code class="name flex">
+<span>def <span class="ident">get_unreachable</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull a list of unreachable IPv4 ping devices</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_unreachable(self):
+    &#39;&#39;&#39; Pull a list of unreachable IPv4 ping devices &#39;&#39;&#39;
+    params = {
+        &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
+    }
+    text = self._get(params=params)
+    data = {}
+    if text:
+        lines = text.split(&#39;\n&#39;)
+        for line in lines:
+            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#39;, line)
+            if match:
+                # epoch fields are in the server&#39;s timezone
+                name = match.group(1)
+                attribute = match.group(3)
+                event_start = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                if name not in data:
+                    # populate a starting point for this device
+                    data[name] = {
+                        &#39;name&#39;: name,
+                        &#39;ping_state&#39;: &#39;n/a&#39;,
+                        &#39;snmp_state&#39;: &#39;n/a&#39;,
+                        &#39;event_start&#39;: event_start  # epoch in local timezone
+                    }
+                if attribute == &#39;PING.icmpState&#39;:
+                    data[name][&#39;child&#39;] = match.group(2),
+                    data[name][&#39;ping_state&#39;] = match.group(5)
+                    data[name][&#39;index&#39;] = match.group(4)
+                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;ip4addr&#39;] = match.group(8)
+                elif attribute == &#39;SNMP.snmpState&#39;:
+                    data[name][&#39;child&#39;] = match.group(2),
+                    data[name][&#39;snmp_state&#39;] = match.group(5)
+                    data[name][&#39;index&#39;] = match.group(4)
+                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;ip4addr&#39;] = None
+                if event_start &lt; data[name][&#39;event_start&#39;]:
+                    data[name][&#39;event_start&#39;] = event_start
+        logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
+        logger.debug(&#34;data: {}&#34;.format(data))
+
+    # for name in data:
+    #     # Fill in the unreported gaps so we have ping4 and snmp up/down data
+    #     if data[name][&#39;ping_state&#39;] == &#39;n/a&#39;:
+    #         ping_status = self.get_status(device=name, child=&#39;ping4&#39;, attribute=&#39;PING.icmpState&#39;)
+
+    #     if data[name][&#39;snmp_state&#39;] == &#39;n/a&#39;:
+    #         snmp_status = self.get_status(device=name, child=&#39;sys&#39;, attribute=&#39;SNMP.snmpState&#39;)
+
+    # ideal data return based on unreachable device report
+    # Device, Ping4 (state,IPv4), SNMP (state,IP), Last Change (... ago), Location, Description
+
+    return data</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.set_maintenance_mode"><code class="name flex">
+<span>def <span class="ident">set_maintenance_mode</span></span>(<span>self, device_name, mode='True')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Set maintenance mode on or off for a device</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
+    &#39;&#39;&#39; Set maintenance mode on or off for a device &#39;&#39;&#39;
+    # params = {
+    #     &#39;function&#39;: &#39;web_manual_grouping&#39;,
+    #     &#39;type&#39;: &#39;device&#39;,
+    #     &#39;group&#39;: &#39;maintenance_mode&#39;,
+    #     &#39;device&#39;: device_name
+    # }
+    pass</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3><a href="#header-submodules">Sub-modules</a></h3>
+<ul>
+<li><code><a title="akips.exceptions" href="exceptions.html">akips.exceptions</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="akips.AKIPS" href="#akips.AKIPS">AKIPS</a></code></h4>
+<ul class="">
+<li><code><a title="akips.AKIPS.get_aggregate" href="#akips.AKIPS.get_aggregate">get_aggregate</a></code></li>
+<li><code><a title="akips.AKIPS.get_device" href="#akips.AKIPS.get_device">get_device</a></code></li>
+<li><code><a title="akips.AKIPS.get_device_by_ip" href="#akips.AKIPS.get_device_by_ip">get_device_by_ip</a></code></li>
+<li><code><a title="akips.AKIPS.get_devices" href="#akips.AKIPS.get_devices">get_devices</a></code></li>
+<li><code><a title="akips.AKIPS.get_events" href="#akips.AKIPS.get_events">get_events</a></code></li>
+<li><code><a title="akips.AKIPS.get_group_membership" href="#akips.AKIPS.get_group_membership">get_group_membership</a></code></li>
+<li><code><a title="akips.AKIPS.get_maintenance_mode" href="#akips.AKIPS.get_maintenance_mode">get_maintenance_mode</a></code></li>
+<li><code><a title="akips.AKIPS.get_series" href="#akips.AKIPS.get_series">get_series</a></code></li>
+<li><code><a title="akips.AKIPS.get_status" href="#akips.AKIPS.get_status">get_status</a></code></li>
+<li><code><a title="akips.AKIPS.get_unreachable" href="#akips.AKIPS.get_unreachable">get_unreachable</a></code></li>
+<li><code><a title="akips.AKIPS.server_timezone" href="#akips.AKIPS.server_timezone">server_timezone</a></code></li>
+<li><code><a title="akips.AKIPS.set_maintenance_mode" href="#akips.AKIPS.set_maintenance_mode">set_maintenance_mode</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.10.0</a>.</p>
+</footer>
+</body>
+</html>
