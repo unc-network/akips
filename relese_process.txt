@@ -12,6 +12,7 @@ poetry run pytest -v -s tests
 # Merge into master
 
 # Publish to pypi
+poetry build
 poetry publish
 
 # Create a tag for the version
