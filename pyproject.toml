@@ -8,13 +8,13 @@ license = "MIT"
 repository = "https://github.com/wwhitaker/akips"
 
 [tool.poetry.dependencies]
-python = ">=3.8.1,<4.0"
+python = ">=3.8,<4.0"
 requests = ">=2.31"
 pytz = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"
-flake8 = "^7.0.0"
+#flake8 = "^7.0.0"
 pdoc3 = "^0.10.0"
 
 [build-system]
