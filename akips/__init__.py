@@ -281,6 +281,25 @@ class AKIPS:
 
     # Base operations
 
+    def _parse_enum(self, enum_string):
+        ''' Attributes with a type of enum return five values separated by commas. '''
+        match = re.match(r'^(\S*),(\S*),(\S*),(\S*),(\S*)$', enum_string)
+        if match:
+            entry = {
+                'number': match.group(1),       # list number (from MIB)
+                'value': match.group(2),        # text value (from MIB)
+                # 'created': match.group(3),      # time created (epoch timestamp)
+                # 'modified': match.group(4),     # time modified (epoch timestamp)
+                'description': match.group(5)   # child description
+            }
+            entry['created'] = datetime.fromtimestamp(int(match.group(3)), 
+                                                        tz=pytz.timezone(self.server_timezone))
+            entry['modified'] = datetime.fromtimestamp(int(match.group(4)), 
+                                                        tz=pytz.timezone(self.server_timezone))
+            return entry
+        else:
+            raise AkipsError(message=f'Not a ENUM type value: {enum_string}')
+
     def _get(self, section='/api-db/', params=None, timeout=30):
         ''' Call HTTP GET against the AKiPS server '''
         server_url = 'https://' + self.server + section
