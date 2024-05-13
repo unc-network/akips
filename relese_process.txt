@@ -1,7 +1,6 @@
 # Use dev machine
 
-# Start poetry shell
-poetry shell
+# Install poetry
 poetry install
 
 # Update docs
@@ -9,12 +8,10 @@ pdoc3 --html --output-dir docs akips --force
 
 # Make sure you have rolled the version in pyproject.toml and __init__.py
 
-# Run poetry tests
+# Run poetry tests, proceed if no errors
 poetry run pytest -v -s tests
 
-# Proceed if no errors
-
-# Merge into master
+# Merge into master via pull request
 
 # Publish to pypi
 poetry build

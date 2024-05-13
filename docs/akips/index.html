@@ -29,7 +29,7 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#39;&#39;&#39; This akips python module provides a simple way for python scripts to interact with 
+<pre><code class="python">&#39;&#39;&#39; This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface. &#39;&#39;&#39;
 __version__ = &#39;0.2.2&#39;
 
@@ -149,7 +149,8 @@ class AKIPS:
                     # epoch fields are in the server&#39;s timezone
                     name = match.group(1)
                     attribute = match.group(3)
-                    event_start = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    event_start = datetime.fromtimestamp(
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                     if name not in data:
                         # populate a starting point for this device
                         data[name] = {
@@ -162,31 +163,24 @@ class AKIPS:
                         data[name][&#39;child&#39;] = match.group(2),
                         data[name][&#39;ping_state&#39;] = match.group(5)
                         data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                         data[name][&#39;ip4addr&#39;] = match.group(8)
                     elif attribute == &#39;SNMP.snmpState&#39;:
                         data[name][&#39;child&#39;] = match.group(2),
                         data[name][&#39;snmp_state&#39;] = match.group(5)
                         data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                         data[name][&#39;ip4addr&#39;] = None
                     if event_start &lt; data[name][&#39;event_start&#39;]:
                         data[name][&#39;event_start&#39;] = event_start
             logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
             logger.debug(&#34;data: {}&#34;.format(data))
-
-        # for name in data:
-        #     # Fill in the unreported gaps so we have ping4 and snmp up/down data
-        #     if data[name][&#39;ping_state&#39;] == &#39;n/a&#39;:
-        #         ping_status = self.get_status(device=name, child=&#39;ping4&#39;, attribute=&#39;PING.icmpState&#39;)
-
-        #     if data[name][&#39;snmp_state&#39;] == &#39;n/a&#39;:
-        #         snmp_status = self.get_status(device=name, child=&#39;sys&#39;, attribute=&#39;SNMP.snmpState&#39;)
-
-        # ideal data return based on unreachable device report
-        # Device, Ping4 (state,IPv4), SNMP (state,IP), Last Change (... ago), Location, Description
 
         return data
 
@@ -264,7 +258,8 @@ class AKIPS:
 
     # Time-series commands
 
-    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[], get_dict=True):
+    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
+                   group_filter=&#39;any&#39;, groups=[]):
         &#39;&#39;&#39; Pull a series of values.  Command syntax:
             cseries avg
             time {time filter} type parent child attribute
@@ -290,7 +285,8 @@ class AKIPS:
             return csv_to_list
         return None
 
-    def get_aggregate(self, operator=&#39;avg&#39;, interval=&#39;300&#39;, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+    def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
+                      operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
         &#39;&#39;&#39; Aggregate stats in intervals over a period of time. Command syntax:
             aggregate interval {avg|total seconds}
             time {time filter} type parent child attribute
@@ -311,6 +307,25 @@ class AKIPS:
         return None
 
     # Base operations
+
+    def _parse_enum(self, enum_string):
+        &#39;&#39;&#39; Attributes with a type of enum return five values separated by commas. &#39;&#39;&#39;
+        match = re.match(r&#39;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#39;, enum_string)
+        if match:
+            entry = {
+                &#39;number&#39;: match.group(1),       # list number (from MIB)
+                &#39;value&#39;: match.group(2),        # text value (from MIB)
+                # &#39;created&#39;: match.group(3),      # time created (epoch timestamp)
+                # &#39;modified&#39;: match.group(4),     # time modified (epoch timestamp)
+                &#39;description&#39;: match.group(5)   # child description
+            }
+            entry[&#39;created&#39;] = datetime.fromtimestamp(
+                int(match.group(3)), tz=pytz.timezone(self.server_timezone))
+            entry[&#39;modified&#39;] = datetime.fromtimestamp(
+                int(match.group(4)), tz=pytz.timezone(self.server_timezone))
+            return entry
+        else:
+            raise AkipsError(message=f&#39;Not a ENUM type value: {enum_string}&#39;)
 
     def _get(self, section=&#39;/api-db/&#39;, params=None, timeout=30):
         &#39;&#39;&#39; Call HTTP GET against the AKiPS server &#39;&#39;&#39;
@@ -474,7 +489,8 @@ class AKIPS:
                     # epoch fields are in the server&#39;s timezone
                     name = match.group(1)
                     attribute = match.group(3)
-                    event_start = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    event_start = datetime.fromtimestamp(
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                     if name not in data:
                         # populate a starting point for this device
                         data[name] = {
@@ -487,31 +503,24 @@ class AKIPS:
                         data[name][&#39;child&#39;] = match.group(2),
                         data[name][&#39;ping_state&#39;] = match.group(5)
                         data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                         data[name][&#39;ip4addr&#39;] = match.group(8)
                     elif attribute == &#39;SNMP.snmpState&#39;:
                         data[name][&#39;child&#39;] = match.group(2),
                         data[name][&#39;snmp_state&#39;] = match.group(5)
                         data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                         data[name][&#39;ip4addr&#39;] = None
                     if event_start &lt; data[name][&#39;event_start&#39;]:
                         data[name][&#39;event_start&#39;] = event_start
             logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
             logger.debug(&#34;data: {}&#34;.format(data))
-
-        # for name in data:
-        #     # Fill in the unreported gaps so we have ping4 and snmp up/down data
-        #     if data[name][&#39;ping_state&#39;] == &#39;n/a&#39;:
-        #         ping_status = self.get_status(device=name, child=&#39;ping4&#39;, attribute=&#39;PING.icmpState&#39;)
-
-        #     if data[name][&#39;snmp_state&#39;] == &#39;n/a&#39;:
-        #         snmp_status = self.get_status(device=name, child=&#39;sys&#39;, attribute=&#39;SNMP.snmpState&#39;)
-
-        # ideal data return based on unreachable device report
-        # Device, Ping4 (state,IPv4), SNMP (state,IP), Last Change (... ago), Location, Description
 
         return data
 
@@ -589,7 +598,8 @@ class AKIPS:
 
     # Time-series commands
 
-    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[], get_dict=True):
+    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
+                   group_filter=&#39;any&#39;, groups=[]):
         &#39;&#39;&#39; Pull a series of values.  Command syntax:
             cseries avg
             time {time filter} type parent child attribute
@@ -615,7 +625,8 @@ class AKIPS:
             return csv_to_list
         return None
 
-    def get_aggregate(self, operator=&#39;avg&#39;, interval=&#39;300&#39;, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+    def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
+                      operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
         &#39;&#39;&#39; Aggregate stats in intervals over a period of time. Command syntax:
             aggregate interval {avg|total seconds}
             time {time filter} type parent child attribute
@@ -636,6 +647,25 @@ class AKIPS:
         return None
 
     # Base operations
+
+    def _parse_enum(self, enum_string):
+        &#39;&#39;&#39; Attributes with a type of enum return five values separated by commas. &#39;&#39;&#39;
+        match = re.match(r&#39;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#39;, enum_string)
+        if match:
+            entry = {
+                &#39;number&#39;: match.group(1),       # list number (from MIB)
+                &#39;value&#39;: match.group(2),        # text value (from MIB)
+                # &#39;created&#39;: match.group(3),      # time created (epoch timestamp)
+                # &#39;modified&#39;: match.group(4),     # time modified (epoch timestamp)
+                &#39;description&#39;: match.group(5)   # child description
+            }
+            entry[&#39;created&#39;] = datetime.fromtimestamp(
+                int(match.group(3)), tz=pytz.timezone(self.server_timezone))
+            entry[&#39;modified&#39;] = datetime.fromtimestamp(
+                int(match.group(4)), tz=pytz.timezone(self.server_timezone))
+            return entry
+        else:
+            raise AkipsError(message=f&#39;Not a ENUM type value: {enum_string}&#39;)
 
     def _get(self, section=&#39;/api-db/&#39;, params=None, timeout=30):
         &#39;&#39;&#39; Call HTTP GET against the AKiPS server &#39;&#39;&#39;
@@ -679,7 +709,7 @@ class AKIPS:
 <h3>Methods</h3>
 <dl>
 <dt id="akips.AKIPS.get_aggregate"><code class="name flex">
-<span>def <span class="ident">get_aggregate</span></span>(<span>self, operator='avg', interval='300', period='last1h', device='*', attribute='*', group_filter='any', groups=[])</span>
+<span>def <span class="ident">get_aggregate</span></span>(<span>self, period='last1h', device='*', attribute='*', operator='avg', interval='300', group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Aggregate stats in intervals over a period of time. Command syntax:
@@ -690,7 +720,8 @@ time {time filter} type parent child attribute
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_aggregate(self, operator=&#39;avg&#39;, interval=&#39;300&#39;, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+<pre><code class="python">def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
+                  operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
     &#39;&#39;&#39; Aggregate stats in intervals over a period of time. Command syntax:
         aggregate interval {avg|total seconds}
         time {time filter} type parent child attribute
@@ -908,7 +939,7 @@ time {time filter} [{parent regex} {child regex}
 </details>
 </dd>
 <dt id="akips.AKIPS.get_series"><code class="name flex">
-<span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', device='*', attribute='*', group_filter='any', groups=[], get_dict=True)</span>
+<span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', device='*', attribute='*', get_dict=True, group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Pull a series of values.
@@ -920,7 +951,8 @@ time {time filter} type parent child attribute
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[], get_dict=True):
+<pre><code class="python">def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
+               group_filter=&#39;any&#39;, groups=[]):
     &#39;&#39;&#39; Pull a series of values.  Command syntax:
         cseries avg
         time {time filter} type parent child attribute
@@ -985,7 +1017,8 @@ time {time filter} type parent child attribute
                 # epoch fields are in the server&#39;s timezone
                 name = match.group(1)
                 attribute = match.group(3)
-                event_start = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                event_start = datetime.fromtimestamp(
+                    int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                 if name not in data:
                     # populate a starting point for this device
                     data[name] = {
@@ -998,31 +1031,24 @@ time {time filter} type parent child attribute
                     data[name][&#39;child&#39;] = match.group(2),
                     data[name][&#39;ping_state&#39;] = match.group(5)
                     data[name][&#39;index&#39;] = match.group(4)
-                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
+                        int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                     data[name][&#39;ip4addr&#39;] = match.group(8)
                 elif attribute == &#39;SNMP.snmpState&#39;:
                     data[name][&#39;child&#39;] = match.group(2),
                     data[name][&#39;snmp_state&#39;] = match.group(5)
                     data[name][&#39;index&#39;] = match.group(4)
-                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
+                        int(match.group(6)), tz=pytz.timezone(self.server_timezone))
+                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
                     data[name][&#39;ip4addr&#39;] = None
                 if event_start &lt; data[name][&#39;event_start&#39;]:
                     data[name][&#39;event_start&#39;] = event_start
         logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
         logger.debug(&#34;data: {}&#34;.format(data))
-
-    # for name in data:
-    #     # Fill in the unreported gaps so we have ping4 and snmp up/down data
-    #     if data[name][&#39;ping_state&#39;] == &#39;n/a&#39;:
-    #         ping_status = self.get_status(device=name, child=&#39;ping4&#39;, attribute=&#39;PING.icmpState&#39;)
-
-    #     if data[name][&#39;snmp_state&#39;] == &#39;n/a&#39;:
-    #         snmp_status = self.get_status(device=name, child=&#39;sys&#39;, attribute=&#39;SNMP.snmpState&#39;)
-
-    # ideal data return based on unreachable device report
-    # Device, Ping4 (state,IPv4), SNMP (state,IP), Last Change (... ago), Location, Description
 
     return data</code></pre>
 </details>
