@@ -1,4 +1,5 @@
-''' Base module '''
+''' This akips python module provides a simple way for python scripts to interact with 
+the AKiPS Network Monitoring Software Web API interface. '''
 __version__ = '0.2.2'
 
 import io
