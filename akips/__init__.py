@@ -1,4 +1,4 @@
-''' This akips python module provides a simple way for python scripts to interact with 
+''' This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface. '''
 __version__ = '0.2.2'
 
@@ -292,10 +292,8 @@ class AKIPS:
                 # 'modified': match.group(4),     # time modified (epoch timestamp)
                 'description': match.group(5)   # child description
             }
-            entry['created'] = datetime.fromtimestamp(int(match.group(3)), 
-                                                        tz=pytz.timezone(self.server_timezone))
-            entry['modified'] = datetime.fromtimestamp(int(match.group(4)), 
-                                                        tz=pytz.timezone(self.server_timezone))
+            entry['created'] = datetime.fromtimestamp(int(match.group(3)), tz=pytz.timezone(self.server_timezone))
+            entry['modified'] = datetime.fromtimestamp(int(match.group(4)), tz=pytz.timezone(self.server_timezone))
             return entry
         else:
             raise AkipsError(message=f'Not a ENUM type value: {enum_string}')
