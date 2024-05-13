@@ -68,3 +68,15 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
         series = api.get_series(attribute='WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients')
         self.assertEqual(series[0]['2024-02-21 09:10'], '0')
         self.assertEqual(series[1]['2024-02-21 09:10'], '2')
+
+    @patch('requests.Session.get')
+    def test_get_aggregate(self, session_mock: MagicMock):
+        r_text = """30,31,30,27,27,28,28,28,30,29,29,28,27,29,30,29,28,28,27,28,26,25,25,25,25,26,24,24,24,21,23,24,23,24,22,23,25,29,30,31,34,34,34,34,36,33,31,31,32,32,33,29,29,30,29,28,27,31,31,31,30,28,28,29,28,26,26,25,26,26,25,25,24,23,23,22,20,13,12,12,11,11,13,12,11,11,11,9,9,8,8,10,10,10,9,9,7,7,8,10,10,8,9,11,12,12,8,8,8,8,9,7,7,7,6,6,7,7,7,8,7,7,8,8,6,6,6,6,6,7,7,7,6,7,6,6,6,6,6,6,6,6,7,7,7,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,8,7,7,6,6,6,6,6,6,6,6,7,7,7,7,6,7,7,7,7,6,6,7,6,7,6,6,7,6,6,6,6,7,7,7,7,6,6,6,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,6,6,6,6,6,6,6,6,7,7,7,6,7,7,7,7,6,6,6,6,6,6,6,6,7,7,7,7,7,7,7,12,13,12,13,14,14,15,14,14,14,19,21,22,22,23,23,25,24,23,23,23,23
+"""
+        session_mock.return_value.ok = True
+        session_mock.return_value.status_code = 200
+        session_mock.return_value.text = r_text
+
+        api = AKIPS('127.0.0.1')
+        series = api.get_aggregate(attribute='WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients')
+        self.assertEqual(series[1], '31')
