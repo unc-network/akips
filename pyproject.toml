@@ -12,10 +12,10 @@ python = ">=3.8.1,<4.0"
 requests = ">=2.31"
 pytz = "*"
 
-[tool.poetry.dev-dependencies]
-pytest = "^7.4"
-flake8 = "^6.1"
-pdoc3 = "0.10.0"
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+flake8 = "^7.0.0"
+pdoc3 = "^0.10.0"
 
 [build-system]
 requires = ["poetry-core"]
