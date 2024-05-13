@@ -40,7 +40,7 @@ for name, fields in devices.items():
 ```
 
 ## API Documentation
-[API Documentation](https://github.com/wwhitaker/akips/docs/akips/index.html)
+[API Documentation](https://wwhitaker.github.io/akips/docs/akips/index.html)
 
 ## Bugs/Requests
 
