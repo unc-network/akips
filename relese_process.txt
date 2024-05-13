@@ -1,0 +1,17 @@
+# Use dev machine
+
+# Make sure you have rolled the version in pyproject.toml and __init__.py
+
+# Run poetry steps
+poetry shell
+poetry install
+poetry run pytest -v -s tests
+
+# Proceed if no errors
+
+# Merge into master
+
+# Publish to pypi
+poetry publish
+
+# Create a tag for the version
