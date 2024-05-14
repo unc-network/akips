@@ -3,18 +3,21 @@
 # Install poetry
 poetry install
 
+# Run quality checks
+poetry run pylama .
+poetry run pytest -v -s tests
+
+# Fix errors before proceeding.
+
 # Update docs
 pdoc3 --html --output-dir docs akips --force
 
 # Make sure you have rolled the version in pyproject.toml and __init__.py
 
-# Run poetry tests, proceed if no errors
-poetry run pytest -v -s tests
-
 # Merge into master via pull request
+
+# Create a tag and release for the version
 
 # Publish to pypi
 poetry build
 poetry publish
-
-# Create a tag for the version

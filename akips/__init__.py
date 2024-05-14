@@ -32,9 +32,12 @@ class AKIPS:
             requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
 
     def get_devices(self, group_filter='any', groups=[]):
-        """ 
+        """
         Pull a list of key attributes for multiple devices.  Can be filtered by group
-        but the default is all devices. 
+        but the default is all devices.
+
+        AKiPS command syntax:
+
         """
         attributes = [
             'ip4addr',
@@ -68,8 +71,11 @@ class AKIPS:
         return None
 
     def get_device(self, name):
-        """ 
+        """
         Pull the entire configuration for a single device.
+
+        AKiPS command syntax:
+
         """
         params = {
             'cmds': f'mget * {name} * *'
@@ -99,12 +105,12 @@ class AKIPS:
         return None
 
     def get_device_by_ip(self, ipaddr, use_cache=True):
-        """ 
-        Devices may have additional IP addresses recorded in akips, but only one primary 
-        name and address.  Search for a device name by an alternate IP address.  This makes 
-        use of a special site script and not the normal web API.
+        """
+        Devices may have additional IP addresses recorded in akips, but only one primary
+        name and address.  Search for a device name by an alternate IP address.
 
-        AKiPS user "api-rw" is required to run api scripts.
+        AKiPS user "api-rw" is required to run api scripts.  This call makes use of a
+        special site script and not the normal web API commands.
         """
         params = {
             'function': 'web_find_device_by_ip',
@@ -123,7 +129,12 @@ class AKIPS:
         return None
 
     def get_unreachable(self):
-        """ Pull a list of unreachable IPv4 ping devices """
+        """
+        Pull a list of unreachable IPv4 ping devices
+
+        AKiPS command syntax:
+
+        """
         params = {
             'cmds': 'mget * * * /PING.icmpState|SNMP.snmpState/ value /down/',
         }
@@ -173,7 +184,12 @@ class AKIPS:
         return data
 
     def get_group_membership(self):
-        """ Pull a list of device to group memberships """
+        """
+        Pull a list of device to group memberships
+
+        AKiPS command syntax:
+
+        """
         params = {
             'cmds': 'mgroup device *',
         }
@@ -193,14 +209,24 @@ class AKIPS:
         return None
 
     def get_maintenance_mode(self):
-        """ Pull a list of devices in maintenance mode """
+        """
+        Pull a list of devices in maintenance mode
+
+        AKiPS command syntax:
+
+        """
         # params = {
         #     'cmds': 'mget * * any group maintenance_mode',
         # }
         pass
 
     def set_maintenance_mode(self, device_name, mode='True'):
-        """ Set maintenance mode on or off for a device """
+        """
+        Set maintenance mode on or off for a device
+
+        AKiPS user "api-rw" is required to run api scripts.  This call makes use of a
+        special site script and not the normal web API commands.
+        """
         # params = {
         #     'function': 'web_manual_grouping',
         #     'type': 'device',
@@ -210,16 +236,24 @@ class AKIPS:
         pass
 
     def get_status(self, device='*', child='*', attribute='*'):
-        """ Pull the status values we are most interested in """
+        """
+        Pull the status values we are most interested in
+
+        AKiPS command syntax:
+
+        """
         pass
 
     def get_events(self, event_type='all', period='last1h'):
-        """ Pull a list of events.  Command syntax:
+        """
+        Pull a list of events.
+
+        AKiPS command syntax:
             mget event {all,critical,enum,threshold,uptime}
             time {time filter} [{parent regex} {child regex}
             {attribute regex}] [profile {profile name}]
-            [any|all|not group {group name} ...] """
-
+            [any|all|not group {group name} ...]
+        """
         params = {
             'cmds': f'mget event {event_type} time {period}'
         }
@@ -248,10 +282,14 @@ class AKIPS:
 
     def get_series(self, period='last1h', device='*', attribute='*', get_dict=True,
                    group_filter='any', groups=[]):
-        """ Pull a series of values.  Command syntax:
+        """
+        Pull a series of counter values.
+
+        AKiPS command syntax:
             cseries avg
             time {time filter} type parent child attribute
-            [any|all|not group {group name} ...] """
+            [any|all|not group {group name} ...]
+        """
         params = {
             'cmds': f'cseries avg time {period} * {device} * {attribute}'
         }
@@ -275,10 +313,14 @@ class AKIPS:
 
     def get_aggregate(self, period='last1h', device='*', attribute='*',
                       operator='avg', interval='300', group_filter='any', groups=[]):
-        """ Aggregate stats in intervals over a period of time. Command syntax:
+        """
+        Aggregate counter values in intervals over a period of time.
+
+        AKiPS command syntax:
             aggregate interval {avg|total seconds}
             time {time filter} type parent child attribute
-            [any|all|not group {group name} ...] """
+            [any|all|not group {group name} ...]
+        """
         params = {
             'cmds': f'aggregate interval {operator} {interval} time {period} * {device} * {attribute}'
         }
@@ -297,7 +339,9 @@ class AKIPS:
     # Base operations
 
     def _parse_enum(self, enum_string):
-        """ Attributes with a type of enum return five values separated by commas. """
+        """
+        Attributes with a type of enum return five values separated by commas.
+        """
         match = re.match(r'^(\S*),(\S*),(\S*),(\S*),(\S*)$', enum_string)
         if match:
             entry = {
@@ -316,7 +360,9 @@ class AKIPS:
             raise AkipsError(message=f'Not a ENUM type value: {enum_string}')
 
     def _get(self, section='/api-db/', params=None, timeout=30):
-        """ Call HTTP GET against the AKiPS server """
+        """
+        Call HTTP GET against the AKiPS server
+        """
         server_url = 'https://' + self.server + section
         params['username'] = self.username
         params['password'] = self.password
