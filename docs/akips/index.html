@@ -31,7 +31,7 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 </summary>
 <pre><code class="python">&#34;&#34;&#34; This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface. &#34;&#34;&#34;
-__version__ = &#39;0.2.2&#39;
+__version__ = &#39;0.2.3&#39;
 
 import io
 import re
@@ -50,12 +50,13 @@ logger = logging.getLogger(__name__)
 class AKIPS:
     &#34;&#34;&#34; Class to handle interactions with AKiPS API &#34;&#34;&#34;
 
-    def __init__(self, server, username=&#39;api-ro&#39;, password=None, verify=True):
+    def __init__(self, server, username=&#39;api-ro&#39;, password=None,
+                 verify=True, timezone=&#39;America/New_York&#39;):
         self.server = server
         self.username = username
         self.password = password
         self.verify = verify
-        self.server_timezone = &#39;America/New_York&#39;
+        self.server_timezone = timezone
         self.session = requests.Session()
 
         if not verify:
@@ -377,7 +378,7 @@ class AKIPS:
 <dl>
 <dt id="akips.AKIPS"><code class="flex name class">
 <span>class <span class="ident">AKIPS</span></span>
-<span>(</span><span>server, username='api-ro', password=None, verify=True)</span>
+<span>(</span><span>server, username='api-ro', password=None, verify=True, timezone='America/New_York')</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Class to handle interactions with AKiPS API</p></div>
@@ -388,12 +389,13 @@ class AKIPS:
 <pre><code class="python">class AKIPS:
     &#34;&#34;&#34; Class to handle interactions with AKiPS API &#34;&#34;&#34;
 
-    def __init__(self, server, username=&#39;api-ro&#39;, password=None, verify=True):
+    def __init__(self, server, username=&#39;api-ro&#39;, password=None,
+                 verify=True, timezone=&#39;America/New_York&#39;):
         self.server = server
         self.username = username
         self.password = password
         self.verify = verify
-        self.server_timezone = &#39;America/New_York&#39;
+        self.server_timezone = timezone
         self.session = requests.Session()
 
         if not verify:
