@@ -37,9 +37,9 @@ class AKIPS:
         but the default is all devices.
 
         AKiPS command syntax:
-            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...
+                [any|all|not group {group name} ...`
         """
         attributes = [
             'ip4addr',
@@ -77,9 +77,9 @@ class AKIPS:
         Pull the entire configuration for a single device.
 
         AKiPS command syntax:
-            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...
+                [any|all|not group {group name} ...`
         """
         params = {
             'cmds': f'mget * {name} * *'
@@ -137,9 +137,9 @@ class AKIPS:
         Pull a list of unreachable IPv4 ping devices
 
         AKiPS command syntax:
-            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...
+                [any|all|not group {group name} ...`
         """
         params = {
             'cmds': 'mget * * * /PING.icmpState|SNMP.snmpState/ value /down/',
@@ -195,8 +195,8 @@ class AKIPS:
         and all groups (including the special 'maintenance_mode' group).
 
         AKiPS command syntax:
-            mgroup {type} [{parent regex}]
-                [any|all|not group {group name} ...]
+            `mgroup {type} [{parent regex}]
+                [any|all|not group {group name} ...]`
         """
         params = {
             'cmds': f'mgroup {device} *',
@@ -252,9 +252,9 @@ class AKIPS:
         Pull the status values we are most interested in
 
         AKiPS command syntax:
-            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...
+                [any|all|not group {group name} ...`
         """
         pass
 
@@ -263,10 +263,10 @@ class AKIPS:
         Pull a list of events.
 
         AKiPS command syntax:
-            mget event {all,critical,enum,threshold,uptime}
+            `mget event {all,critical,enum,threshold,uptime}
             time {time filter} [{parent regex} {child regex}
             {attribute regex}] [profile {profile name}]
-            [any|all|not group {group name} ...]
+            [any|all|not group {group name} ...]`
         """
         params = {
             'cmds': f'mget event {event_type} time {period}'
@@ -300,9 +300,9 @@ class AKIPS:
         Pull a series of counter values.
 
         AKiPS command syntax:
-            cseries avg
+            `cseries avg
             time {time filter} type parent child attribute
-            [any|all|not group {group name} ...]
+            [any|all|not group {group name} ...]`
         """
         params = {
             'cmds': f'cseries avg time {period} * {device} * {attribute}'
@@ -331,9 +331,9 @@ class AKIPS:
         Aggregate counter values in intervals over a period of time.
 
         AKiPS command syntax:
-            aggregate interval {avg|total seconds}
+            `aggregate interval {avg|total seconds}
             time {time filter} type parent child attribute
-            [any|all|not group {group name} ...]
+            [any|all|not group {group name} ...]`
         """
         params = {
             'cmds': f'aggregate interval {operator} {interval} time {period} * {device} * {attribute}'
