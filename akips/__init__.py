@@ -37,7 +37,9 @@ class AKIPS:
         but the default is all devices.
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         """
         attributes = [
             'ip4addr',
@@ -75,7 +77,9 @@ class AKIPS:
         Pull the entire configuration for a single device.
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         """
         params = {
             'cmds': f'mget * {name} * *'
@@ -133,7 +137,9 @@ class AKIPS:
         Pull a list of unreachable IPv4 ping devices
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         """
         params = {
             'cmds': 'mget * * * /PING.icmpState|SNMP.snmpState/ value /down/',
@@ -183,16 +189,21 @@ class AKIPS:
 
         return data
 
-    def get_group_membership(self):
+    def get_group_membership(self, device='*', group_filter='any', groups=[]):
         """
-        Pull a list of device to group memberships
+        Pull a list of device names to group memberships.  Defaults to all devices
+        and all groups (including the special 'maintenance_mode' group).
 
         AKiPS command syntax:
-
+            mgroup {type} [{parent regex}]
+                [any|all|not group {group name} ...]
         """
         params = {
-            'cmds': 'mgroup device *',
+            'cmds': f'mgroup {device} *',
         }
+        if groups:
+            group_list = " ".join(groups)
+            params['cmds'] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
             data = {}
@@ -207,18 +218,6 @@ class AKIPS:
             logger.debug("Found {} device and group mappings in akips".format(len(data.keys())))
             return data
         return None
-
-    def get_maintenance_mode(self):
-        """
-        Pull a list of devices in maintenance mode
-
-        AKiPS command syntax:
-
-        """
-        # params = {
-        #     'cmds': 'mget * * any group maintenance_mode',
-        # }
-        pass
 
     def set_maintenance_mode(self, device_name, mode='True'):
         """

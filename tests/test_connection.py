@@ -92,3 +92,17 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
         api = AKIPS('127.0.0.1')
         device_name = api.get_device_by_ip(ipaddr='10.194.200.65')
         self.assertEqual(device_name, 'cisco-sw1')
+
+    @patch('requests.Session.get')
+    def test_get_group_membership(self, session_mock: MagicMock):
+        r_text = """10.10.10.146 = admin,Cisco,maintenance_mode,Not-Core,OpsCenter,poll_oid_10,user
+10.10.20.31 = Security,admin,maintenance_mode,Not-Core,OpsCenter,PaloAlto,user
+10.10.30.26 = admin,Brocade,maintenance_mode,Not-Core,OpsCenter,Ungrouped,user
+""" # noqa
+        session_mock.return_value.ok = True
+        session_mock.return_value.status_code = 200
+        session_mock.return_value.text = r_text
+
+        api = AKIPS('127.0.0.1')
+        list = api.get_group_membership(groups=['maintenance_mode'])
+        self.assertEqual(list['10.10.10.146'][0], 'admin')
