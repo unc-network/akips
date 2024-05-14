@@ -70,7 +70,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         attributes = [
             &#39;ip4addr&#39;,
@@ -110,7 +110,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
@@ -170,7 +170,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
@@ -285,7 +285,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         pass
 
@@ -488,7 +488,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         attributes = [
             &#39;ip4addr&#39;,
@@ -528,7 +528,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
@@ -588,7 +588,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
@@ -703,7 +703,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         pass
 
@@ -905,7 +905,7 @@ time {time filter} type parent child attribute
 <p>AKiPS command syntax:
 <code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...</code></p></div>
+[any|all|not group {group name} ...]</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -917,7 +917,7 @@ time {time filter} type parent child attribute
     AKiPS command syntax:
         `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
             [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...`
+            [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {
         &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
@@ -996,7 +996,7 @@ but the default is all devices.</p>
 <p>AKiPS command syntax:
 <code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...</code></p></div>
+[any|all|not group {group name} ...]</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1009,7 +1009,7 @@ but the default is all devices.</p>
     AKiPS command syntax:
         `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
             [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...`
+            [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     attributes = [
         &#39;ip4addr&#39;,
@@ -1190,7 +1190,7 @@ time {time filter} type parent child attribute
 <p>AKiPS command syntax:
 <code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...</code></p></div>
+[any|all|not group {group name} ...]</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1202,7 +1202,7 @@ time {time filter} type parent child attribute
     AKiPS command syntax:
         `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
             [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...`
+            [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     pass</code></pre>
 </details>
@@ -1215,7 +1215,7 @@ time {time filter} type parent child attribute
 <p>AKiPS command syntax:
 <code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...</code></p></div>
+[any|all|not group {group name} ...]</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1227,7 +1227,7 @@ time {time filter} type parent child attribute
     AKiPS command syntax:
         `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
             [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...`
+            [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {
         &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,

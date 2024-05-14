@@ -10,7 +10,7 @@ poetry run pytest -v -s tests
 # Fix errors before proceeding.
 
 # Update docs
-pdoc3 --html --output-dir docs akips --force
+poetry run pdoc3 --html --output-dir docs akips --force
 
 # Make sure you have rolled the version in pyproject.toml and __init__.py
 
