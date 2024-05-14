@@ -63,12 +63,14 @@ class AKIPS:
             requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
 
     def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
-        &#34;&#34;&#34; 
+        &#34;&#34;&#34;
         Pull a list of key attributes for multiple devices.  Can be filtered by group
-        but the default is all devices. 
+        but the default is all devices.
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         attributes = [
             &#39;ip4addr&#39;,
@@ -102,11 +104,13 @@ class AKIPS:
         return None
 
     def get_device(self, name):
-        &#34;&#34;&#34; 
+        &#34;&#34;&#34;
         Pull the entire configuration for a single device.
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
@@ -136,11 +140,11 @@ class AKIPS:
         return None
 
     def get_device_by_ip(self, ipaddr, use_cache=True):
-        &#34;&#34;&#34; 
-        Devices may have additional IP addresses recorded in akips, but only one primary 
+        &#34;&#34;&#34;
+        Devices may have additional IP addresses recorded in akips, but only one primary
         name and address.  Search for a device name by an alternate IP address.
 
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a 
+        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
         params = {
@@ -162,9 +166,11 @@ class AKIPS:
     def get_unreachable(self):
         &#34;&#34;&#34;
         Pull a list of unreachable IPv4 ping devices
-        
-        AKiPS command syntax:
 
+        AKiPS command syntax:
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
@@ -214,16 +220,21 @@ class AKIPS:
 
         return data
 
-    def get_group_membership(self):
+    def get_group_membership(self, device=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
         &#34;&#34;&#34;
-        Pull a list of device to group memberships
-        
-        AKiPS command syntax:
+        Pull a list of device names to group memberships.  Defaults to all devices
+        and all groups (including the special &#39;maintenance_mode&#39; group).
 
+        AKiPS command syntax:
+            mgroup {type} [{parent regex}]
+                [any|all|not group {group name} ...]
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: &#39;mgroup device *&#39;,
+            &#39;cmds&#39;: f&#39;mgroup {device} *&#39;,
         }
+        if groups:
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = {}
@@ -239,23 +250,11 @@ class AKIPS:
             return data
         return None
 
-    def get_maintenance_mode(self):
-        &#34;&#34;&#34;
-        Pull a list of devices in maintenance mode
-         
-        AKiPS command syntax:
-
-        &#34;&#34;&#34;
-        # params = {
-        #     &#39;cmds&#39;: &#39;mget * * any group maintenance_mode&#39;,
-        # }
-        pass
-
     def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
         &#34;&#34;&#34;
         Set maintenance mode on or off for a device
-        
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a 
+
+        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
         # params = {
@@ -277,8 +276,8 @@ class AKIPS:
 
     def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
         &#34;&#34;&#34;
-        Pull a list of events.  
-        
+        Pull a list of events.
+
         AKiPS command syntax:
             mget event {all,critical,enum,threshold,uptime}
             time {time filter} [{parent regex} {child regex}
@@ -313,9 +312,9 @@ class AKIPS:
 
     def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
                    group_filter=&#39;any&#39;, groups=[]):
-        &#34;&#34;&#34; 
-        Pull a series of counter values.  
-        
+        &#34;&#34;&#34;
+        Pull a series of counter values.
+
         AKiPS command syntax:
             cseries avg
             time {time filter} type parent child attribute
@@ -344,8 +343,8 @@ class AKIPS:
 
     def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
                       operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
-        &#34;&#34;&#34; 
-        Aggregate counter values in intervals over a period of time. 
+        &#34;&#34;&#34;
+        Aggregate counter values in intervals over a period of time.
 
         AKiPS command syntax:
             aggregate interval {avg|total seconds}
@@ -467,12 +466,14 @@ class AKIPS:
             requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
 
     def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
-        &#34;&#34;&#34; 
+        &#34;&#34;&#34;
         Pull a list of key attributes for multiple devices.  Can be filtered by group
-        but the default is all devices. 
+        but the default is all devices.
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         attributes = [
             &#39;ip4addr&#39;,
@@ -506,11 +507,13 @@ class AKIPS:
         return None
 
     def get_device(self, name):
-        &#34;&#34;&#34; 
+        &#34;&#34;&#34;
         Pull the entire configuration for a single device.
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
@@ -540,11 +543,11 @@ class AKIPS:
         return None
 
     def get_device_by_ip(self, ipaddr, use_cache=True):
-        &#34;&#34;&#34; 
-        Devices may have additional IP addresses recorded in akips, but only one primary 
+        &#34;&#34;&#34;
+        Devices may have additional IP addresses recorded in akips, but only one primary
         name and address.  Search for a device name by an alternate IP address.
 
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a 
+        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
         params = {
@@ -566,9 +569,11 @@ class AKIPS:
     def get_unreachable(self):
         &#34;&#34;&#34;
         Pull a list of unreachable IPv4 ping devices
-        
-        AKiPS command syntax:
 
+        AKiPS command syntax:
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         params = {
             &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
@@ -618,16 +623,21 @@ class AKIPS:
 
         return data
 
-    def get_group_membership(self):
+    def get_group_membership(self, device=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
         &#34;&#34;&#34;
-        Pull a list of device to group memberships
-        
-        AKiPS command syntax:
+        Pull a list of device names to group memberships.  Defaults to all devices
+        and all groups (including the special &#39;maintenance_mode&#39; group).
 
+        AKiPS command syntax:
+            mgroup {type} [{parent regex}]
+                [any|all|not group {group name} ...]
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: &#39;mgroup device *&#39;,
+            &#39;cmds&#39;: f&#39;mgroup {device} *&#39;,
         }
+        if groups:
+            group_list = &#34; &#34;.join(groups)
+            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = {}
@@ -643,23 +653,11 @@ class AKIPS:
             return data
         return None
 
-    def get_maintenance_mode(self):
-        &#34;&#34;&#34;
-        Pull a list of devices in maintenance mode
-         
-        AKiPS command syntax:
-
-        &#34;&#34;&#34;
-        # params = {
-        #     &#39;cmds&#39;: &#39;mget * * any group maintenance_mode&#39;,
-        # }
-        pass
-
     def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
         &#34;&#34;&#34;
         Set maintenance mode on or off for a device
-        
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a 
+
+        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
         # params = {
@@ -681,8 +679,8 @@ class AKIPS:
 
     def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
         &#34;&#34;&#34;
-        Pull a list of events.  
-        
+        Pull a list of events.
+
         AKiPS command syntax:
             mget event {all,critical,enum,threshold,uptime}
             time {time filter} [{parent regex} {child regex}
@@ -717,9 +715,9 @@ class AKIPS:
 
     def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
                    group_filter=&#39;any&#39;, groups=[]):
-        &#34;&#34;&#34; 
-        Pull a series of counter values.  
-        
+        &#34;&#34;&#34;
+        Pull a series of counter values.
+
         AKiPS command syntax:
             cseries avg
             time {time filter} type parent child attribute
@@ -748,8 +746,8 @@ class AKIPS:
 
     def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
                       operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
-        &#34;&#34;&#34; 
-        Aggregate counter values in intervals over a period of time. 
+        &#34;&#34;&#34;
+        Aggregate counter values in intervals over a period of time.
 
         AKiPS command syntax:
             aggregate interval {avg|total seconds}
@@ -834,7 +832,7 @@ class AKIPS:
 <span>def <span class="ident">get_aggregate</span></span>(<span>self, period='last1h', device='*', attribute='*', operator='avg', interval='300', group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Aggregate counter values in intervals over a period of time. </p>
+<div class="desc"><p>Aggregate counter values in intervals over a period of time.</p>
 <p>AKiPS command syntax:
 aggregate interval {avg|total seconds}
 time {time filter} type parent child attribute
@@ -845,8 +843,8 @@ time {time filter} type parent child attribute
 </summary>
 <pre><code class="python">def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
                   operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
-    &#34;&#34;&#34; 
-    Aggregate counter values in intervals over a period of time. 
+    &#34;&#34;&#34;
+    Aggregate counter values in intervals over a period of time.
 
     AKiPS command syntax:
         aggregate interval {avg|total seconds}
@@ -874,17 +872,22 @@ time {time filter} type parent child attribute
 </code></dt>
 <dd>
 <div class="desc"><p>Pull the entire configuration for a single device.</p>
-<p>AKiPS command syntax:</p></div>
+<p>AKiPS command syntax:
+mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+[any|all|not group {group name} &hellip;</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_device(self, name):
-    &#34;&#34;&#34; 
+    &#34;&#34;&#34;
     Pull the entire configuration for a single device.
 
     AKiPS command syntax:
-
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+            [any|all|not group {group name} ...
     &#34;&#34;&#34;
     params = {
         &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
@@ -929,11 +932,11 @@ special site script and not the normal web API commands.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_device_by_ip(self, ipaddr, use_cache=True):
-    &#34;&#34;&#34; 
-    Devices may have additional IP addresses recorded in akips, but only one primary 
+    &#34;&#34;&#34;
+    Devices may have additional IP addresses recorded in akips, but only one primary
     name and address.  Search for a device name by an alternate IP address.
 
-    AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a 
+    AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
     special site script and not the normal web API commands.
     &#34;&#34;&#34;
     params = {
@@ -959,19 +962,24 @@ special site script and not the normal web API commands.</p></div>
 <dd>
 <div class="desc"><p>Pull a list of key attributes for multiple devices.
 Can be filtered by group
-but the default is all devices. </p>
-<p>AKiPS command syntax:</p></div>
+but the default is all devices.</p>
+<p>AKiPS command syntax:
+mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+[any|all|not group {group name} &hellip;</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
-    &#34;&#34;&#34; 
+    &#34;&#34;&#34;
     Pull a list of key attributes for multiple devices.  Can be filtered by group
-    but the default is all devices. 
+    but the default is all devices.
 
     AKiPS command syntax:
-
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+            [any|all|not group {group name} ...
     &#34;&#34;&#34;
     attributes = [
         &#39;ip4addr&#39;,
@@ -1009,8 +1017,7 @@ but the default is all devices. </p>
 <span>def <span class="ident">get_events</span></span>(<span>self, event_type='all', period='last1h')</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull a list of events.
-</p>
+<div class="desc"><p>Pull a list of events.</p>
 <p>AKiPS command syntax:
 mget event {all,critical,enum,threshold,uptime}
 time {time filter} [{parent regex} {child regex}
@@ -1022,8 +1029,8 @@ time {time filter} [{parent regex} {child regex}
 </summary>
 <pre><code class="python">def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
     &#34;&#34;&#34;
-    Pull a list of events.  
-    
+    Pull a list of events.
+
     AKiPS command syntax:
         mget event {all,critical,enum,threshold,uptime}
         time {time filter} [{parent regex} {child regex}
@@ -1056,25 +1063,34 @@ time {time filter} [{parent regex} {child regex}
 </details>
 </dd>
 <dt id="akips.AKIPS.get_group_membership"><code class="name flex">
-<span>def <span class="ident">get_group_membership</span></span>(<span>self)</span>
+<span>def <span class="ident">get_group_membership</span></span>(<span>self, device='*', group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull a list of device to group memberships</p>
-<p>AKiPS command syntax:</p></div>
+<div class="desc"><p>Pull a list of device names to group memberships.
+Defaults to all devices
+and all groups (including the special 'maintenance_mode' group).</p>
+<p>AKiPS command syntax:
+mgroup {type} [{parent regex}]
+[any|all|not group {group name} &hellip;]</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_group_membership(self):
+<pre><code class="python">def get_group_membership(self, device=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
     &#34;&#34;&#34;
-    Pull a list of device to group memberships
-    
-    AKiPS command syntax:
+    Pull a list of device names to group memberships.  Defaults to all devices
+    and all groups (including the special &#39;maintenance_mode&#39; group).
 
+    AKiPS command syntax:
+        mgroup {type} [{parent regex}]
+            [any|all|not group {group name} ...]
     &#34;&#34;&#34;
     params = {
-        &#39;cmds&#39;: &#39;mgroup device *&#39;,
+        &#39;cmds&#39;: f&#39;mgroup {device} *&#39;,
     }
+    if groups:
+        group_list = &#34; &#34;.join(groups)
+        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
     text = self._get(params=params)
     if text:
         data = {}
@@ -1091,35 +1107,11 @@ time {time filter} [{parent regex} {child regex}
     return None</code></pre>
 </details>
 </dd>
-<dt id="akips.AKIPS.get_maintenance_mode"><code class="name flex">
-<span>def <span class="ident">get_maintenance_mode</span></span>(<span>self)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Pull a list of devices in maintenance mode</p>
-<p>AKiPS command syntax:</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def get_maintenance_mode(self):
-    &#34;&#34;&#34;
-    Pull a list of devices in maintenance mode
-     
-    AKiPS command syntax:
-
-    &#34;&#34;&#34;
-    # params = {
-    #     &#39;cmds&#39;: &#39;mget * * any group maintenance_mode&#39;,
-    # }
-    pass</code></pre>
-</details>
-</dd>
 <dt id="akips.AKIPS.get_series"><code class="name flex">
 <span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', device='*', attribute='*', get_dict=True, group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull a series of counter values.
-</p>
+<div class="desc"><p>Pull a series of counter values.</p>
 <p>AKiPS command syntax:
 cseries avg
 time {time filter} type parent child attribute
@@ -1130,9 +1122,9 @@ time {time filter} type parent child attribute
 </summary>
 <pre><code class="python">def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
                group_filter=&#39;any&#39;, groups=[]):
-    &#34;&#34;&#34; 
-    Pull a series of counter values.  
-    
+    &#34;&#34;&#34;
+    Pull a series of counter values.
+
     AKiPS command syntax:
         cseries avg
         time {time filter} type parent child attribute
@@ -1185,7 +1177,10 @@ time {time filter} type parent child attribute
 </code></dt>
 <dd>
 <div class="desc"><p>Pull a list of unreachable IPv4 ping devices</p>
-<p>AKiPS command syntax:</p></div>
+<p>AKiPS command syntax:
+mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+[any|all|not group {group name} &hellip;</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1193,9 +1188,11 @@ time {time filter} type parent child attribute
 <pre><code class="python">def get_unreachable(self):
     &#34;&#34;&#34;
     Pull a list of unreachable IPv4 ping devices
-    
-    AKiPS command syntax:
 
+    AKiPS command syntax:
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+            [any|all|not group {group name} ...
     &#34;&#34;&#34;
     params = {
         &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
@@ -1261,8 +1258,8 @@ special site script and not the normal web API commands.</p></div>
 <pre><code class="python">def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
     &#34;&#34;&#34;
     Set maintenance mode on or off for a device
-    
-    AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a 
+
+    AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
     special site script and not the normal web API commands.
     &#34;&#34;&#34;
     # params = {
@@ -1301,7 +1298,6 @@ special site script and not the normal web API commands.</p></div>
 <li><code><a title="akips.AKIPS.get_devices" href="#akips.AKIPS.get_devices">get_devices</a></code></li>
 <li><code><a title="akips.AKIPS.get_events" href="#akips.AKIPS.get_events">get_events</a></code></li>
 <li><code><a title="akips.AKIPS.get_group_membership" href="#akips.AKIPS.get_group_membership">get_group_membership</a></code></li>
-<li><code><a title="akips.AKIPS.get_maintenance_mode" href="#akips.AKIPS.get_maintenance_mode">get_maintenance_mode</a></code></li>
 <li><code><a title="akips.AKIPS.get_series" href="#akips.AKIPS.get_series">get_series</a></code></li>
 <li><code><a title="akips.AKIPS.get_status" href="#akips.AKIPS.get_status">get_status</a></code></li>
 <li><code><a title="akips.AKIPS.get_unreachable" href="#akips.AKIPS.get_unreachable">get_unreachable</a></code></li>
