@@ -1,6 +1,6 @@
 """ This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface. """
-__version__ = '0.2.3'
+__version__ = '0.3.0'
 
 import io
 import re
