@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class AKIPS:
     """ Class to handle interactions with AKiPS API """
 
-    def __init__(self, server, username='api-ro', password=None, 
+    def __init__(self, server, username='api-ro', password=None,
                  verify=True, timezone='America/New_York'):
         self.server = server
         self.username = username
