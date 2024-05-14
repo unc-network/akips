@@ -32,7 +32,10 @@ class AKIPS:
             requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
 
     def get_devices(self, group_filter='any', groups=[]):
-        """ Pull a list of key attributes for all devices in akips """
+        """ 
+        Pull a list of key attributes for multiple devices.  Can be filtered by group
+        but the default is all devices. 
+        """
         attributes = [
             'ip4addr',
             'SNMPv2-MIB.sysName',
@@ -44,7 +47,7 @@ class AKIPS:
             'cmds': f'mget text * sys /{cmd_attributes}/',
         }
         if groups:
-            """ [any|all|not group {group name} ...] """
+            # [any|all|not group {group name} ...]
             group_list = " ".join(groups)
             params['cmds'] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
@@ -65,7 +68,9 @@ class AKIPS:
         return None
 
     def get_device(self, name):
-        """ Pull the entire configuration for a single device """
+        """ 
+        Pull the entire configuration for a single device.
+        """
         params = {
             'cmds': f'mget * {name} * *'
         }
@@ -94,14 +99,28 @@ class AKIPS:
         return None
 
     def get_device_by_ip(self, ipaddr, use_cache=True):
-        """ Search for a device by an alternate IP address
-        This makes use of a special site script and not the normal api """
-        # params = {
-        #     'function': 'web_find_device_by_ip',
-        #     'ipaddr': ipaddr
-        # }
-        # section = '/api-script/'
-        pass
+        """ 
+        Devices may have additional IP addresses recorded in akips, but only one primary 
+        name and address.  Search for a device name by an alternate IP address.  This makes 
+        use of a special site script and not the normal web API.
+
+        AKiPS user "api-rw" is required to run api scripts.
+        """
+        params = {
+            'function': 'web_find_device_by_ip',
+            'ipaddr': ipaddr
+        }
+        text = self._get(section='/api-script/', params=params)
+        if text:
+            lines = text.split('\n')
+            for line in lines:
+                match = re.match(r"IP Address (\S+) is configured on (\S+)", line)
+                if match:
+                    address = match.group(1)
+                    device_name = match.group(2)
+                    logger.debug(f"Found {address} on device {device_name}")
+                    return device_name
+        return None
 
     def get_unreachable(self):
         """ Pull a list of unreachable IPv4 ping devices """

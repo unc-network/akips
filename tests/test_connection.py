@@ -80,3 +80,15 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
         api = AKIPS('127.0.0.1')
         series = api.get_aggregate(attribute='WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients')
         self.assertEqual(series[1], '31')
+
+    @patch('requests.Session.get')
+    def test_get_device_by_ip(self, session_mock: MagicMock):
+        r_text = """IP Address 10.194.200.65 is configured on cisco-sw1
+""" # noqa
+        session_mock.return_value.ok = True
+        session_mock.return_value.status_code = 200
+        session_mock.return_value.text = r_text
+
+        api = AKIPS('127.0.0.1')
+        device_name = api.get_device_by_ip(ipaddr='10.194.200.65')
+        self.assertEqual(device_name, 'cisco-sw1')
