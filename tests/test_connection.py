@@ -106,3 +106,14 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
         api = AKIPS('127.0.0.1')
         list = api.get_group_membership(groups=['maintenance_mode'])
         self.assertEqual(list['10.10.10.146'][0], 'admin')
+
+    @patch('requests.Session.get')
+    def test_set_group_membership(self, session_mock: MagicMock):
+        r_text = """""" # noqa
+        session_mock.return_value.ok = True
+        session_mock.return_value.status_code = 200
+        session_mock.return_value.text = r_text
+
+        api = AKIPS('127.0.0.1')
+        output = api.set_group_membership('10.10.10.146', 'test_group', 'assign')
+        self.assertIsNone(output)

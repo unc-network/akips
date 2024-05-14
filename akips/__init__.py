@@ -219,27 +219,42 @@ class AKIPS:
             return data
         return None
 
-    def set_maintenance_mode(self, device_name, mode='True'):
+    def set_group_membership(self, device, group, mode):
         """
-        Set maintenance mode on or off for a device
+        Update manual grouping rules for a device, including the special
+        'maintenance_mode' group.  The web api script fails silently if the device or group
+        does not exist.
 
         AKiPS user "api-rw" is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         """
-        # params = {
-        #     'function': 'web_manual_grouping',
-        #     'type': 'device',
-        #     'group': 'maintenance_mode',
-        #     'device': device_name
-        # }
-        pass
+        if not device:
+            raise ValueError("a valid device name must be provided for manual grouping update")
+        if not group:
+            raise ValueError("a valid group name must be provided for manual grouping update")
+        if mode not in ('assign', 'clear'):
+            raise ValueError("mode must be 'assign' or 'clear' for manual grouping update")
+        params = {
+            'function': 'web_manual_grouping',
+            'type': 'device',
+            'group': group,    # group_name
+            'mode': mode,      # 'assign' or 'clear' for device memberships
+            'device': device   # device_name
+        }
+        text = self._get(section='/api-script/', params=params)
+        if text:
+            logger.error("Web API request failed: {}".format(text))
+            raise AkipsError(message=text)
+        return None
 
     def get_status(self, device='*', child='*', attribute='*'):
         """
         Pull the status values we are most interested in
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         """
         pass
 

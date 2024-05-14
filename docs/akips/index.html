@@ -250,27 +250,42 @@ class AKIPS:
             return data
         return None
 
-    def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
+    def set_group_membership(self, device, group, mode):
         &#34;&#34;&#34;
-        Set maintenance mode on or off for a device
+        Update manual grouping rules for a device, including the special
+        &#39;maintenance_mode&#39; group.  The web api script fails silently if the device or group
+        does not exist.
 
         AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
-        # params = {
-        #     &#39;function&#39;: &#39;web_manual_grouping&#39;,
-        #     &#39;type&#39;: &#39;device&#39;,
-        #     &#39;group&#39;: &#39;maintenance_mode&#39;,
-        #     &#39;device&#39;: device_name
-        # }
-        pass
+        if not device:
+            raise ValueError(&#34;a valid device name must be provided for manual grouping update&#34;)
+        if not group:
+            raise ValueError(&#34;a valid group name must be provided for manual grouping update&#34;)
+        if mode not in (&#39;assign&#39;, &#39;clear&#39;):
+            raise ValueError(&#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;)
+        params = {
+            &#39;function&#39;: &#39;web_manual_grouping&#39;,
+            &#39;type&#39;: &#39;device&#39;,
+            &#39;group&#39;: group,    # group_name
+            &#39;mode&#39;: mode,      # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#39;device&#39;: device   # device_name
+        }
+        text = self._get(section=&#39;/api-script/&#39;, params=params)
+        if text:
+            logger.error(&#34;Web API request failed: {}&#34;.format(text))
+            raise AkipsError(message=text)
+        return None
 
     def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
         &#34;&#34;&#34;
         Pull the status values we are most interested in
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         pass
 
@@ -653,27 +668,42 @@ class AKIPS:
             return data
         return None
 
-    def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
+    def set_group_membership(self, device, group, mode):
         &#34;&#34;&#34;
-        Set maintenance mode on or off for a device
+        Update manual grouping rules for a device, including the special
+        &#39;maintenance_mode&#39; group.  The web api script fails silently if the device or group
+        does not exist.
 
         AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
-        # params = {
-        #     &#39;function&#39;: &#39;web_manual_grouping&#39;,
-        #     &#39;type&#39;: &#39;device&#39;,
-        #     &#39;group&#39;: &#39;maintenance_mode&#39;,
-        #     &#39;device&#39;: device_name
-        # }
-        pass
+        if not device:
+            raise ValueError(&#34;a valid device name must be provided for manual grouping update&#34;)
+        if not group:
+            raise ValueError(&#34;a valid group name must be provided for manual grouping update&#34;)
+        if mode not in (&#39;assign&#39;, &#39;clear&#39;):
+            raise ValueError(&#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;)
+        params = {
+            &#39;function&#39;: &#39;web_manual_grouping&#39;,
+            &#39;type&#39;: &#39;device&#39;,
+            &#39;group&#39;: group,    # group_name
+            &#39;mode&#39;: mode,      # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#39;device&#39;: device   # device_name
+        }
+        text = self._get(section=&#39;/api-script/&#39;, params=params)
+        if text:
+            logger.error(&#34;Web API request failed: {}&#34;.format(text))
+            raise AkipsError(message=text)
+        return None
 
     def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
         &#34;&#34;&#34;
         Pull the status values we are most interested in
 
         AKiPS command syntax:
-
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+                [any|all|not group {group name} ...
         &#34;&#34;&#34;
         pass
 
@@ -1157,7 +1187,10 @@ time {time filter} type parent child attribute
 </code></dt>
 <dd>
 <div class="desc"><p>Pull the status values we are most interested in</p>
-<p>AKiPS command syntax:</p></div>
+<p>AKiPS command syntax:
+mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+[any|all|not group {group name} &hellip;</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1167,7 +1200,9 @@ time {time filter} type parent child attribute
     Pull the status values we are most interested in
 
     AKiPS command syntax:
-
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+            [any|all|not group {group name} ...
     &#34;&#34;&#34;
     pass</code></pre>
 </details>
@@ -1243,11 +1278,14 @@ mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
     return data</code></pre>
 </details>
 </dd>
-<dt id="akips.AKIPS.set_maintenance_mode"><code class="name flex">
-<span>def <span class="ident">set_maintenance_mode</span></span>(<span>self, device_name, mode='True')</span>
+<dt id="akips.AKIPS.set_group_membership"><code class="name flex">
+<span>def <span class="ident">set_group_membership</span></span>(<span>self, device, group, mode)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Set maintenance mode on or off for a device</p>
+<div class="desc"><p>Update manual grouping rules for a device, including the special
+'maintenance_mode' group.
+The web api script fails silently if the device or group
+does not exist.</p>
 <p>AKiPS user "api-rw" is required to run api scripts.
 This call makes use of a
 special site script and not the normal web API commands.</p></div>
@@ -1255,20 +1293,33 @@ special site script and not the normal web API commands.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def set_maintenance_mode(self, device_name, mode=&#39;True&#39;):
+<pre><code class="python">def set_group_membership(self, device, group, mode):
     &#34;&#34;&#34;
-    Set maintenance mode on or off for a device
+    Update manual grouping rules for a device, including the special
+    &#39;maintenance_mode&#39; group.  The web api script fails silently if the device or group
+    does not exist.
 
     AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
     special site script and not the normal web API commands.
     &#34;&#34;&#34;
-    # params = {
-    #     &#39;function&#39;: &#39;web_manual_grouping&#39;,
-    #     &#39;type&#39;: &#39;device&#39;,
-    #     &#39;group&#39;: &#39;maintenance_mode&#39;,
-    #     &#39;device&#39;: device_name
-    # }
-    pass</code></pre>
+    if not device:
+        raise ValueError(&#34;a valid device name must be provided for manual grouping update&#34;)
+    if not group:
+        raise ValueError(&#34;a valid group name must be provided for manual grouping update&#34;)
+    if mode not in (&#39;assign&#39;, &#39;clear&#39;):
+        raise ValueError(&#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;)
+    params = {
+        &#39;function&#39;: &#39;web_manual_grouping&#39;,
+        &#39;type&#39;: &#39;device&#39;,
+        &#39;group&#39;: group,    # group_name
+        &#39;mode&#39;: mode,      # &#39;assign&#39; or &#39;clear&#39; for device memberships
+        &#39;device&#39;: device   # device_name
+    }
+    text = self._get(section=&#39;/api-script/&#39;, params=params)
+    if text:
+        logger.error(&#34;Web API request failed: {}&#34;.format(text))
+        raise AkipsError(message=text)
+    return None</code></pre>
 </details>
 </dd>
 </dl>
@@ -1301,7 +1352,7 @@ special site script and not the normal web API commands.</p></div>
 <li><code><a title="akips.AKIPS.get_series" href="#akips.AKIPS.get_series">get_series</a></code></li>
 <li><code><a title="akips.AKIPS.get_status" href="#akips.AKIPS.get_status">get_status</a></code></li>
 <li><code><a title="akips.AKIPS.get_unreachable" href="#akips.AKIPS.get_unreachable">get_unreachable</a></code></li>
-<li><code><a title="akips.AKIPS.set_maintenance_mode" href="#akips.AKIPS.set_maintenance_mode">set_maintenance_mode</a></code></li>
+<li><code><a title="akips.AKIPS.set_group_membership" href="#akips.AKIPS.set_group_membership">set_group_membership</a></code></li>
 </ul>
 </li>
 </ul>
