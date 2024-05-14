@@ -39,7 +39,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         """
         attributes = [
             'ip4addr',
@@ -79,7 +79,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         """
         params = {
             'cmds': f'mget * {name} * *'
@@ -139,7 +139,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         """
         params = {
             'cmds': 'mget * * * /PING.icmpState|SNMP.snmpState/ value /down/',
@@ -254,7 +254,7 @@ class AKIPS:
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...`
+                [any|all|not group {group name} ...]`
         """
         pass
 
