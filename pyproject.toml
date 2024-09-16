@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "akips"
-version = "0.3.0"
+version = "0.3.1"
 description = "Module to interact with the AKiPS Network Monitoring Software API interface"
 authors = ["William E Whitaker <will.whitaker@unc.edu>"]
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/wwhitaker/akips"
+repository = "https://github.com/unc-network/akips"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"

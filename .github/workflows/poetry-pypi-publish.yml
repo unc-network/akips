@@ -1,0 +1,36 @@
+# This workflow handles publishing to PYPI
+name: poetry-pypi-publish
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python -
+        poetry lock
+    
+    - name: Install dependencies
+      run: |
+        poetry install
+        
+    - name: Build package
+      run: poetry build
+  
+    - name: Publish package
+      run: |
+        poetry publish
