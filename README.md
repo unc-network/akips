@@ -1,7 +1,7 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/akips.svg)](https://img.shields.io/pypi/pyversions/akips)
 [![PyPI](https://img.shields.io/pypi/v/akips.svg)](https://pypi.python.org/pypi/akips)
 [![Downloads](https://static.pepy.tech/badge/akips)](https://pepy.tech/project/akips)
-[![GitHub contributors](https://img.shields.io/github/contributors/wwhitaker/akips.svg)](https://GitHub.com/wwhitaker/akips/graphs/contributors/)
+[![GitHub contributors](https://img.shields.io/github/contributors/unc-network/akips.svg)](https://GitHub.com/unc-network/akips/graphs/contributors/)
 
 akips
 =======
@@ -40,9 +40,9 @@ for name, fields in devices.items():
 ```
 
 ## API Documentation
-[API Documentation](https://wwhitaker.github.io/akips/docs/akips/index.html)
+[API Documentation](https://unc-network.github.io/akips/docs/akips/index.html)
 
 ## Bugs/Requests
 
-Please use the [GitHub issue tracker](https://github.com/wwhitaker/akips/issues) 
+Please use the [GitHub issue tracker](https://github.com/unc-network/akips/issues) 
 to submit bugs or request features.
