@@ -10,6 +10,9 @@ on:
 jobs:
   Quality:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     environment: prod
 
     env:
@@ -18,10 +21,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Setup python
+    - name: Setup python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: ${{ matrix.python-version }}
+        # python-version: '3.10'
 
     - name: Install Poetry
       uses: snok/install-poetry@v1
