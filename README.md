@@ -13,7 +13,7 @@ the [AKiPS Network Monitoring Software](http://akips.com) API interface.
 To install akips, simply us pip:
 
 ```console
-% pip install akips
+pip install akips
 ```
 
 ### AKiPS Setup
