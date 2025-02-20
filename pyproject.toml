@@ -26,6 +26,7 @@ pytest = "^8.2.0"
 #flake8 = "^7.0.0"
 pdoc3 = "^0.10.0"
 pylama = "^8.4.1"
+setuptools = "^75.8.0"
 
 [build-system]
 requires = ["poetry-core"]

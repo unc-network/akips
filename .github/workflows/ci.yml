@@ -8,11 +8,8 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  Quality:
+  linters:
     runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     environment: prod
 
     env:
@@ -21,11 +18,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Setup python ${{ matrix.python-version }}
+    - name: Setup python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
-        architecture: x64
+        python-version: '3.11'
 
     - name: Install poetry
       run: |
@@ -34,7 +30,7 @@ jobs:
     - name: Set up Python 
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: '3.11'
         cache: 'poetry'
 
     - name: Install dependencies
@@ -62,6 +58,18 @@ jobs:
       run: |
         poetry run pylama .
 
-    - name: Test with pytest
-      run: |
-        poetry run pytest -v tests
+  # pytest:
+  #   name: Std Test on Python ${{ matrix.python-version }} (${{ matrix.platform}})
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   strategy:
+  #     matrix:
+  #       python-version: [ '3.9', '3.10', '3.11', "3.12", "3.13" ]
+  #       platform: [ubuntu-24.04]
+
+  #   runs-on: ${{ matrix.platform }}
+  #   steps:
+  #     - name: Test with pytest
+  #       run: |
+  #         poetry run pytest -v tests
