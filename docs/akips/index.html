@@ -29,9 +29,10 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34; This akips python module provides a simple way for python scripts to interact with
-the AKiPS Network Monitoring Software Web API interface. &#34;&#34;&#34;
-__version__ = &#39;0.3.0&#39;
+<pre><code class="python">&#34;&#34;&#34;This akips python module provides a simple way for python scripts to interact with
+the AKiPS Network Monitoring Software Web API interface.&#34;&#34;&#34;
+
+__version__ = &#34;0.4.0&#34;
 
 import io
 import re
@@ -48,10 +49,16 @@ logger = logging.getLogger(__name__)
 
 
 class AKIPS:
-    &#34;&#34;&#34; Class to handle interactions with AKiPS API &#34;&#34;&#34;
+    &#34;&#34;&#34;Class to handle interactions with AKiPS API&#34;&#34;&#34;
 
-    def __init__(self, server, username=&#39;api-ro&#39;, password=None,
-                 verify=True, timezone=&#39;America/New_York&#39;):
+    def __init__(
+        self,
+        server,
+        username=&#34;api-ro&#34;,
+        password=None,
+        verify=True,
+        timezone=&#34;America/New_York&#34;,
+    ):
         self.server = server
         self.username = username
         self.password = password
@@ -60,9 +67,9 @@ class AKIPS:
         self.session = requests.Session()
 
         if not verify:
-            requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
+            requests.packages.urllib3.disable_warnings()  # pylint: disable=no-member
 
-    def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
+    def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
         Pull a list of key attributes for multiple devices.  Can be filtered by group
         but the default is all devices.
@@ -73,26 +80,26 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         attributes = [
-            &#39;ip4addr&#39;,
-            &#39;SNMPv2-MIB.sysName&#39;,
-            &#39;SNMPv2-MIB.sysDescr&#39;,
-            &#39;SNMPv2-MIB.sysLocation&#39;
+            &#34;ip4addr&#34;,
+            &#34;SNMPv2-MIB.sysName&#34;,
+            &#34;SNMPv2-MIB.sysDescr&#34;,
+            &#34;SNMPv2-MIB.sysLocation&#34;,
         ]
         cmd_attributes = &#34;|&#34;.join(attributes)
         params = {
-            &#39;cmds&#39;: f&#39;mget text * sys /{cmd_attributes}/&#39;,
+            &#34;cmds&#34;: f&#34;mget text * sys /{cmd_attributes}/&#34;,
         }
         if groups:
             # [any|all|not group {group name} ...]
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = {}
             # Data comes back as &#39;plain/text&#39; type so we have to parse it
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#39;, line)
+                match = re.match(r&#34;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#34;, line)
                 if match:
                     if match.group(1) not in data:
                         # Populate a default entry for all desired fields
@@ -112,16 +119,14 @@ class AKIPS:
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {
-            &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
-        }
+        params = {&#34;cmds&#34;: f&#34;mget * {name} * *&#34;}
         text = self._get(params=params)
         if text:
             data = {}
             # Data comes back as &#39;plain/text&#39; type so we have to parse it.  Example:
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#39;, line)
+                match = re.match(r&#34;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#34;, line)
                 if match:
                     name = match.group(1)
                     if match.group(2) not in data:
@@ -132,9 +137,9 @@ class AKIPS:
                         data[match.group(2)][match.group(3)] = match.group(5)
                     else:
                         # save a blank string if there was nothing after equals
-                        data[match.group(2)][match.group(3)] = &#39;&#39;
+                        data[match.group(2)][match.group(3)] = &#34;&#34;
             if name:
-                data[&#39;name&#39;] = name
+                data[&#34;name&#34;] = name
             logger.debug(&#34;Found device {} in akips&#34;.format(data))
             return data
         return None
@@ -147,13 +152,10 @@ class AKIPS:
         AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
-        params = {
-            &#39;function&#39;: &#39;web_find_device_by_ip&#39;,
-            &#39;ipaddr&#39;: ipaddr
-        }
-        text = self._get(section=&#39;/api-script/&#39;, params=params)
+        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
+        text = self._get(section=&#34;/api-script/&#34;, params=params)
         if text:
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
                 match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
                 if match:
@@ -173,54 +175,61 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
+            &#34;cmds&#34;: &#34;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#34;,
         }
         text = self._get(params=params)
         data = {}
         if text:
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#39;, line)
+                match = re.match(
+                    r&#34;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#34;, line
+                )
                 if match:
                     # epoch fields are in the server&#39;s timezone
                     name = match.group(1)
                     attribute = match.group(3)
                     event_start = datetime.fromtimestamp(
-                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                    )
                     if name not in data:
                         # populate a starting point for this device
                         data[name] = {
-                            &#39;name&#39;: name,
-                            &#39;ping_state&#39;: &#39;n/a&#39;,
-                            &#39;snmp_state&#39;: &#39;n/a&#39;,
-                            &#39;event_start&#39;: event_start  # epoch in local timezone
+                            &#34;name&#34;: name,
+                            &#34;ping_state&#34;: &#34;n/a&#34;,
+                            &#34;snmp_state&#34;: &#34;n/a&#34;,
+                            &#34;event_start&#34;: event_start,  # epoch in local timezone
                         }
-                    if attribute == &#39;PING.icmpState&#39;:
-                        data[name][&#39;child&#39;] = match.group(2),
-                        data[name][&#39;ping_state&#39;] = match.group(5)
-                        data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
-                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
-                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;ip4addr&#39;] = match.group(8)
-                    elif attribute == &#39;SNMP.snmpState&#39;:
-                        data[name][&#39;child&#39;] = match.group(2),
-                        data[name][&#39;snmp_state&#39;] = match.group(5)
-                        data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
-                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
-                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;ip4addr&#39;] = None
-                    if event_start &lt; data[name][&#39;event_start&#39;]:
-                        data[name][&#39;event_start&#39;] = event_start
+                    if attribute == &#34;PING.icmpState&#34;:
+                        data[name][&#34;child&#34;] = (match.group(2),)
+                        data[name][&#34;ping_state&#34;] = match.group(5)
+                        data[name][&#34;index&#34;] = match.group(4)
+                        data[name][&#34;device_added&#34;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;event_start&#34;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;ip4addr&#34;] = match.group(8)
+                    elif attribute == &#34;SNMP.snmpState&#34;:
+                        data[name][&#34;child&#34;] = (match.group(2),)
+                        data[name][&#34;snmp_state&#34;] = match.group(5)
+                        data[name][&#34;index&#34;] = match.group(4)
+                        data[name][&#34;device_added&#34;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;event_start&#34;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;ip4addr&#34;] = None
+                    if event_start &lt; data[name][&#34;event_start&#34;]:
+                        data[name][&#34;event_start&#34;] = event_start
             logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
             logger.debug(&#34;data: {}&#34;.format(data))
 
         return data
 
-    def get_group_membership(self, device=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+    def get_group_membership(self, device=&#34;*&#34;, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
         Pull a list of device names to group memberships.  Defaults to all devices
         and all groups (including the special &#39;maintenance_mode&#39; group).
@@ -230,23 +239,25 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: f&#39;mgroup {device} *&#39;,
+            &#34;cmds&#34;: f&#34;mgroup {device} *&#34;,
         }
         if groups:
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = {}
             # Data comes back as &#39;plain/text&#39; type so we have to parse it
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s=\s(.*)$&#39;, line)
+                match = re.match(r&#34;^(\S+)\s=\s(.*)$&#34;, line)
                 if match:
                     if match.group(1) not in data:
                         # Populate a default entry for all desired fields
-                        data[match.group(1)] = match.group(2).split(&#39;,&#39;)
-            logger.debug(&#34;Found {} device and group mappings in akips&#34;.format(len(data.keys())))
+                        data[match.group(1)] = match.group(2).split(&#34;,&#34;)
+            logger.debug(
+                &#34;Found {} device and group mappings in akips&#34;.format(len(data.keys()))
+            )
             return data
         return None
 
@@ -260,25 +271,31 @@ class AKIPS:
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
         if not device:
-            raise ValueError(&#34;a valid device name must be provided for manual grouping update&#34;)
+            raise ValueError(
+                &#34;a valid device name must be provided for manual grouping update&#34;
+            )
         if not group:
-            raise ValueError(&#34;a valid group name must be provided for manual grouping update&#34;)
-        if mode not in (&#39;assign&#39;, &#39;clear&#39;):
-            raise ValueError(&#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;)
+            raise ValueError(
+                &#34;a valid group name must be provided for manual grouping update&#34;
+            )
+        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
+            raise ValueError(
+                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
+            )
         params = {
-            &#39;function&#39;: &#39;web_manual_grouping&#39;,
-            &#39;type&#39;: &#39;device&#39;,
-            &#39;group&#39;: group,    # group_name
-            &#39;mode&#39;: mode,      # &#39;assign&#39; or &#39;clear&#39; for device memberships
-            &#39;device&#39;: device   # device_name
+            &#34;function&#34;: &#34;web_manual_grouping&#34;,
+            &#34;type&#34;: &#34;device&#34;,
+            &#34;group&#34;: group,  # group_name
+            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#34;device&#34;: device,  # device_name
         }
-        text = self._get(section=&#39;/api-script/&#39;, params=params)
+        text = self._get(section=&#34;/api-script/&#34;, params=params)
         if text:
             logger.error(&#34;Web API request failed: {}&#34;.format(text))
             raise AkipsError(message=text)
         return None
 
-    def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
+    def get_status(self, device=&#34;*&#34;, child=&#34;*&#34;, attribute=&#34;*&#34;):
         &#34;&#34;&#34;
         Pull the status values we are most interested in
 
@@ -289,7 +306,7 @@ class AKIPS:
         &#34;&#34;&#34;
         pass
 
-    def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
+    def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
         &#34;&#34;&#34;
         Pull a list of events.
 
@@ -299,24 +316,24 @@ class AKIPS:
             {attribute regex}] [profile {profile name}]
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {
-            &#39;cmds&#39;: f&#39;mget event {event_type} time {period}&#39;
-        }
+        params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
         text = self._get(params=params)
         if text:
             data = []
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#39;, line)
+                match = re.match(
+                    r&#34;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#34;, line
+                )
                 if match:
                     entry = {
-                        &#39;epoch&#39;: match.group(1),
-                        &#39;parent&#39;: match.group(2),
-                        &#39;child&#39;: match.group(3),
-                        &#39;attribute&#39;: match.group(4),
-                        &#39;type&#39;: match.group(5),
-                        &#39;flags&#39;: match.group(6),
-                        &#39;details&#39;: match.group(7),
+                        &#34;epoch&#34;: match.group(1),
+                        &#34;parent&#34;: match.group(2),
+                        &#34;child&#34;: match.group(3),
+                        &#34;attribute&#34;: match.group(4),
+                        &#34;type&#34;: match.group(5),
+                        &#34;flags&#34;: match.group(6),
+                        &#34;details&#34;: match.group(7),
                     }
                     data.append(entry)
             logger.debug(&#34;Found {} events of type {} in akips&#34;.format(len(data), type))
@@ -325,8 +342,15 @@ class AKIPS:
 
     # Time-series commands
 
-    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
-                   group_filter=&#39;any&#39;, groups=[]):
+    def get_series(
+        self,
+        period=&#34;last1h&#34;,
+        device=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        get_dict=True,
+        group_filter=&#34;any&#34;,
+        groups=[],
+    ):
         &#34;&#34;&#34;
         Pull a series of counter values.
 
@@ -335,12 +359,10 @@ class AKIPS:
             time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {
-            &#39;cmds&#39;: f&#39;cseries avg time {period} * {device} * {attribute}&#39;
-        }
+        params = {&#34;cmds&#34;: f&#34;cseries avg time {period} * {device} * {attribute}&#34;}
         if groups:
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             # Parse output in CSV format
@@ -356,8 +378,16 @@ class AKIPS:
             return csv_to_list
         return None
 
-    def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
-                      operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
+    def get_aggregate(
+        self,
+        period=&#34;last1h&#34;,
+        device=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        operator=&#34;avg&#34;,
+        interval=&#34;300&#34;,
+        group_filter=&#34;any&#34;,
+        groups=[],
+    ):
         &#34;&#34;&#34;
         Aggregate counter values in intervals over a period of time.
 
@@ -367,16 +397,16 @@ class AKIPS:
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: f&#39;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#39;
+            &#34;cmds&#34;: f&#34;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#34;
         }
         if groups:
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             # Text should be one CSV line followed by one blank line
-            lines = text.split(&#39;\n&#39;)
-            values = lines[0].split(&#39;,&#39;)
+            lines = text.split(&#34;\n&#34;)
+            values = lines[0].split(&#34;,&#34;)
             logger.debug(&#34;Found {} aggregate values&#34;.format(len(values)))
             return values
         return None
@@ -387,35 +417,39 @@ class AKIPS:
         &#34;&#34;&#34;
         Attributes with a type of enum return five values separated by commas.
         &#34;&#34;&#34;
-        match = re.match(r&#39;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#39;, enum_string)
+        match = re.match(r&#34;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#34;, enum_string)
         if match:
             entry = {
-                &#39;number&#39;: match.group(1),       # list number (from MIB)
-                &#39;value&#39;: match.group(2),        # text value (from MIB)
+                &#34;number&#34;: match.group(1),  # list number (from MIB)
+                &#34;value&#34;: match.group(2),  # text value (from MIB)
                 # &#39;created&#39;: match.group(3),      # time created (epoch timestamp)
                 # &#39;modified&#39;: match.group(4),     # time modified (epoch timestamp)
-                &#39;description&#39;: match.group(5)   # child description
+                &#34;description&#34;: match.group(5),  # child description
             }
-            entry[&#39;created&#39;] = datetime.fromtimestamp(
-                int(match.group(3)), tz=pytz.timezone(self.server_timezone))
-            entry[&#39;modified&#39;] = datetime.fromtimestamp(
-                int(match.group(4)), tz=pytz.timezone(self.server_timezone))
+            entry[&#34;created&#34;] = datetime.fromtimestamp(
+                int(match.group(3)), tz=pytz.timezone(self.server_timezone)
+            )
+            entry[&#34;modified&#34;] = datetime.fromtimestamp(
+                int(match.group(4)), tz=pytz.timezone(self.server_timezone)
+            )
             return entry
         else:
-            raise AkipsError(message=f&#39;Not a ENUM type value: {enum_string}&#39;)
+            raise AkipsError(message=f&#34;Not a ENUM type value: {enum_string}&#34;)
 
-    def _get(self, section=&#39;/api-db/&#39;, params=None, timeout=30):
+    def _get(self, section=&#34;/api-db/&#34;, params=None, timeout=30):
         &#34;&#34;&#34;
         Call HTTP GET against the AKiPS server
         &#34;&#34;&#34;
-        server_url = &#39;https://&#39; + self.server + section
-        params[&#39;username&#39;] = self.username
-        params[&#39;password&#39;] = self.password
+        server_url = &#34;https://&#34; + self.server + section
+        params[&#34;username&#34;] = self.username
+        params[&#34;password&#34;] = self.password
 
-        if &#39;cmds&#39; in params:
-            logger.debug(&#34;akips command: {}&#34;.format(params[&#39;cmds&#39;]))
+        if &#34;cmds&#34; in params:
+            logger.debug(&#34;akips command: {}&#34;.format(params[&#34;cmds&#34;]))
         try:
-            r = self.session.get(server_url, params=params, verify=self.verify, timeout=timeout)
+            r = self.session.get(
+                server_url, params=params, verify=self.verify, timeout=timeout
+            )
             r.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             logger.error(errh)
@@ -431,7 +465,7 @@ class AKIPS:
             raise
 
         # AKiPS can return a raw error message if something fails
-        if re.match(r&#39;^ERROR:&#39;, r.text):
+        if re.match(r&#34;^ERROR:&#34;, r.text):
             logger.error(&#34;Web API request failed: {}&#34;.format(r.text))
             raise AkipsError(message=r.text)
         else:
@@ -466,10 +500,16 @@ class AKIPS:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AKIPS:
-    &#34;&#34;&#34; Class to handle interactions with AKiPS API &#34;&#34;&#34;
+    &#34;&#34;&#34;Class to handle interactions with AKiPS API&#34;&#34;&#34;
 
-    def __init__(self, server, username=&#39;api-ro&#39;, password=None,
-                 verify=True, timezone=&#39;America/New_York&#39;):
+    def __init__(
+        self,
+        server,
+        username=&#34;api-ro&#34;,
+        password=None,
+        verify=True,
+        timezone=&#34;America/New_York&#34;,
+    ):
         self.server = server
         self.username = username
         self.password = password
@@ -478,9 +518,9 @@ class AKIPS:
         self.session = requests.Session()
 
         if not verify:
-            requests.packages.urllib3.disable_warnings()    # pylint: disable=no-member
+            requests.packages.urllib3.disable_warnings()  # pylint: disable=no-member
 
-    def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
+    def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
         Pull a list of key attributes for multiple devices.  Can be filtered by group
         but the default is all devices.
@@ -491,26 +531,26 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         attributes = [
-            &#39;ip4addr&#39;,
-            &#39;SNMPv2-MIB.sysName&#39;,
-            &#39;SNMPv2-MIB.sysDescr&#39;,
-            &#39;SNMPv2-MIB.sysLocation&#39;
+            &#34;ip4addr&#34;,
+            &#34;SNMPv2-MIB.sysName&#34;,
+            &#34;SNMPv2-MIB.sysDescr&#34;,
+            &#34;SNMPv2-MIB.sysLocation&#34;,
         ]
         cmd_attributes = &#34;|&#34;.join(attributes)
         params = {
-            &#39;cmds&#39;: f&#39;mget text * sys /{cmd_attributes}/&#39;,
+            &#34;cmds&#34;: f&#34;mget text * sys /{cmd_attributes}/&#34;,
         }
         if groups:
             # [any|all|not group {group name} ...]
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = {}
             # Data comes back as &#39;plain/text&#39; type so we have to parse it
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#39;, line)
+                match = re.match(r&#34;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#34;, line)
                 if match:
                     if match.group(1) not in data:
                         # Populate a default entry for all desired fields
@@ -530,16 +570,14 @@ class AKIPS:
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {
-            &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
-        }
+        params = {&#34;cmds&#34;: f&#34;mget * {name} * *&#34;}
         text = self._get(params=params)
         if text:
             data = {}
             # Data comes back as &#39;plain/text&#39; type so we have to parse it.  Example:
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#39;, line)
+                match = re.match(r&#34;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#34;, line)
                 if match:
                     name = match.group(1)
                     if match.group(2) not in data:
@@ -550,9 +588,9 @@ class AKIPS:
                         data[match.group(2)][match.group(3)] = match.group(5)
                     else:
                         # save a blank string if there was nothing after equals
-                        data[match.group(2)][match.group(3)] = &#39;&#39;
+                        data[match.group(2)][match.group(3)] = &#34;&#34;
             if name:
-                data[&#39;name&#39;] = name
+                data[&#34;name&#34;] = name
             logger.debug(&#34;Found device {} in akips&#34;.format(data))
             return data
         return None
@@ -565,13 +603,10 @@ class AKIPS:
         AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
-        params = {
-            &#39;function&#39;: &#39;web_find_device_by_ip&#39;,
-            &#39;ipaddr&#39;: ipaddr
-        }
-        text = self._get(section=&#39;/api-script/&#39;, params=params)
+        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
+        text = self._get(section=&#34;/api-script/&#34;, params=params)
         if text:
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
                 match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
                 if match:
@@ -591,54 +626,61 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
+            &#34;cmds&#34;: &#34;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#34;,
         }
         text = self._get(params=params)
         data = {}
         if text:
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#39;, line)
+                match = re.match(
+                    r&#34;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#34;, line
+                )
                 if match:
                     # epoch fields are in the server&#39;s timezone
                     name = match.group(1)
                     attribute = match.group(3)
                     event_start = datetime.fromtimestamp(
-                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                    )
                     if name not in data:
                         # populate a starting point for this device
                         data[name] = {
-                            &#39;name&#39;: name,
-                            &#39;ping_state&#39;: &#39;n/a&#39;,
-                            &#39;snmp_state&#39;: &#39;n/a&#39;,
-                            &#39;event_start&#39;: event_start  # epoch in local timezone
+                            &#34;name&#34;: name,
+                            &#34;ping_state&#34;: &#34;n/a&#34;,
+                            &#34;snmp_state&#34;: &#34;n/a&#34;,
+                            &#34;event_start&#34;: event_start,  # epoch in local timezone
                         }
-                    if attribute == &#39;PING.icmpState&#39;:
-                        data[name][&#39;child&#39;] = match.group(2),
-                        data[name][&#39;ping_state&#39;] = match.group(5)
-                        data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
-                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
-                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;ip4addr&#39;] = match.group(8)
-                    elif attribute == &#39;SNMP.snmpState&#39;:
-                        data[name][&#39;child&#39;] = match.group(2),
-                        data[name][&#39;snmp_state&#39;] = match.group(5)
-                        data[name][&#39;index&#39;] = match.group(4)
-                        data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
-                            int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
-                            int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                        data[name][&#39;ip4addr&#39;] = None
-                    if event_start &lt; data[name][&#39;event_start&#39;]:
-                        data[name][&#39;event_start&#39;] = event_start
+                    if attribute == &#34;PING.icmpState&#34;:
+                        data[name][&#34;child&#34;] = (match.group(2),)
+                        data[name][&#34;ping_state&#34;] = match.group(5)
+                        data[name][&#34;index&#34;] = match.group(4)
+                        data[name][&#34;device_added&#34;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;event_start&#34;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;ip4addr&#34;] = match.group(8)
+                    elif attribute == &#34;SNMP.snmpState&#34;:
+                        data[name][&#34;child&#34;] = (match.group(2),)
+                        data[name][&#34;snmp_state&#34;] = match.group(5)
+                        data[name][&#34;index&#34;] = match.group(4)
+                        data[name][&#34;device_added&#34;] = datetime.fromtimestamp(
+                            int(match.group(6)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;event_start&#34;] = datetime.fromtimestamp(
+                            int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                        )
+                        data[name][&#34;ip4addr&#34;] = None
+                    if event_start &lt; data[name][&#34;event_start&#34;]:
+                        data[name][&#34;event_start&#34;] = event_start
             logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
             logger.debug(&#34;data: {}&#34;.format(data))
 
         return data
 
-    def get_group_membership(self, device=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+    def get_group_membership(self, device=&#34;*&#34;, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
         Pull a list of device names to group memberships.  Defaults to all devices
         and all groups (including the special &#39;maintenance_mode&#39; group).
@@ -648,23 +690,25 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: f&#39;mgroup {device} *&#39;,
+            &#34;cmds&#34;: f&#34;mgroup {device} *&#34;,
         }
         if groups:
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = {}
             # Data comes back as &#39;plain/text&#39; type so we have to parse it
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s=\s(.*)$&#39;, line)
+                match = re.match(r&#34;^(\S+)\s=\s(.*)$&#34;, line)
                 if match:
                     if match.group(1) not in data:
                         # Populate a default entry for all desired fields
-                        data[match.group(1)] = match.group(2).split(&#39;,&#39;)
-            logger.debug(&#34;Found {} device and group mappings in akips&#34;.format(len(data.keys())))
+                        data[match.group(1)] = match.group(2).split(&#34;,&#34;)
+            logger.debug(
+                &#34;Found {} device and group mappings in akips&#34;.format(len(data.keys()))
+            )
             return data
         return None
 
@@ -678,25 +722,31 @@ class AKIPS:
         special site script and not the normal web API commands.
         &#34;&#34;&#34;
         if not device:
-            raise ValueError(&#34;a valid device name must be provided for manual grouping update&#34;)
+            raise ValueError(
+                &#34;a valid device name must be provided for manual grouping update&#34;
+            )
         if not group:
-            raise ValueError(&#34;a valid group name must be provided for manual grouping update&#34;)
-        if mode not in (&#39;assign&#39;, &#39;clear&#39;):
-            raise ValueError(&#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;)
+            raise ValueError(
+                &#34;a valid group name must be provided for manual grouping update&#34;
+            )
+        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
+            raise ValueError(
+                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
+            )
         params = {
-            &#39;function&#39;: &#39;web_manual_grouping&#39;,
-            &#39;type&#39;: &#39;device&#39;,
-            &#39;group&#39;: group,    # group_name
-            &#39;mode&#39;: mode,      # &#39;assign&#39; or &#39;clear&#39; for device memberships
-            &#39;device&#39;: device   # device_name
+            &#34;function&#34;: &#34;web_manual_grouping&#34;,
+            &#34;type&#34;: &#34;device&#34;,
+            &#34;group&#34;: group,  # group_name
+            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#34;device&#34;: device,  # device_name
         }
-        text = self._get(section=&#39;/api-script/&#39;, params=params)
+        text = self._get(section=&#34;/api-script/&#34;, params=params)
         if text:
             logger.error(&#34;Web API request failed: {}&#34;.format(text))
             raise AkipsError(message=text)
         return None
 
-    def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
+    def get_status(self, device=&#34;*&#34;, child=&#34;*&#34;, attribute=&#34;*&#34;):
         &#34;&#34;&#34;
         Pull the status values we are most interested in
 
@@ -707,7 +757,7 @@ class AKIPS:
         &#34;&#34;&#34;
         pass
 
-    def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
+    def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
         &#34;&#34;&#34;
         Pull a list of events.
 
@@ -717,24 +767,24 @@ class AKIPS:
             {attribute regex}] [profile {profile name}]
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {
-            &#39;cmds&#39;: f&#39;mget event {event_type} time {period}&#39;
-        }
+        params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
         text = self._get(params=params)
         if text:
             data = []
-            lines = text.split(&#39;\n&#39;)
+            lines = text.split(&#34;\n&#34;)
             for line in lines:
-                match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#39;, line)
+                match = re.match(
+                    r&#34;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#34;, line
+                )
                 if match:
                     entry = {
-                        &#39;epoch&#39;: match.group(1),
-                        &#39;parent&#39;: match.group(2),
-                        &#39;child&#39;: match.group(3),
-                        &#39;attribute&#39;: match.group(4),
-                        &#39;type&#39;: match.group(5),
-                        &#39;flags&#39;: match.group(6),
-                        &#39;details&#39;: match.group(7),
+                        &#34;epoch&#34;: match.group(1),
+                        &#34;parent&#34;: match.group(2),
+                        &#34;child&#34;: match.group(3),
+                        &#34;attribute&#34;: match.group(4),
+                        &#34;type&#34;: match.group(5),
+                        &#34;flags&#34;: match.group(6),
+                        &#34;details&#34;: match.group(7),
                     }
                     data.append(entry)
             logger.debug(&#34;Found {} events of type {} in akips&#34;.format(len(data), type))
@@ -743,8 +793,15 @@ class AKIPS:
 
     # Time-series commands
 
-    def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
-                   group_filter=&#39;any&#39;, groups=[]):
+    def get_series(
+        self,
+        period=&#34;last1h&#34;,
+        device=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        get_dict=True,
+        group_filter=&#34;any&#34;,
+        groups=[],
+    ):
         &#34;&#34;&#34;
         Pull a series of counter values.
 
@@ -753,12 +810,10 @@ class AKIPS:
             time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {
-            &#39;cmds&#39;: f&#39;cseries avg time {period} * {device} * {attribute}&#39;
-        }
+        params = {&#34;cmds&#34;: f&#34;cseries avg time {period} * {device} * {attribute}&#34;}
         if groups:
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             # Parse output in CSV format
@@ -774,8 +829,16 @@ class AKIPS:
             return csv_to_list
         return None
 
-    def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
-                      operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
+    def get_aggregate(
+        self,
+        period=&#34;last1h&#34;,
+        device=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        operator=&#34;avg&#34;,
+        interval=&#34;300&#34;,
+        group_filter=&#34;any&#34;,
+        groups=[],
+    ):
         &#34;&#34;&#34;
         Aggregate counter values in intervals over a period of time.
 
@@ -785,16 +848,16 @@ class AKIPS:
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#39;cmds&#39;: f&#39;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#39;
+            &#34;cmds&#34;: f&#34;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#34;
         }
         if groups:
             group_list = &#34; &#34;.join(groups)
-            params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             # Text should be one CSV line followed by one blank line
-            lines = text.split(&#39;\n&#39;)
-            values = lines[0].split(&#39;,&#39;)
+            lines = text.split(&#34;\n&#34;)
+            values = lines[0].split(&#34;,&#34;)
             logger.debug(&#34;Found {} aggregate values&#34;.format(len(values)))
             return values
         return None
@@ -805,35 +868,39 @@ class AKIPS:
         &#34;&#34;&#34;
         Attributes with a type of enum return five values separated by commas.
         &#34;&#34;&#34;
-        match = re.match(r&#39;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#39;, enum_string)
+        match = re.match(r&#34;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#34;, enum_string)
         if match:
             entry = {
-                &#39;number&#39;: match.group(1),       # list number (from MIB)
-                &#39;value&#39;: match.group(2),        # text value (from MIB)
+                &#34;number&#34;: match.group(1),  # list number (from MIB)
+                &#34;value&#34;: match.group(2),  # text value (from MIB)
                 # &#39;created&#39;: match.group(3),      # time created (epoch timestamp)
                 # &#39;modified&#39;: match.group(4),     # time modified (epoch timestamp)
-                &#39;description&#39;: match.group(5)   # child description
+                &#34;description&#34;: match.group(5),  # child description
             }
-            entry[&#39;created&#39;] = datetime.fromtimestamp(
-                int(match.group(3)), tz=pytz.timezone(self.server_timezone))
-            entry[&#39;modified&#39;] = datetime.fromtimestamp(
-                int(match.group(4)), tz=pytz.timezone(self.server_timezone))
+            entry[&#34;created&#34;] = datetime.fromtimestamp(
+                int(match.group(3)), tz=pytz.timezone(self.server_timezone)
+            )
+            entry[&#34;modified&#34;] = datetime.fromtimestamp(
+                int(match.group(4)), tz=pytz.timezone(self.server_timezone)
+            )
             return entry
         else:
-            raise AkipsError(message=f&#39;Not a ENUM type value: {enum_string}&#39;)
+            raise AkipsError(message=f&#34;Not a ENUM type value: {enum_string}&#34;)
 
-    def _get(self, section=&#39;/api-db/&#39;, params=None, timeout=30):
+    def _get(self, section=&#34;/api-db/&#34;, params=None, timeout=30):
         &#34;&#34;&#34;
         Call HTTP GET against the AKiPS server
         &#34;&#34;&#34;
-        server_url = &#39;https://&#39; + self.server + section
-        params[&#39;username&#39;] = self.username
-        params[&#39;password&#39;] = self.password
+        server_url = &#34;https://&#34; + self.server + section
+        params[&#34;username&#34;] = self.username
+        params[&#34;password&#34;] = self.password
 
-        if &#39;cmds&#39; in params:
-            logger.debug(&#34;akips command: {}&#34;.format(params[&#39;cmds&#39;]))
+        if &#34;cmds&#34; in params:
+            logger.debug(&#34;akips command: {}&#34;.format(params[&#34;cmds&#34;]))
         try:
-            r = self.session.get(server_url, params=params, verify=self.verify, timeout=timeout)
+            r = self.session.get(
+                server_url, params=params, verify=self.verify, timeout=timeout
+            )
             r.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             logger.error(errh)
@@ -849,7 +916,7 @@ class AKIPS:
             raise
 
         # AKiPS can return a raw error message if something fails
-        if re.match(r&#39;^ERROR:&#39;, r.text):
+        if re.match(r&#34;^ERROR:&#34;, r.text):
             logger.error(&#34;Web API request failed: {}&#34;.format(r.text))
             raise AkipsError(message=r.text)
         else:
@@ -871,8 +938,16 @@ time {time filter} type parent child attribute
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_aggregate(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;,
-                  operator=&#39;avg&#39;, interval=&#39;300&#39;, group_filter=&#39;any&#39;, groups=[]):
+<pre><code class="python">def get_aggregate(
+    self,
+    period=&#34;last1h&#34;,
+    device=&#34;*&#34;,
+    attribute=&#34;*&#34;,
+    operator=&#34;avg&#34;,
+    interval=&#34;300&#34;,
+    group_filter=&#34;any&#34;,
+    groups=[],
+):
     &#34;&#34;&#34;
     Aggregate counter values in intervals over a period of time.
 
@@ -882,16 +957,16 @@ time {time filter} type parent child attribute
         [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {
-        &#39;cmds&#39;: f&#39;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#39;
+        &#34;cmds&#34;: f&#34;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#34;
     }
     if groups:
         group_list = &#34; &#34;.join(groups)
-        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
     text = self._get(params=params)
     if text:
         # Text should be one CSV line followed by one blank line
-        lines = text.split(&#39;\n&#39;)
-        values = lines[0].split(&#39;,&#39;)
+        lines = text.split(&#34;\n&#34;)
+        values = lines[0].split(&#34;,&#34;)
         logger.debug(&#34;Found {} aggregate values&#34;.format(len(values)))
         return values
     return None</code></pre>
@@ -919,16 +994,14 @@ time {time filter} type parent child attribute
             [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
             [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
-    params = {
-        &#39;cmds&#39;: f&#39;mget * {name} * *&#39;
-    }
+    params = {&#34;cmds&#34;: f&#34;mget * {name} * *&#34;}
     text = self._get(params=params)
     if text:
         data = {}
         # Data comes back as &#39;plain/text&#39; type so we have to parse it.  Example:
-        lines = text.split(&#39;\n&#39;)
+        lines = text.split(&#34;\n&#34;)
         for line in lines:
-            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#39;, line)
+            match = re.match(r&#34;^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$&#34;, line)
             if match:
                 name = match.group(1)
                 if match.group(2) not in data:
@@ -939,9 +1012,9 @@ time {time filter} type parent child attribute
                     data[match.group(2)][match.group(3)] = match.group(5)
                 else:
                     # save a blank string if there was nothing after equals
-                    data[match.group(2)][match.group(3)] = &#39;&#39;
+                    data[match.group(2)][match.group(3)] = &#34;&#34;
         if name:
-            data[&#39;name&#39;] = name
+            data[&#34;name&#34;] = name
         logger.debug(&#34;Found device {} in akips&#34;.format(data))
         return data
     return None</code></pre>
@@ -969,13 +1042,10 @@ special site script and not the normal web API commands.</p></div>
     AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
     special site script and not the normal web API commands.
     &#34;&#34;&#34;
-    params = {
-        &#39;function&#39;: &#39;web_find_device_by_ip&#39;,
-        &#39;ipaddr&#39;: ipaddr
-    }
-    text = self._get(section=&#39;/api-script/&#39;, params=params)
+    params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
+    text = self._get(section=&#34;/api-script/&#34;, params=params)
     if text:
-        lines = text.split(&#39;\n&#39;)
+        lines = text.split(&#34;\n&#34;)
         for line in lines:
             match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
             if match:
@@ -1001,7 +1071,7 @@ but the default is all devices.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_devices(self, group_filter=&#39;any&#39;, groups=[]):
+<pre><code class="python">def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
     &#34;&#34;&#34;
     Pull a list of key attributes for multiple devices.  Can be filtered by group
     but the default is all devices.
@@ -1012,26 +1082,26 @@ but the default is all devices.</p>
             [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     attributes = [
-        &#39;ip4addr&#39;,
-        &#39;SNMPv2-MIB.sysName&#39;,
-        &#39;SNMPv2-MIB.sysDescr&#39;,
-        &#39;SNMPv2-MIB.sysLocation&#39;
+        &#34;ip4addr&#34;,
+        &#34;SNMPv2-MIB.sysName&#34;,
+        &#34;SNMPv2-MIB.sysDescr&#34;,
+        &#34;SNMPv2-MIB.sysLocation&#34;,
     ]
     cmd_attributes = &#34;|&#34;.join(attributes)
     params = {
-        &#39;cmds&#39;: f&#39;mget text * sys /{cmd_attributes}/&#39;,
+        &#34;cmds&#34;: f&#34;mget text * sys /{cmd_attributes}/&#34;,
     }
     if groups:
         # [any|all|not group {group name} ...]
         group_list = &#34; &#34;.join(groups)
-        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
     text = self._get(params=params)
     if text:
         data = {}
         # Data comes back as &#39;plain/text&#39; type so we have to parse it
-        lines = text.split(&#39;\n&#39;)
+        lines = text.split(&#34;\n&#34;)
         for line in lines:
-            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#39;, line)
+            match = re.match(r&#34;^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$&#34;, line)
             if match:
                 if match.group(1) not in data:
                     # Populate a default entry for all desired fields
@@ -1057,7 +1127,7 @@ time {time filter} [{parent regex} {child regex}
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_events(self, event_type=&#39;all&#39;, period=&#39;last1h&#39;):
+<pre><code class="python">def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
     &#34;&#34;&#34;
     Pull a list of events.
 
@@ -1067,24 +1137,24 @@ time {time filter} [{parent regex} {child regex}
         {attribute regex}] [profile {profile name}]
         [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
-    params = {
-        &#39;cmds&#39;: f&#39;mget event {event_type} time {period}&#39;
-    }
+    params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
     text = self._get(params=params)
     if text:
         data = []
-        lines = text.split(&#39;\n&#39;)
+        lines = text.split(&#34;\n&#34;)
         for line in lines:
-            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#39;, line)
+            match = re.match(
+                r&#34;^(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(.*)$&#34;, line
+            )
             if match:
                 entry = {
-                    &#39;epoch&#39;: match.group(1),
-                    &#39;parent&#39;: match.group(2),
-                    &#39;child&#39;: match.group(3),
-                    &#39;attribute&#39;: match.group(4),
-                    &#39;type&#39;: match.group(5),
-                    &#39;flags&#39;: match.group(6),
-                    &#39;details&#39;: match.group(7),
+                    &#34;epoch&#34;: match.group(1),
+                    &#34;parent&#34;: match.group(2),
+                    &#34;child&#34;: match.group(3),
+                    &#34;attribute&#34;: match.group(4),
+                    &#34;type&#34;: match.group(5),
+                    &#34;flags&#34;: match.group(6),
+                    &#34;details&#34;: match.group(7),
                 }
                 data.append(entry)
         logger.debug(&#34;Found {} events of type {} in akips&#34;.format(len(data), type))
@@ -1106,7 +1176,7 @@ and all groups (including the special 'maintenance_mode' group).</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_group_membership(self, device=&#39;*&#39;, group_filter=&#39;any&#39;, groups=[]):
+<pre><code class="python">def get_group_membership(self, device=&#34;*&#34;, group_filter=&#34;any&#34;, groups=[]):
     &#34;&#34;&#34;
     Pull a list of device names to group memberships.  Defaults to all devices
     and all groups (including the special &#39;maintenance_mode&#39; group).
@@ -1116,23 +1186,25 @@ and all groups (including the special 'maintenance_mode' group).</p>
             [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {
-        &#39;cmds&#39;: f&#39;mgroup {device} *&#39;,
+        &#34;cmds&#34;: f&#34;mgroup {device} *&#34;,
     }
     if groups:
         group_list = &#34; &#34;.join(groups)
-        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
     text = self._get(params=params)
     if text:
         data = {}
         # Data comes back as &#39;plain/text&#39; type so we have to parse it
-        lines = text.split(&#39;\n&#39;)
+        lines = text.split(&#34;\n&#34;)
         for line in lines:
-            match = re.match(r&#39;^(\S+)\s=\s(.*)$&#39;, line)
+            match = re.match(r&#34;^(\S+)\s=\s(.*)$&#34;, line)
             if match:
                 if match.group(1) not in data:
                     # Populate a default entry for all desired fields
-                    data[match.group(1)] = match.group(2).split(&#39;,&#39;)
-        logger.debug(&#34;Found {} device and group mappings in akips&#34;.format(len(data.keys())))
+                    data[match.group(1)] = match.group(2).split(&#34;,&#34;)
+        logger.debug(
+            &#34;Found {} device and group mappings in akips&#34;.format(len(data.keys()))
+        )
         return data
     return None</code></pre>
 </details>
@@ -1150,8 +1222,15 @@ time {time filter} type parent child attribute
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_series(self, period=&#39;last1h&#39;, device=&#39;*&#39;, attribute=&#39;*&#39;, get_dict=True,
-               group_filter=&#39;any&#39;, groups=[]):
+<pre><code class="python">def get_series(
+    self,
+    period=&#34;last1h&#34;,
+    device=&#34;*&#34;,
+    attribute=&#34;*&#34;,
+    get_dict=True,
+    group_filter=&#34;any&#34;,
+    groups=[],
+):
     &#34;&#34;&#34;
     Pull a series of counter values.
 
@@ -1160,12 +1239,10 @@ time {time filter} type parent child attribute
         time {time filter} type parent child attribute
         [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
-    params = {
-        &#39;cmds&#39;: f&#39;cseries avg time {period} * {device} * {attribute}&#39;
-    }
+    params = {&#34;cmds&#34;: f&#34;cseries avg time {period} * {device} * {attribute}&#34;}
     if groups:
         group_list = &#34; &#34;.join(groups)
-        params[&#39;cmds&#39;] += f&#34; {group_filter} group {group_list}&#34;
+        params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
     text = self._get(params=params)
     if text:
         # Parse output in CSV format
@@ -1195,7 +1272,7 @@ time {time filter} type parent child attribute
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_status(self, device=&#39;*&#39;, child=&#39;*&#39;, attribute=&#39;*&#39;):
+<pre><code class="python">def get_status(self, device=&#34;*&#34;, child=&#34;*&#34;, attribute=&#34;*&#34;):
     &#34;&#34;&#34;
     Pull the status values we are most interested in
 
@@ -1230,48 +1307,55 @@ time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {
-        &#39;cmds&#39;: &#39;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#39;,
+        &#34;cmds&#34;: &#34;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#34;,
     }
     text = self._get(params=params)
     data = {}
     if text:
-        lines = text.split(&#39;\n&#39;)
+        lines = text.split(&#34;\n&#34;)
         for line in lines:
-            match = re.match(r&#39;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#39;, line)
+            match = re.match(
+                r&#34;^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$&#34;, line
+            )
             if match:
                 # epoch fields are in the server&#39;s timezone
                 name = match.group(1)
                 attribute = match.group(3)
                 event_start = datetime.fromtimestamp(
-                    int(match.group(7)), tz=pytz.timezone(self.server_timezone))
+                    int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                )
                 if name not in data:
                     # populate a starting point for this device
                     data[name] = {
-                        &#39;name&#39;: name,
-                        &#39;ping_state&#39;: &#39;n/a&#39;,
-                        &#39;snmp_state&#39;: &#39;n/a&#39;,
-                        &#39;event_start&#39;: event_start  # epoch in local timezone
+                        &#34;name&#34;: name,
+                        &#34;ping_state&#34;: &#34;n/a&#34;,
+                        &#34;snmp_state&#34;: &#34;n/a&#34;,
+                        &#34;event_start&#34;: event_start,  # epoch in local timezone
                     }
-                if attribute == &#39;PING.icmpState&#39;:
-                    data[name][&#39;child&#39;] = match.group(2),
-                    data[name][&#39;ping_state&#39;] = match.group(5)
-                    data[name][&#39;index&#39;] = match.group(4)
-                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
-                        int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
-                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                    data[name][&#39;ip4addr&#39;] = match.group(8)
-                elif attribute == &#39;SNMP.snmpState&#39;:
-                    data[name][&#39;child&#39;] = match.group(2),
-                    data[name][&#39;snmp_state&#39;] = match.group(5)
-                    data[name][&#39;index&#39;] = match.group(4)
-                    data[name][&#39;device_added&#39;] = datetime.fromtimestamp(
-                        int(match.group(6)), tz=pytz.timezone(self.server_timezone))
-                    data[name][&#39;event_start&#39;] = datetime.fromtimestamp(
-                        int(match.group(7)), tz=pytz.timezone(self.server_timezone))
-                    data[name][&#39;ip4addr&#39;] = None
-                if event_start &lt; data[name][&#39;event_start&#39;]:
-                    data[name][&#39;event_start&#39;] = event_start
+                if attribute == &#34;PING.icmpState&#34;:
+                    data[name][&#34;child&#34;] = (match.group(2),)
+                    data[name][&#34;ping_state&#34;] = match.group(5)
+                    data[name][&#34;index&#34;] = match.group(4)
+                    data[name][&#34;device_added&#34;] = datetime.fromtimestamp(
+                        int(match.group(6)), tz=pytz.timezone(self.server_timezone)
+                    )
+                    data[name][&#34;event_start&#34;] = datetime.fromtimestamp(
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                    )
+                    data[name][&#34;ip4addr&#34;] = match.group(8)
+                elif attribute == &#34;SNMP.snmpState&#34;:
+                    data[name][&#34;child&#34;] = (match.group(2),)
+                    data[name][&#34;snmp_state&#34;] = match.group(5)
+                    data[name][&#34;index&#34;] = match.group(4)
+                    data[name][&#34;device_added&#34;] = datetime.fromtimestamp(
+                        int(match.group(6)), tz=pytz.timezone(self.server_timezone)
+                    )
+                    data[name][&#34;event_start&#34;] = datetime.fromtimestamp(
+                        int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                    )
+                    data[name][&#34;ip4addr&#34;] = None
+                if event_start &lt; data[name][&#34;event_start&#34;]:
+                    data[name][&#34;event_start&#34;] = event_start
         logger.debug(&#34;Found {} devices in akips&#34;.format(len(data)))
         logger.debug(&#34;data: {}&#34;.format(data))
 
@@ -1303,19 +1387,25 @@ special site script and not the normal web API commands.</p></div>
     special site script and not the normal web API commands.
     &#34;&#34;&#34;
     if not device:
-        raise ValueError(&#34;a valid device name must be provided for manual grouping update&#34;)
+        raise ValueError(
+            &#34;a valid device name must be provided for manual grouping update&#34;
+        )
     if not group:
-        raise ValueError(&#34;a valid group name must be provided for manual grouping update&#34;)
-    if mode not in (&#39;assign&#39;, &#39;clear&#39;):
-        raise ValueError(&#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;)
+        raise ValueError(
+            &#34;a valid group name must be provided for manual grouping update&#34;
+        )
+    if mode not in (&#34;assign&#34;, &#34;clear&#34;):
+        raise ValueError(
+            &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
+        )
     params = {
-        &#39;function&#39;: &#39;web_manual_grouping&#39;,
-        &#39;type&#39;: &#39;device&#39;,
-        &#39;group&#39;: group,    # group_name
-        &#39;mode&#39;: mode,      # &#39;assign&#39; or &#39;clear&#39; for device memberships
-        &#39;device&#39;: device   # device_name
+        &#34;function&#34;: &#34;web_manual_grouping&#34;,
+        &#34;type&#34;: &#34;device&#34;,
+        &#34;group&#34;: group,  # group_name
+        &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
+        &#34;device&#34;: device,  # device_name
     }
-    text = self._get(section=&#39;/api-script/&#39;, params=params)
+    text = self._get(section=&#34;/api-script/&#34;, params=params)
     if text:
         logger.error(&#34;Web API request failed: {}&#34;.format(text))
         raise AkipsError(message=text)
