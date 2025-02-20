@@ -380,6 +380,23 @@ class AKIPS:
             return values
         return None
 
+    # Low-level operations
+
+    def cmd(self, cmd, output="raw"):
+        """
+        Send a direct console command to AKiPS and parse and return the
+        output accordingly.
+        """
+
+        params = {"cmds": f"{cmd}"}
+        text = self._get(params=params)
+        if text:
+            if output == "raw":
+                return text
+            else:
+                raise ValueError("Invalid output value provided to cmd.")
+        return None
+
     # Base operations
 
     def _parse_enum(self, enum_string):
