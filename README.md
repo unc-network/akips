@@ -42,6 +42,10 @@ for name, fields in devices.items():
 
 [API Documentation](https://unc-network.github.io/akips/docs/akips/index.html)
 
+## Contributing
+
+[CONTRIBUTING.md](https://github.com/unc-network/akips/blob/develop/CONTRIBUTING.md)
+
 ## Bugs/Requests
 
 Please use the [GitHub issue tracker](https://github.com/unc-network/akips/issues) 
