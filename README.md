@@ -3,8 +3,8 @@
 [![Downloads](https://static.pepy.tech/badge/akips)](https://pepy.tech/project/akips)
 [![GitHub contributors](https://img.shields.io/github/contributors/unc-network/akips.svg)](https://GitHub.com/unc-network/akips/graphs/contributors/)
 
-akips
-=======
+# akips
+
 This akips module provides a simple way for python scripts to interact with 
 the [AKiPS Network Monitoring Software](http://akips.com) API interface.
 
@@ -12,7 +12,7 @@ the [AKiPS Network Monitoring Software](http://akips.com) API interface.
 
 To install akips, simply us pip:
 
-```
+```console
 $ pip install akips
 ```
 
@@ -24,7 +24,6 @@ with install instructions.
 
 This module can use additional routines included in the *akips_setup* directory of 
 this repository, [site_scripting.pl](akips_setup/site_scripting.pl).
-
 
 ## Usage Example
 
@@ -40,6 +39,7 @@ for name, fields in devices.items():
 ```
 
 ## API Documentation
+
 [API Documentation](https://unc-network.github.io/akips/docs/akips/index.html)
 
 ## Bugs/Requests
