@@ -69,19 +69,21 @@ jobs:
 
   pytest:
     name: Std Test on Python ${{ matrix.python-version }} (${{ matrix.platform}})
+    needs: linters
+    if: needs.linters.result == 'success'
     defaults:
       run:
         shell: bash
     strategy:
       matrix:
         python-version: [ '3.9', '3.10', '3.11', "3.12", "3.13" ]
-        platform: [ubuntu-24.04]
+        platform: [ubuntu-24.04, windows-2022]
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup python ${{ matrix.python-version }}
+      - name: Setup python ${{ matrix.python-version }} on ${{ matrix.platform }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -92,7 +94,7 @@ jobs:
         run: |
           pipx install poetry
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}  on ${{ matrix.platform }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
