@@ -1,18 +1,27 @@
 [tool.poetry]
 name = "akips"
-version = "0.3.1"
+version = "0.4.0"
 description = "Module to interact with the AKiPS Network Monitoring Software API interface"
 authors = ["William E Whitaker <will.whitaker@unc.edu>"]
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/unc-network/akips"
+classifiers = [
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<4.0"
+python = ">=3.9,<4.0"
 requests = ">=2.31"
 pytz = "*"
 
 [tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
 pytest = "^8.2.0"
 #flake8 = "^7.0.0"
 pdoc3 = "^0.10.0"
@@ -21,3 +30,15 @@ pylama = "^8.4.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+exclude = '''
+/(
+    \.git
+    | \.venv
+    | build
+    | dist
+    | akips_setup
+    | docs
+)/
+'''

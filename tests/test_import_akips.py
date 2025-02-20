@@ -1,4 +1,4 @@
-from akips import AKIPS     # noqa
+from akips import AKIPS  # noqa
 
 
 def test_placeholder():
