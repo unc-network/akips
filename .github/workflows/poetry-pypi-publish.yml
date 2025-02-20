@@ -1,17 +1,18 @@
-# This workflow handles publishing to PYPI
-name: poetry-pypi-publish
+name: Publish to PyPI
 on:
+  workflow_dispatch:
   release:
     types: [published]
-  workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
+    environment: prod
+
     steps:
     - uses: actions/checkout@v4
     

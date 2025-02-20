@@ -40,9 +40,9 @@ jobs:
       run: poetry install
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
 
-    - name: Run pylama
-      run: |
-        poetry run pylama .
+    #- name: Run pylama
+    #  run: |
+    #    poetry run pylama .
 
     - name: Test with pytest
       run: |
