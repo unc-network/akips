@@ -4,11 +4,13 @@ In order to contribute without having to be directly added as a contributor to t
 
 ## Navigate and Fork akips Repository
 
-Navigate to the AKiPS project on GitHub. Once you're on the main repository page click on the fork button.
+Navigate to the [AKiPS project](https://github.com/unc-network/akips) on GitHub. Once you're on the main repository page click on the fork button.
 
-[akips](https://github.com/unc-network/akips)
+![fork akips](./images/contribute-1.png)
 
 You'll then be brought to a screen to complete the fork into your personal user repository.
+
+![fork akips](./images/contribute-2.png)
 
 You'll finally be redirected to your fork, which is linked to the parent repository.
 
