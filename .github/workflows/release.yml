@@ -41,6 +41,22 @@ jobs:
       - name: Build package
         run: poetry build
 
+      - uses: actions/download-artifact@v2
+        with: { name: package }
+      - id: package_name
+        run: |
+          P="$(ls dist/akips*)"
+          echo "::set-output name=path::${P}"
+          echo "::set-output name=name::$(basename $P)"
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }} 
+          asset_path: ${{ steps.package_name.outputs.path }}
+          asset_name: ${{ steps.package_name.outputs.name }}
+          asset_content_type: application/octet-stream
+
       # - name: Upload Release Asset
       #   uses: actions/upload-release-asset@v1
       #   env:
