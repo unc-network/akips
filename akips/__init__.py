@@ -1,7 +1,7 @@
 """This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface."""
 
-__version__ = "0.4.0"
+__version__ = "0.4.2"
 
 import io
 import re
@@ -264,16 +264,52 @@ class AKIPS:
             raise AkipsError(message=text)
         return None
 
-    def get_status(self, device="*", child="*", attribute="*"):
+    def get_attributes(
+        self,
+        device="*",
+        child="*",
+        attribute="*",
+        value=None,
+        group_filter="any",
+        groups=[],
+    ):
         """
-        Pull the status values we are most interested in
+        Pull multiple attribute values that match.
 
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
                 [any|all|not group {group name} ...]`
         """
-        pass
+        params = {
+            "cmds": f"mget * {device} {child} {attribute}/",
+        }
+        if value:
+            # [value {text|/regex/|integer|ipaddr}]
+            params["cmds"] += f" value {value}"
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = " ".join(groups)
+            params["cmds"] += f" {group_filter} group {group_list}"
+        text = self._get(params=params)
+        if text:
+            data = {}
+            lines = text.split("\n")
+            for line in lines:
+                m = re.match(
+                    r"^(?P<d>\S+)\s(?P<c>\S+)\s(?P<a>\S+)\s=(\s(?P<v>.*))?$", line
+                )
+                if m:
+                    if m.group("d") not in data:
+                        # add device key if needed
+                        data[m.group("d")] = {}
+                    if m.group("c") not in data[m.group("d")]:
+                        # add child key if needed
+                        data[m.group("d")][m.group("c")] = {}
+                    data[m.group("d")][m.group("c")][m.group("a")] = m.group("v")
+            logger.debug("Found {} devices in akips".format(len(data.keys())))
+            return data
+        return None
 
     def get_events(self, event_type="all", period="last1h"):
         """
@@ -314,6 +350,7 @@ class AKIPS:
     def get_series(
         self,
         period="last1h",
+        time_interval=60,
         device="*",
         attribute="*",
         get_dict=True,
@@ -324,11 +361,13 @@ class AKIPS:
         Pull a series of counter values.
 
         AKiPS command syntax:
-            `cseries avg
-            time {time filter} type parent child attribute
+            `cseries interval avg
+            {time_interval} time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
         """
-        params = {"cmds": f"cseries avg time {period} * {device} * {attribute}"}
+        params = {
+            "cmds": f"cseries interval avg {time_interval} time {period} * {device} * {attribute}"
+        }
         if groups:
             group_list = " ".join(groups)
             params["cmds"] += f" {group_filter} group {group_list}"
@@ -378,6 +417,23 @@ class AKIPS:
             values = lines[0].split(",")
             logger.debug("Found {} aggregate values".format(len(values)))
             return values
+        return None
+
+    # Low-level operations
+
+    def cmd(self, cmd, output="raw"):
+        """
+        Send a direct console command to AKiPS and parse and return the
+        output accordingly.
+        """
+
+        params = {"cmds": f"{cmd}"}
+        text = self._get(params=params)
+        if text:
+            if output == "raw":
+                return text
+            else:
+                raise ValueError("Invalid output value provided to cmd.")
         return None
 
     # Base operations

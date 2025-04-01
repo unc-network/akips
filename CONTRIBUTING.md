@@ -4,11 +4,13 @@ In order to contribute without having to be directly added as a contributor to t
 
 ## Navigate and Fork akips Repository
 
-Navigate to the AKiPS project on GitHub. Once you're on the main repository page click on the fork button.
+Navigate to the [AKiPS project](https://github.com/unc-network/akips) on GitHub. Once you're on the main repository page click on the fork button.
 
-[akips](https://github.com/unc-network/akips)
+![fork akips](./images/contribute-1.png)
 
 You'll then be brought to a screen to complete the fork into your personal user repository.
+
+![fork akips](./images/contribute-2.png)
 
 You'll finally be redirected to your fork, which is linked to the parent repository.
 
@@ -52,7 +54,7 @@ nothing to commit, working tree clean
 
 ## Install Poetry
 
-Poetry is used to manage the dependencies needed for the Netmiko development environment.
+Poetry is used to manage the dependencies needed for the akips development environment.
 
 Make sure that you add Poetry to your $PATH.
 
@@ -63,7 +65,7 @@ Make sure that you add Poetry to your $PATH.
 Poetry (version 1.6.1)
 ```
 
-## Use Poetry to install Netmiko dependencies
+## Use Poetry to install akips dependencies
 
 This will also create a virtual environment located in .venv.
 
@@ -128,7 +130,7 @@ At the end of your changes the linters and unit tests MUST all pass.
 % pylama .
 
 # Unit tests
-% py.test tests/unit/
+% py.test tests
 ```
 
 ## Submit your PR to the akips repository

@@ -126,3 +126,36 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
         api = AKIPS("127.0.0.1")
         output = api.set_group_membership("10.10.10.146", "test_group", "assign")
         self.assertIsNone(output)
+
+    @patch("requests.Session.get")
+    def test_get_attributes(self, session_mock: MagicMock):
+        r_text = """TH840-F cpu A10-AX-MIB.axSysAverageControlCpuUsage = 1
+TH840-F cpu A10-AX-MIB.axSysAverageCpuUsage = 1
+TH840-F cpu A10-AX-MIB.axSysAverageDataCpuUsage = 1
+TH840-F cpu.0.5 A10-AX-MIB.axSysCpuUsageValueAtPeriod = 1
+TH840-F cpu.1 HOST-RESOURCES-MIB.hrDeviceDescr = Control CPU
+TH840-F cpu.1 HOST-RESOURCES-MIB.hrProcessorLoad = 1
+TH840-F cpu.1.5 A10-AX-MIB.axSysCpuUsageValueAtPeriod = 1
+TH840-F cpu.2 HOST-RESOURCES-MIB.hrDeviceDescr = Data CPU1
+TH840-F cpu.2 HOST-RESOURCES-MIB.hrProcessorLoad = 1
+TH840-F cpu.2.5 A10-AX-MIB.axSysCpuUsageValueAtPeriod = 1
+TH840-F Ethernet1 IF-MIB.ifAdminStatus = 1,up,1581605551,1581605551,
+TH840-F Ethernet1 IF-MIB.ifAlias =
+TH840-F Ethernet1 IF-MIB.ifDescr = Ethernet 1
+TH840-F Ethernet1 IF-MIB.ifHCInBroadcastPkts = 1
+TH840-F Ethernet1 IF-MIB.ifHCInMulticastPkts = 1
+TH840-F Ethernet1 IF-MIB.ifPhysAddress = 001fa008d411
+"""  # noqa
+        session_mock.return_value.ok = True
+        session_mock.return_value.status_code = 200
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        attr = api.get_attributes(device="TH840-F")
+        self.assertEqual(
+            attr["TH840-F"]["cpu"]["A10-AX-MIB.axSysAverageDataCpuUsage"], "1"
+        )
+        self.assertEqual(
+            attr["TH840-F"]["cpu.2"]["HOST-RESOURCES-MIB.hrDeviceDescr"], "Data CPU1"
+        )
+        self.assertIsNone(attr["TH840-F"]["Ethernet1"]["IF-MIB.ifAlias"])
