@@ -295,16 +295,52 @@ class AKIPS:
             raise AkipsError(message=text)
         return None
 
-    def get_status(self, device=&#34;*&#34;, child=&#34;*&#34;, attribute=&#34;*&#34;):
+    def get_attributes(
+        self,
+        device=&#34;*&#34;,
+        child=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        value=None,
+        group_filter=&#34;any&#34;,
+        groups=[],
+    ):
         &#34;&#34;&#34;
-        Pull the status values we are most interested in
+        Pull multiple attribute values that match.
 
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        pass
+        params = {
+            &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}/&#34;,
+        }
+        if value:
+            # [value {text|/regex/|integer|ipaddr}]
+            params[&#34;cmds&#34;] += f&#34; value {value}&#34;
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = &#34; &#34;.join(groups)
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            data = {}
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                m = re.match(
+                    r&#34;^(?P&lt;d&gt;\S+)\s(?P&lt;c&gt;\S+)\s(?P&lt;a&gt;\S+)\s=(\s(?P&lt;v&gt;.*))?$&#34;, line
+                )
+                if m:
+                    if m.group(&#34;d&#34;) not in data:  # add device key if needed
+                        data[m.group(&#34;d&#34;)] = {}
+                    if (
+                        m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]
+                    ):  # add child key if needed
+                        data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)] = {}
+                    data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)][m.group(&#34;a&#34;)] = m.group(&#34;v&#34;)
+            logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
+            return data
+        return None
 
     def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
         &#34;&#34;&#34;
@@ -766,16 +802,52 @@ class AKIPS:
             raise AkipsError(message=text)
         return None
 
-    def get_status(self, device=&#34;*&#34;, child=&#34;*&#34;, attribute=&#34;*&#34;):
+    def get_attributes(
+        self,
+        device=&#34;*&#34;,
+        child=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        value=None,
+        group_filter=&#34;any&#34;,
+        groups=[],
+    ):
         &#34;&#34;&#34;
-        Pull the status values we are most interested in
+        Pull multiple attribute values that match.
 
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        pass
+        params = {
+            &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}/&#34;,
+        }
+        if value:
+            # [value {text|/regex/|integer|ipaddr}]
+            params[&#34;cmds&#34;] += f&#34; value {value}&#34;
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = &#34; &#34;.join(groups)
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
+        text = self._get(params=params)
+        if text:
+            data = {}
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                m = re.match(
+                    r&#34;^(?P&lt;d&gt;\S+)\s(?P&lt;c&gt;\S+)\s(?P&lt;a&gt;\S+)\s=(\s(?P&lt;v&gt;.*))?$&#34;, line
+                )
+                if m:
+                    if m.group(&#34;d&#34;) not in data:  # add device key if needed
+                        data[m.group(&#34;d&#34;)] = {}
+                    if (
+                        m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]
+                    ):  # add child key if needed
+                        data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)] = {}
+                    data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)][m.group(&#34;a&#34;)] = m.group(&#34;v&#34;)
+            logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
+            return data
+        return None
 
     def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
         &#34;&#34;&#34;
@@ -1035,6 +1107,67 @@ time {time filter} type parent child attribute
         values = lines[0].split(&#34;,&#34;)
         logger.debug(&#34;Found {} aggregate values&#34;.format(len(values)))
         return values
+    return None</code></pre>
+</details>
+</dd>
+<dt id="akips.AKIPS.get_attributes"><code class="name flex">
+<span>def <span class="ident">get_attributes</span></span>(<span>self, device='*', child='*', attribute='*', value=None, group_filter='any', groups=[])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pull multiple attribute values that match.</p>
+<p>AKiPS command syntax:
+<code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+[any|all|not group {group name} ...]</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_attributes(
+    self,
+    device=&#34;*&#34;,
+    child=&#34;*&#34;,
+    attribute=&#34;*&#34;,
+    value=None,
+    group_filter=&#34;any&#34;,
+    groups=[],
+):
+    &#34;&#34;&#34;
+    Pull multiple attribute values that match.
+
+    AKiPS command syntax:
+        `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
+            [any|all|not group {group name} ...]`
+    &#34;&#34;&#34;
+    params = {
+        &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}/&#34;,
+    }
+    if value:
+        # [value {text|/regex/|integer|ipaddr}]
+        params[&#34;cmds&#34;] += f&#34; value {value}&#34;
+    if groups:
+        # [any|all|not group {group name} ...]
+        group_list = &#34; &#34;.join(groups)
+        params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
+    text = self._get(params=params)
+    if text:
+        data = {}
+        lines = text.split(&#34;\n&#34;)
+        for line in lines:
+            m = re.match(
+                r&#34;^(?P&lt;d&gt;\S+)\s(?P&lt;c&gt;\S+)\s(?P&lt;a&gt;\S+)\s=(\s(?P&lt;v&gt;.*))?$&#34;, line
+            )
+            if m:
+                if m.group(&#34;d&#34;) not in data:  # add device key if needed
+                    data[m.group(&#34;d&#34;)] = {}
+                if (
+                    m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]
+                ):  # add child key if needed
+                    data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)] = {}
+                data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)][m.group(&#34;a&#34;)] = m.group(&#34;v&#34;)
+        logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
+        return data
     return None</code></pre>
 </details>
 </dd>
@@ -1328,31 +1461,6 @@ and all groups (including the special 'maintenance_mode' group).</p>
     return None</code></pre>
 </details>
 </dd>
-<dt id="akips.AKIPS.get_status"><code class="name flex">
-<span>def <span class="ident">get_status</span></span>(<span>self, device='*', child='*', attribute='*')</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Pull the status values we are most interested in</p>
-<p>AKiPS command syntax:
-<code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...]</code></p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def get_status(self, device=&#34;*&#34;, child=&#34;*&#34;, attribute=&#34;*&#34;):
-    &#34;&#34;&#34;
-    Pull the status values we are most interested in
-
-    AKiPS command syntax:
-        `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...]`
-    &#34;&#34;&#34;
-    pass</code></pre>
-</details>
-</dd>
 <dt id="akips.AKIPS.get_unreachable"><code class="name flex">
 <span>def <span class="ident">get_unreachable</span></span>(<span>self)</span>
 </code></dt>
@@ -1504,13 +1612,13 @@ special site script and not the normal web API commands.</p></div>
 <ul class="">
 <li><code><a title="akips.AKIPS.cmd" href="#akips.AKIPS.cmd">cmd</a></code></li>
 <li><code><a title="akips.AKIPS.get_aggregate" href="#akips.AKIPS.get_aggregate">get_aggregate</a></code></li>
+<li><code><a title="akips.AKIPS.get_attributes" href="#akips.AKIPS.get_attributes">get_attributes</a></code></li>
 <li><code><a title="akips.AKIPS.get_device" href="#akips.AKIPS.get_device">get_device</a></code></li>
 <li><code><a title="akips.AKIPS.get_device_by_ip" href="#akips.AKIPS.get_device_by_ip">get_device_by_ip</a></code></li>
 <li><code><a title="akips.AKIPS.get_devices" href="#akips.AKIPS.get_devices">get_devices</a></code></li>
 <li><code><a title="akips.AKIPS.get_events" href="#akips.AKIPS.get_events">get_events</a></code></li>
 <li><code><a title="akips.AKIPS.get_group_membership" href="#akips.AKIPS.get_group_membership">get_group_membership</a></code></li>
 <li><code><a title="akips.AKIPS.get_series" href="#akips.AKIPS.get_series">get_series</a></code></li>
-<li><code><a title="akips.AKIPS.get_status" href="#akips.AKIPS.get_status">get_status</a></code></li>
 <li><code><a title="akips.AKIPS.get_unreachable" href="#akips.AKIPS.get_unreachable">get_unreachable</a></code></li>
 <li><code><a title="akips.AKIPS.set_group_membership" href="#akips.AKIPS.set_group_membership">set_group_membership</a></code></li>
 </ul>
