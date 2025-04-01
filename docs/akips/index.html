@@ -32,7 +32,7 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 <pre><code class="python">&#34;&#34;&#34;This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface.&#34;&#34;&#34;
 
-__version__ = &#34;0.4.0&#34;
+__version__ = &#34;0.4.1&#34;
 
 import io
 import re
@@ -345,6 +345,7 @@ class AKIPS:
     def get_series(
         self,
         period=&#34;last1h&#34;,
+        time_interval=60,
         device=&#34;*&#34;,
         attribute=&#34;*&#34;,
         get_dict=True,
@@ -355,11 +356,13 @@ class AKIPS:
         Pull a series of counter values.
 
         AKiPS command syntax:
-            `cseries avg
-            time {time filter} type parent child attribute
+            `cseries interval avg
+            {time_interval} time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {&#34;cmds&#34;: f&#34;cseries avg time {period} * {device} * {attribute}&#34;}
+        params = {
+            &#34;cmds&#34;: f&#34;cseries interval avg {time_interval} time {period} * {device} * {attribute}&#34;
+        }
         if groups:
             group_list = &#34; &#34;.join(groups)
             params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
@@ -813,6 +816,7 @@ class AKIPS:
     def get_series(
         self,
         period=&#34;last1h&#34;,
+        time_interval=60,
         device=&#34;*&#34;,
         attribute=&#34;*&#34;,
         get_dict=True,
@@ -823,11 +827,13 @@ class AKIPS:
         Pull a series of counter values.
 
         AKiPS command syntax:
-            `cseries avg
-            time {time filter} type parent child attribute
+            `cseries interval avg
+            {time_interval} time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
-        params = {&#34;cmds&#34;: f&#34;cseries avg time {period} * {device} * {attribute}&#34;}
+        params = {
+            &#34;cmds&#34;: f&#34;cseries interval avg {time_interval} time {period} * {device} * {attribute}&#34;
+        }
         if groups:
             group_list = &#34; &#34;.join(groups)
             params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
@@ -1270,13 +1276,13 @@ and all groups (including the special 'maintenance_mode' group).</p>
 </details>
 </dd>
 <dt id="akips.AKIPS.get_series"><code class="name flex">
-<span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', device='*', attribute='*', get_dict=True, group_filter='any', groups=[])</span>
+<span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', time_interval=60, device='*', attribute='*', get_dict=True, group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Pull a series of counter values.</p>
 <p>AKiPS command syntax:
-<code>cseries avg
-time {time filter} type parent child attribute
+<code>cseries interval avg
+{time_interval} time {time filter} type parent child attribute
 [any|all|not group {group name} ...]</code></p></div>
 <details class="source">
 <summary>
@@ -1285,6 +1291,7 @@ time {time filter} type parent child attribute
 <pre><code class="python">def get_series(
     self,
     period=&#34;last1h&#34;,
+    time_interval=60,
     device=&#34;*&#34;,
     attribute=&#34;*&#34;,
     get_dict=True,
@@ -1295,11 +1302,13 @@ time {time filter} type parent child attribute
     Pull a series of counter values.
 
     AKiPS command syntax:
-        `cseries avg
-        time {time filter} type parent child attribute
+        `cseries interval avg
+        {time_interval} time {time filter} type parent child attribute
         [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
-    params = {&#34;cmds&#34;: f&#34;cseries avg time {period} * {device} * {attribute}&#34;}
+    params = {
+        &#34;cmds&#34;: f&#34;cseries interval avg {time_interval} time {period} * {device} * {attribute}&#34;
+    }
     if groups:
         group_list = &#34; &#34;.join(groups)
         params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
