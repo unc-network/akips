@@ -300,11 +300,11 @@ class AKIPS:
                     r"^(?P<d>\S+)\s(?P<c>\S+)\s(?P<a>\S+)\s=(\s(?P<v>.*))?$", line
                 )
                 if m:
-                    if m.group("d") not in data:  # add device key if needed
+                    if m.group("d") not in data:
+                        # add device key if needed
                         data[m.group("d")] = {}
-                    if (
-                        m.group("c") not in data[m.group("d")]
-                    ):  # add child key if needed
+                    if m.group("c") not in data[m.group("d")]:
+                        # add child key if needed
                         data[m.group("d")][m.group("c")] = {}
                     data[m.group("d")][m.group("c")][m.group("a")] = m.group("v")
             logger.debug("Found {} devices in akips".format(len(data.keys())))
