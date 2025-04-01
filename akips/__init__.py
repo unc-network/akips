@@ -264,16 +264,52 @@ class AKIPS:
             raise AkipsError(message=text)
         return None
 
-    def get_status(self, device="*", child="*", attribute="*"):
+    def get_attributes(
+        self,
+        device="*",
+        child="*",
+        attribute="*",
+        value=None,
+        group_filter="any",
+        groups=[],
+    ):
         """
-        Pull the status values we are most interested in
+        Pull multiple attribute values that match.
 
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
                 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
                 [any|all|not group {group name} ...]`
         """
-        pass
+        params = {
+            "cmds": f"mget * {device} {child} {attribute}/",
+        }
+        if value:
+            # [value {text|/regex/|integer|ipaddr}]
+            params["cmds"] += f" value {value}"
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = " ".join(groups)
+            params["cmds"] += f" {group_filter} group {group_list}"
+        text = self._get(params=params)
+        if text:
+            data = {}
+            lines = text.split("\n")
+            for line in lines:
+                m = re.match(
+                    r"^(?P<d>\S+)\s(?P<c>\S+)\s(?P<a>\S+)\s=(\s(?P<v>.*))?$", line
+                )
+                if m:
+                    if m.group("d") not in data:  # add device key if needed
+                        data[m.group("d")] = {}
+                    if (
+                        m.group("c") not in data[m.group("d")]
+                    ):  # add child key if needed
+                        data[m.group("d")][m.group("c")] = {}
+                    data[m.group("d")][m.group("c")][m.group("a")] = m.group("v")
+            logger.debug("Found {} devices in akips".format(len(data.keys())))
+            return data
+        return None
 
     def get_events(self, event_type="all", period="last1h"):
         """
