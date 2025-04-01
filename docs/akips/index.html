@@ -32,7 +32,7 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 <pre><code class="python">&#34;&#34;&#34;This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface.&#34;&#34;&#34;
 
-__version__ = &#34;0.4.1&#34;
+__version__ = &#34;0.4.2&#34;
 
 import io
 import re
@@ -331,11 +331,11 @@ class AKIPS:
                     r&#34;^(?P&lt;d&gt;\S+)\s(?P&lt;c&gt;\S+)\s(?P&lt;a&gt;\S+)\s=(\s(?P&lt;v&gt;.*))?$&#34;, line
                 )
                 if m:
-                    if m.group(&#34;d&#34;) not in data:  # add device key if needed
+                    if m.group(&#34;d&#34;) not in data:
+                        # add device key if needed
                         data[m.group(&#34;d&#34;)] = {}
-                    if (
-                        m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]
-                    ):  # add child key if needed
+                    if m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]:
+                        # add child key if needed
                         data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)] = {}
                     data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)][m.group(&#34;a&#34;)] = m.group(&#34;v&#34;)
             logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
@@ -838,11 +838,11 @@ class AKIPS:
                     r&#34;^(?P&lt;d&gt;\S+)\s(?P&lt;c&gt;\S+)\s(?P&lt;a&gt;\S+)\s=(\s(?P&lt;v&gt;.*))?$&#34;, line
                 )
                 if m:
-                    if m.group(&#34;d&#34;) not in data:  # add device key if needed
+                    if m.group(&#34;d&#34;) not in data:
+                        # add device key if needed
                         data[m.group(&#34;d&#34;)] = {}
-                    if (
-                        m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]
-                    ):  # add child key if needed
+                    if m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]:
+                        # add child key if needed
                         data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)] = {}
                     data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)][m.group(&#34;a&#34;)] = m.group(&#34;v&#34;)
             logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
@@ -1159,11 +1159,11 @@ time {time filter} type parent child attribute
                 r&#34;^(?P&lt;d&gt;\S+)\s(?P&lt;c&gt;\S+)\s(?P&lt;a&gt;\S+)\s=(\s(?P&lt;v&gt;.*))?$&#34;, line
             )
             if m:
-                if m.group(&#34;d&#34;) not in data:  # add device key if needed
+                if m.group(&#34;d&#34;) not in data:
+                    # add device key if needed
                     data[m.group(&#34;d&#34;)] = {}
-                if (
-                    m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]
-                ):  # add child key if needed
+                if m.group(&#34;c&#34;) not in data[m.group(&#34;d&#34;)]:
+                    # add child key if needed
                     data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)] = {}
                 data[m.group(&#34;d&#34;)][m.group(&#34;c&#34;)][m.group(&#34;a&#34;)] = m.group(&#34;v&#34;)
         logger.debug(&#34;Found {} devices in akips&#34;.format(len(data.keys())))
