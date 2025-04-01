@@ -314,6 +314,7 @@ class AKIPS:
     def get_series(
         self,
         period="last1h",
+        time_interval=60,
         device="*",
         attribute="*",
         get_dict=True,
@@ -324,11 +325,13 @@ class AKIPS:
         Pull a series of counter values.
 
         AKiPS command syntax:
-            `cseries avg
-            time {time filter} type parent child attribute
+            `cseries interval avg
+            {time_interval} time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
         """
-        params = {"cmds": f"cseries avg time {period} * {device} * {attribute}"}
+        params = {
+            "cmds": f"cseries interval avg {time_interval} time {period} * {device} * {attribute}"
+        }
         if groups:
             group_list = " ".join(groups)
             params["cmds"] += f" {group_filter} group {group_list}"
