@@ -1,15 +1,16 @@
 """This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface."""
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 
-import io
-import re
-import logging
-from datetime import datetime
-import requests
-import pytz
 import csv
+import io
+import logging
+import re
+from datetime import datetime
+
+import pytz
+import requests
 
 from akips.exceptions import AkipsError
 
@@ -282,7 +283,7 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         """
         params = {
-            "cmds": f"mget * {device} {child} {attribute}/",
+            "cmds": f"mget * {device} {child} {attribute}",
         }
         if value:
             # [value {text|/regex/|integer|ipaddr}]
