@@ -209,7 +209,7 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         """
         params = {
-            "cmds": f"mgroup {device} *",
+            "cmds": f"mgroup * {device}",
         }
         if groups:
             group_list = " ".join(groups)
