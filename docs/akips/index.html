@@ -32,15 +32,16 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 <pre><code class="python">&#34;&#34;&#34;This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface.&#34;&#34;&#34;
 
-__version__ = &#34;0.4.2&#34;
+__version__ = &#34;0.4.3&#34;
 
-import io
-import re
-import logging
-from datetime import datetime
-import requests
-import pytz
 import csv
+import io
+import logging
+import re
+from datetime import datetime
+
+import pytz
+import requests
 
 from akips.exceptions import AkipsError
 
@@ -313,7 +314,7 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}/&#34;,
+            &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}&#34;,
         }
         if value:
             # [value {text|/regex/|integer|ipaddr}]
@@ -820,7 +821,7 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}/&#34;,
+            &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}&#34;,
         }
         if value:
             # [value {text|/regex/|integer|ipaddr}]
@@ -1141,7 +1142,7 @@ time {time filter} type parent child attribute
             [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {
-        &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}/&#34;,
+        &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}&#34;,
     }
     if value:
         # [value {text|/regex/|integer|ipaddr}]
