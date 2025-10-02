@@ -240,7 +240,7 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#34;cmds&#34;: f&#34;mgroup {device} *&#34;,
+            &#34;cmds&#34;: f&#34;mgroup * {device}&#34;,
         }
         if groups:
             group_list = &#34; &#34;.join(groups)
@@ -343,7 +343,9 @@ class AKIPS:
             return data
         return None
 
-    def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
+    def get_events(
+        self, event_type=&#34;all&#34;, period=&#34;last1h&#34;, group_filter=&#34;any&#34;, groups=[]
+    ):
         &#34;&#34;&#34;
         Pull a list of events.
 
@@ -354,6 +356,10 @@ class AKIPS:
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = &#34; &#34;.join(groups)
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = []
@@ -747,7 +753,7 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {
-            &#34;cmds&#34;: f&#34;mgroup {device} *&#34;,
+            &#34;cmds&#34;: f&#34;mgroup * {device}&#34;,
         }
         if groups:
             group_list = &#34; &#34;.join(groups)
@@ -850,7 +856,9 @@ class AKIPS:
             return data
         return None
 
-    def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
+    def get_events(
+        self, event_type=&#34;all&#34;, period=&#34;last1h&#34;, group_filter=&#34;any&#34;, groups=[]
+    ):
         &#34;&#34;&#34;
         Pull a list of events.
 
@@ -861,6 +869,10 @@ class AKIPS:
             [any|all|not group {group name} ...]`
         &#34;&#34;&#34;
         params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = &#34; &#34;.join(groups)
+            params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
         text = self._get(params=params)
         if text:
             data = []
@@ -1314,7 +1326,7 @@ but the default is all devices.</p>
 </details>
 </dd>
 <dt id="akips.AKIPS.get_events"><code class="name flex">
-<span>def <span class="ident">get_events</span></span>(<span>self, event_type='all', period='last1h')</span>
+<span>def <span class="ident">get_events</span></span>(<span>self, event_type='all', period='last1h', group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Pull a list of events.</p>
@@ -1327,7 +1339,9 @@ time {time filter} [{parent regex} {child regex}
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_events(self, event_type=&#34;all&#34;, period=&#34;last1h&#34;):
+<pre><code class="python">def get_events(
+    self, event_type=&#34;all&#34;, period=&#34;last1h&#34;, group_filter=&#34;any&#34;, groups=[]
+):
     &#34;&#34;&#34;
     Pull a list of events.
 
@@ -1338,6 +1352,10 @@ time {time filter} [{parent regex} {child regex}
         [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
+    if groups:
+        # [any|all|not group {group name} ...]
+        group_list = &#34; &#34;.join(groups)
+        params[&#34;cmds&#34;] += f&#34; {group_filter} group {group_list}&#34;
     text = self._get(params=params)
     if text:
         data = []
@@ -1386,7 +1404,7 @@ and all groups (including the special 'maintenance_mode' group).</p>
             [any|all|not group {group name} ...]`
     &#34;&#34;&#34;
     params = {
-        &#34;cmds&#34;: f&#34;mgroup {device} *&#34;,
+        &#34;cmds&#34;: f&#34;mgroup * {device}&#34;,
     }
     if groups:
         group_list = &#34; &#34;.join(groups)
