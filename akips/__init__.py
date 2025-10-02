@@ -312,7 +312,9 @@ class AKIPS:
             return data
         return None
 
-    def get_events(self, event_type="all", period="last1h", group_filter="any", groups=[]):
+    def get_events(
+        self, event_type="all", period="last1h", group_filter="any", groups=[]
+    ):
         """
         Pull a list of events.
 
