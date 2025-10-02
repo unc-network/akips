@@ -1,7 +1,7 @@
 """This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface."""
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"
 
 import csv
 import io
@@ -209,7 +209,7 @@ class AKIPS:
                 [any|all|not group {group name} ...]`
         """
         params = {
-            "cmds": f"mgroup {device} *",
+            "cmds": f"mgroup * {device}",
         }
         if groups:
             group_list = " ".join(groups)
@@ -312,7 +312,9 @@ class AKIPS:
             return data
         return None
 
-    def get_events(self, event_type="all", period="last1h"):
+    def get_events(
+        self, event_type="all", period="last1h", group_filter="any", groups=[]
+    ):
         """
         Pull a list of events.
 
@@ -323,6 +325,10 @@ class AKIPS:
             [any|all|not group {group name} ...]`
         """
         params = {"cmds": f"mget event {event_type} time {period}"}
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = " ".join(groups)
+            params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
             data = []
