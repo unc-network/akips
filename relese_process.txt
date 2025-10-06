@@ -5,6 +5,7 @@ poetry install
 
 # Run quality checks
 poetry run pylama .
+poetry run black --check . 
 poetry run pytest -v -s tests
 
 # Fix errors before proceeding.

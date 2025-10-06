@@ -1,7 +1,7 @@
 """This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface."""
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 
 import csv
 import io
@@ -114,7 +114,7 @@ class AKIPS:
             return data
         return None
 
-    def get_device_by_ip(self, ipaddr, use_cache=True):
+    def get_device_by_ip(self, ipaddr):
         """
         Devices may have additional IP addresses recorded in akips, but only one primary
         name and address.  Search for a device name by an alternate IP address.
@@ -275,7 +275,8 @@ class AKIPS:
         groups=[],
     ):
         """
-        Pull multiple attribute values that match.
+        Pull multiple attribute values that match.  Results can be filtered by
+        'device', 'child', 'attribute', or attribute 'value'.
 
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
