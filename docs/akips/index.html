@@ -32,7 +32,7 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 <pre><code class="python">&#34;&#34;&#34;This akips python module provides a simple way for python scripts to interact with
 the AKiPS Network Monitoring Software Web API interface.&#34;&#34;&#34;
 
-__version__ = &#34;0.4.3&#34;
+__version__ = &#34;0.4.5&#34;
 
 import csv
 import io
@@ -145,7 +145,7 @@ class AKIPS:
             return data
         return None
 
-    def get_device_by_ip(self, ipaddr, use_cache=True):
+    def get_device_by_ip(self, ipaddr):
         &#34;&#34;&#34;
         Devices may have additional IP addresses recorded in akips, but only one primary
         name and address.  Search for a device name by an alternate IP address.
@@ -306,7 +306,8 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Pull multiple attribute values that match.
+        Pull multiple attribute values that match.  Results can be filtered by
+        &#39;device&#39;, &#39;child&#39;, &#39;attribute&#39;, or attribute &#39;value&#39;.
 
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
@@ -658,7 +659,7 @@ class AKIPS:
             return data
         return None
 
-    def get_device_by_ip(self, ipaddr, use_cache=True):
+    def get_device_by_ip(self, ipaddr):
         &#34;&#34;&#34;
         Devices may have additional IP addresses recorded in akips, but only one primary
         name and address.  Search for a device name by an alternate IP address.
@@ -819,7 +820,8 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Pull multiple attribute values that match.
+        Pull multiple attribute values that match.  Results can be filtered by
+        &#39;device&#39;, &#39;child&#39;, &#39;attribute&#39;, or attribute &#39;value&#39;.
 
         AKiPS command syntax:
             `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
@@ -1127,7 +1129,9 @@ time {time filter} type parent child attribute
 <span>def <span class="ident">get_attributes</span></span>(<span>self, device='*', child='*', attribute='*', value=None, group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull multiple attribute values that match.</p>
+<div class="desc"><p>Pull multiple attribute values that match.
+Results can be filtered by
+'device', 'child', 'attribute', or attribute 'value'.</p>
 <p>AKiPS command syntax:
 <code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
 [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
@@ -1146,7 +1150,8 @@ time {time filter} type parent child attribute
     groups=[],
 ):
     &#34;&#34;&#34;
-    Pull multiple attribute values that match.
+    Pull multiple attribute values that match.  Results can be filtered by
+    &#39;device&#39;, &#39;child&#39;, &#39;attribute&#39;, or attribute &#39;value&#39;.
 
     AKiPS command syntax:
         `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
@@ -1233,7 +1238,7 @@ time {time filter} type parent child attribute
 </details>
 </dd>
 <dt id="akips.AKIPS.get_device_by_ip"><code class="name flex">
-<span>def <span class="ident">get_device_by_ip</span></span>(<span>self, ipaddr, use_cache=True)</span>
+<span>def <span class="ident">get_device_by_ip</span></span>(<span>self, ipaddr)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Devices may have additional IP addresses recorded in akips, but only one primary
@@ -1246,7 +1251,7 @@ special site script and not the normal web API commands.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_device_by_ip(self, ipaddr, use_cache=True):
+<pre><code class="python">def get_device_by_ip(self, ipaddr):
     &#34;&#34;&#34;
     Devices may have additional IP addresses recorded in akips, but only one primary
     name and address.  Search for a device name by an alternate IP address.
