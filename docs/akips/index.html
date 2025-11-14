@@ -29,10 +29,12 @@ the AKiPS Network Monitoring Software Web API interface.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34;This akips python module provides a simple way for python scripts to interact with
-the AKiPS Network Monitoring Software Web API interface.&#34;&#34;&#34;
+<pre><code class="python">&#34;&#34;&#34;
+This akips python module provides a simple way for python scripts to interact with
+the AKiPS Network Monitoring Software Web API interface.
+&#34;&#34;&#34;
 
-__version__ = &#34;0.4.5&#34;
+__version__ = &#34;0.5.0&#34;
 
 import csv
 import io
@@ -50,7 +52,16 @@ logger = logging.getLogger(__name__)
 
 
 class AKIPS:
-    &#34;&#34;&#34;Class to handle interactions with AKiPS API&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    A class to handle interactions with the AKiPS Web API
+
+    Attributes:
+        server (str): The AKiPS server hostname or IP address
+        username (str): The AKiPS API username (default: &#34;api-ro&#34;)
+        password (str): The AKiPS API password
+        verify (bool): Whether to verify SSL certificates (default: True)
+        server_timezone (str): Timezone of the AKiPS server (default: &#34;America/New_York&#34;)
+    &#34;&#34;&#34;
 
     def __init__(
         self,
@@ -72,13 +83,22 @@ class AKIPS:
 
     def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
-        Pull a list of key attributes for multiple devices.  Can be filtered by group
-        but the default is all devices.
+        Pull a list of all devices and their key attributes, optionally filtered by group
+        membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to attribute dictionaries, or None if no devices found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         attributes = [
             &#34;ip4addr&#34;,
@@ -113,12 +133,22 @@ class AKIPS:
 
     def get_device(self, name):
         &#34;&#34;&#34;
-        Pull the entire configuration for a single device.
+        Pull all configuration attributes for a single device.  The name is the
+        primary device key in AKiPS which might be an IP address or hostname
+        depending on your AKiPS settings.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            name (str): The device name to retrieve
+        Returns:
+            A dictionary of device attributes, or None if the device was not found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {&#34;cmds&#34;: f&#34;mget * {name} * *&#34;}
         text = self._get(params=params)
@@ -147,14 +177,23 @@ class AKIPS:
 
     def get_device_by_ip(self, ipaddr):
         &#34;&#34;&#34;
-        Devices may have additional IP addresses recorded in akips, but only one primary
-        name and address.  Search for a device name by an alternate IP address.
+        Return the device name (primary key) for a device matching the given IP address.
+        AKiPS records additional IP addresses when found on devices, so this function
+        can be used to find the primary device name (primary key) from any known IP address.
 
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
-        special site script and not the normal web API commands.
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_find_device_by_ip(ipaddr)
+
+        Args:
+            ipaddr (str): IP address to search for
+        Returns:
+            the device name (str) if found, or None if no match is found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
-        text = self._get(section=&#34;/api-script/&#34;, params=params)
+        text = self._get(section=&#34;api-script&#34;, params=params)
         if text:
             lines = text.split(&#34;\n&#34;)
             for line in lines:
@@ -168,12 +207,18 @@ class AKIPS:
 
     def get_unreachable(self):
         &#34;&#34;&#34;
-        Pull a list of unreachable IPv4 ping devices
+        Pull a list of unreachable devices by Ping and SNMP state.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Returns:
+            A dictionary of device names to their unreachable attributes
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: &#34;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#34;,
@@ -235,9 +280,19 @@ class AKIPS:
         Pull a list of device names to group memberships.  Defaults to all devices
         and all groups (including the special &#39;maintenance_mode&#39; group).
 
-        AKiPS command syntax:
-            `mgroup {type} [{parent regex}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mgroup {type} [{parent regex}]
+                [any|all|not group {group name} ...]
+
+        Args:
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to lists of group names, or None if no devices found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;mgroup * {device}&#34;,
@@ -264,12 +319,22 @@ class AKIPS:
 
     def set_group_membership(self, device, group, mode):
         &#34;&#34;&#34;
-        Update manual grouping rules for a device, including the special
-        &#39;maintenance_mode&#39; group.  The web api script fails silently if the device or group
-        does not exist.
+        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
+        group.  The web api script fails silently if the device or group does not exist.
 
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
-        special site script and not the normal web API commands.
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_manual_grouping(type, group, mode, device)
+
+        Args:
+            device (str): device name to update
+            group (str): group name to update
+            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
+        Returns:
+            None
+        Raises:
+            ValueError: if invalid parameters are provided
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         if not device:
             raise ValueError(
@@ -290,7 +355,7 @@ class AKIPS:
             &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
             &#34;device&#34;: device,  # device_name
         }
-        text = self._get(section=&#34;/api-script/&#34;, params=params)
+        text = self._get(section=&#34;api-script&#34;, params=params)
         if text:
             logger.error(&#34;Web API request failed: {}&#34;.format(text))
             raise AkipsError(message=text)
@@ -306,13 +371,30 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Pull multiple attribute values that match.  Results can be filtered by
-        &#39;device&#39;, &#39;child&#39;, &#39;attribute&#39;, or attribute &#39;value&#39;.
+        Pull attribute values with variable search criteria.  Search criteria defaults to
+        a wildcard match but can be filtered by &#39;device&#39; name or pattern, &#39;child&#39; name or pattern,
+        &#39;attribute&#39; name or pattern, and/or attribute &#39;value&#39; or pattern.  Additionally,
+        results can be filtered by group membership using &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators
+        along with one or more group names.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            child (str): child name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            value (str): value or pattern to match (default: None)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A nested dictionary of device names to child names to attribute names and values,
+            or None if no devices found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}&#34;,
@@ -345,18 +427,44 @@ class AKIPS:
         return None
 
     def get_events(
-        self, event_type=&#34;all&#34;, period=&#34;last1h&#34;, group_filter=&#34;any&#34;, groups=[]
+        self,
+        event_type=&#34;all&#34;,
+        period=&#34;last1h&#34;,
+        device=&#34;*&#34;,
+        child=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        group_filter=&#34;any&#34;,
+        groups=[],
     ):
         &#34;&#34;&#34;
-        Pull a list of events.
+        Pull a list of events over a time period with optional filtering by device,
+        child, attribute, and/or group membership.  Defaults to all event types over
+        the last hour.  Review AKiPS documentation for details on event types and
+        time filter syntax.
 
-        AKiPS command syntax:
-            `mget event {all,critical,enum,threshold,uptime}
-            time {time filter} [{parent regex} {child regex}
-            {attribute regex}] [profile {profile name}]
-            [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget event {all,critical,enum,threshold,uptime}
+                time {time filter} [{parent regex} {child regex}
+                {attribute regex}] [profile {profile name}]
+                [any|all|not group {group name} ...]
+
+        Args:
+            event_type (str): type of events to retrieve (default: &#39;all&#39;)
+            period (str): time period to retrieve events from (default: &#39;last1h&#39;)
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            child (str): child name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A list of event dictionaries, or None if no events found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
-        params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
+        params = {
+            &#34;cmds&#34;: f&#34;mget event {event_type} time {period} {device} {child} {attribute}&#34;
+        }
         if groups:
             # [any|all|not group {group name} ...]
             group_list = &#34; &#34;.join(groups)
@@ -397,12 +505,29 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Pull a series of counter values.
+        Pull a series of counter values with average values over a time period with optional
+        filtering by device, attribute, and/or group membership.  Defaults to all devices
+        and attributes over the last hour with 60 second intervals.  Review AKiPS documentation
+        for details on time filter syntax.
 
-        AKiPS command syntax:
-            `cseries interval avg
-            {time_interval} time {time filter} type parent child attribute
-            [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            cseries [interval total|avg {secs}] time {time filter}
+                {type} {parent regex} {child regex} {attribute regex}
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            period (str): time period to retrieve series from (default: &#39;last1h&#39;)
+            time_interval (int): interval in seconds for series data points (default: 60)
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            get_dict (bool): return each row as a dictionary (default: True)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A list of series data rows (as dictionaries or lists), or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;cseries interval avg {time_interval} time {period} * {device} * {attribute}&#34;
@@ -436,12 +561,29 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Aggregate counter values in intervals over a period of time.
+        Pull aggregate counter values over a period of time with optional filtering
+        by device, attribute, and/or group membership.  Defaults to all devices
+        and attributes over the last hour with average aggregation every 300 seconds.  Review
+        AKiPS documentation for details on time filter syntax.
 
-        AKiPS command syntax:
-            `aggregate interval {avg|total seconds}
-            time {time filter} type parent child attribute
-            [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            aggregate [interval total|avg {secs}] time {time filter}
+                {type} {parent regex} {child regex} {attribute regex}
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            period (str): time period to retrieve series from (default: &#39;last1h&#39;)
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            operator (str): aggregation operator, &#39;avg&#39; or &#39;total seconds&#39; (default: &#39;avg&#39;)
+            interval (str): interval in seconds for aggregation points (default: &#39;300&#39;)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A list of aggregate values, or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#34;
@@ -462,8 +604,18 @@ class AKIPS:
 
     def cmd(self, cmd, output=&#34;raw&#34;):
         &#34;&#34;&#34;
-        Send a direct console command to AKiPS and parse and return the
-        output accordingly.
+        Experimental and may be removed in future releases.  Currently only a shortcut
+        to send raw AKiPS api-db command strings to the server and return raw output for
+        debugging.
+
+        Args:
+            cmd (str): AKiPS command string to send
+            output (str): desired output format, currently only &#39;raw&#39; is supported
+        Returns:
+            The command output in the desired format, or None if no output
+        Raises:
+            ValueError: if an invalid output format is provided
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
 
         params = {&#34;cmds&#34;: f&#34;{cmd}&#34;}
@@ -480,6 +632,13 @@ class AKIPS:
     def _parse_enum(self, enum_string):
         &#34;&#34;&#34;
         Attributes with a type of enum return five values separated by commas.
+
+        Args:
+            enum_string (str): the raw enum string from AKiPS
+        Returns:
+            A dictionary with keys: number, value, created, modified, description
+        Raises:
+            AkipsError: if the provided string is not a valid enum type value
         &#34;&#34;&#34;
         match = re.match(r&#34;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#34;, enum_string)
         if match:
@@ -500,16 +659,46 @@ class AKIPS:
         else:
             raise AkipsError(message=f&#34;Not a ENUM type value: {enum_string}&#34;)
 
-    def _get(self, section=&#34;/api-db/&#34;, params=None, timeout=30):
+    def _get(self, section=&#34;api-db&#34;, params=None, timeout=30):
         &#34;&#34;&#34;
-        Call HTTP GET against the AKiPS server
+        Base HTTP GET against the AKiPS server for web API calls.
+
+        Section options are individually enabled via the AKiPS Web API Settings page.
+            api-availability      : Availability, default off
+            api-db                : Config and Events, default off
+            api-config-viewer     : Config Viewer, default off
+            api-http-log          : HTTP Log, default off
+            api-flow              : NetFlow, default off
+            api-flow-timeseries   : NetFlow Time-series, default off
+            api-script            : Site Script Functions, default off
+            api-spm               : Switch Port Mapper, default off
+            api-msg               : Syslog and Traps, default off
+            api-unused-interfaces : Unused Interface, default off
+
+        Args:
+            section (str): API section to call (default: &#39;api-db&#39;)
+            params (dict): dictionary of parameters to pass to the server
+            timeout (int): HTTP timeout in seconds (default: 30)
+        Returns:
+            text output from the server
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+            requests.exceptions.HTTPError: for HTTP error responses
+            requests.exceptions.ConnectionError: for connection errors
+            requests.exceptions.Timeout: for request timeouts
+            requests.exceptions.RequestException: for HTTP request errors
         &#34;&#34;&#34;
-        server_url = &#34;https://&#34; + self.server + section
+        server_url = f&#34;https://{self.server}/{section}&#34;
         params[&#34;username&#34;] = self.username
         params[&#34;password&#34;] = self.password
 
-        if &#34;cmds&#34; in params:
-            logger.debug(&#34;akips command: {}&#34;.format(params[&#34;cmds&#34;]))
+        logger.debug(&#34;GET url: {}&#34;.format(server_url))
+        logger.debug(
+            &#34;GET params: {}&#34;.format(
+                {k: v for k, v in params.items() if k != &#34;password&#34;}
+            )
+        )
+
         try:
             r = self.session.get(
                 server_url, params=params, verify=self.verify, timeout=timeout
@@ -558,13 +747,35 @@ class AKIPS:
 <span>(</span><span>server, username='api-ro', password=None, verify=True, timezone='America/New_York')</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Class to handle interactions with AKiPS API</p></div>
+<div class="desc"><p>A class to handle interactions with the AKiPS Web API</p>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>server</code></strong> :&ensp;<code>str</code></dt>
+<dd>The AKiPS server hostname or IP address</dd>
+<dt><strong><code>username</code></strong> :&ensp;<code>str</code></dt>
+<dd>The AKiPS API username (default: "api-ro")</dd>
+<dt><strong><code>password</code></strong> :&ensp;<code>str</code></dt>
+<dd>The AKiPS API password</dd>
+<dt><strong><code>verify</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to verify SSL certificates (default: True)</dd>
+<dt><strong><code>server_timezone</code></strong> :&ensp;<code>str</code></dt>
+<dd>Timezone of the AKiPS server (default: "America/New_York")</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AKIPS:
-    &#34;&#34;&#34;Class to handle interactions with AKiPS API&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    A class to handle interactions with the AKiPS Web API
+
+    Attributes:
+        server (str): The AKiPS server hostname or IP address
+        username (str): The AKiPS API username (default: &#34;api-ro&#34;)
+        password (str): The AKiPS API password
+        verify (bool): Whether to verify SSL certificates (default: True)
+        server_timezone (str): Timezone of the AKiPS server (default: &#34;America/New_York&#34;)
+    &#34;&#34;&#34;
 
     def __init__(
         self,
@@ -586,13 +797,22 @@ class AKIPS:
 
     def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
-        Pull a list of key attributes for multiple devices.  Can be filtered by group
-        but the default is all devices.
+        Pull a list of all devices and their key attributes, optionally filtered by group
+        membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to attribute dictionaries, or None if no devices found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         attributes = [
             &#34;ip4addr&#34;,
@@ -627,12 +847,22 @@ class AKIPS:
 
     def get_device(self, name):
         &#34;&#34;&#34;
-        Pull the entire configuration for a single device.
+        Pull all configuration attributes for a single device.  The name is the
+        primary device key in AKiPS which might be an IP address or hostname
+        depending on your AKiPS settings.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            name (str): The device name to retrieve
+        Returns:
+            A dictionary of device attributes, or None if the device was not found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {&#34;cmds&#34;: f&#34;mget * {name} * *&#34;}
         text = self._get(params=params)
@@ -661,14 +891,23 @@ class AKIPS:
 
     def get_device_by_ip(self, ipaddr):
         &#34;&#34;&#34;
-        Devices may have additional IP addresses recorded in akips, but only one primary
-        name and address.  Search for a device name by an alternate IP address.
+        Return the device name (primary key) for a device matching the given IP address.
+        AKiPS records additional IP addresses when found on devices, so this function
+        can be used to find the primary device name (primary key) from any known IP address.
 
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
-        special site script and not the normal web API commands.
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_find_device_by_ip(ipaddr)
+
+        Args:
+            ipaddr (str): IP address to search for
+        Returns:
+            the device name (str) if found, or None if no match is found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
-        text = self._get(section=&#34;/api-script/&#34;, params=params)
+        text = self._get(section=&#34;api-script&#34;, params=params)
         if text:
             lines = text.split(&#34;\n&#34;)
             for line in lines:
@@ -682,12 +921,18 @@ class AKIPS:
 
     def get_unreachable(self):
         &#34;&#34;&#34;
-        Pull a list of unreachable IPv4 ping devices
+        Pull a list of unreachable devices by Ping and SNMP state.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Returns:
+            A dictionary of device names to their unreachable attributes
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: &#34;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#34;,
@@ -749,9 +994,19 @@ class AKIPS:
         Pull a list of device names to group memberships.  Defaults to all devices
         and all groups (including the special &#39;maintenance_mode&#39; group).
 
-        AKiPS command syntax:
-            `mgroup {type} [{parent regex}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mgroup {type} [{parent regex}]
+                [any|all|not group {group name} ...]
+
+        Args:
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to lists of group names, or None if no devices found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;mgroup * {device}&#34;,
@@ -778,12 +1033,22 @@ class AKIPS:
 
     def set_group_membership(self, device, group, mode):
         &#34;&#34;&#34;
-        Update manual grouping rules for a device, including the special
-        &#39;maintenance_mode&#39; group.  The web api script fails silently if the device or group
-        does not exist.
+        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
+        group.  The web api script fails silently if the device or group does not exist.
 
-        AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
-        special site script and not the normal web API commands.
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_manual_grouping(type, group, mode, device)
+
+        Args:
+            device (str): device name to update
+            group (str): group name to update
+            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
+        Returns:
+            None
+        Raises:
+            ValueError: if invalid parameters are provided
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         if not device:
             raise ValueError(
@@ -804,7 +1069,7 @@ class AKIPS:
             &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
             &#34;device&#34;: device,  # device_name
         }
-        text = self._get(section=&#34;/api-script/&#34;, params=params)
+        text = self._get(section=&#34;api-script&#34;, params=params)
         if text:
             logger.error(&#34;Web API request failed: {}&#34;.format(text))
             raise AkipsError(message=text)
@@ -820,13 +1085,30 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Pull multiple attribute values that match.  Results can be filtered by
-        &#39;device&#39;, &#39;child&#39;, &#39;attribute&#39;, or attribute &#39;value&#39;.
+        Pull attribute values with variable search criteria.  Search criteria defaults to
+        a wildcard match but can be filtered by &#39;device&#39; name or pattern, &#39;child&#39; name or pattern,
+        &#39;attribute&#39; name or pattern, and/or attribute &#39;value&#39; or pattern.  Additionally,
+        results can be filtered by group membership using &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators
+        along with one or more group names.
 
-        AKiPS command syntax:
-            `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-                [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            child (str): child name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            value (str): value or pattern to match (default: None)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A nested dictionary of device names to child names to attribute names and values,
+            or None if no devices found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}&#34;,
@@ -859,18 +1141,44 @@ class AKIPS:
         return None
 
     def get_events(
-        self, event_type=&#34;all&#34;, period=&#34;last1h&#34;, group_filter=&#34;any&#34;, groups=[]
+        self,
+        event_type=&#34;all&#34;,
+        period=&#34;last1h&#34;,
+        device=&#34;*&#34;,
+        child=&#34;*&#34;,
+        attribute=&#34;*&#34;,
+        group_filter=&#34;any&#34;,
+        groups=[],
     ):
         &#34;&#34;&#34;
-        Pull a list of events.
+        Pull a list of events over a time period with optional filtering by device,
+        child, attribute, and/or group membership.  Defaults to all event types over
+        the last hour.  Review AKiPS documentation for details on event types and
+        time filter syntax.
 
-        AKiPS command syntax:
-            `mget event {all,critical,enum,threshold,uptime}
-            time {time filter} [{parent regex} {child regex}
-            {attribute regex}] [profile {profile name}]
-            [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            mget event {all,critical,enum,threshold,uptime}
+                time {time filter} [{parent regex} {child regex}
+                {attribute regex}] [profile {profile name}]
+                [any|all|not group {group name} ...]
+
+        Args:
+            event_type (str): type of events to retrieve (default: &#39;all&#39;)
+            period (str): time period to retrieve events from (default: &#39;last1h&#39;)
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            child (str): child name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A list of event dictionaries, or None if no events found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
-        params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
+        params = {
+            &#34;cmds&#34;: f&#34;mget event {event_type} time {period} {device} {child} {attribute}&#34;
+        }
         if groups:
             # [any|all|not group {group name} ...]
             group_list = &#34; &#34;.join(groups)
@@ -911,12 +1219,29 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Pull a series of counter values.
+        Pull a series of counter values with average values over a time period with optional
+        filtering by device, attribute, and/or group membership.  Defaults to all devices
+        and attributes over the last hour with 60 second intervals.  Review AKiPS documentation
+        for details on time filter syntax.
 
-        AKiPS command syntax:
-            `cseries interval avg
-            {time_interval} time {time filter} type parent child attribute
-            [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            cseries [interval total|avg {secs}] time {time filter}
+                {type} {parent regex} {child regex} {attribute regex}
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            period (str): time period to retrieve series from (default: &#39;last1h&#39;)
+            time_interval (int): interval in seconds for series data points (default: 60)
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            get_dict (bool): return each row as a dictionary (default: True)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A list of series data rows (as dictionaries or lists), or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;cseries interval avg {time_interval} time {period} * {device} * {attribute}&#34;
@@ -950,12 +1275,29 @@ class AKIPS:
         groups=[],
     ):
         &#34;&#34;&#34;
-        Aggregate counter values in intervals over a period of time.
+        Pull aggregate counter values over a period of time with optional filtering
+        by device, attribute, and/or group membership.  Defaults to all devices
+        and attributes over the last hour with average aggregation every 300 seconds.  Review
+        AKiPS documentation for details on time filter syntax.
 
-        AKiPS command syntax:
-            `aggregate interval {avg|total seconds}
-            time {time filter} type parent child attribute
-            [any|all|not group {group name} ...]`
+        Supporting AKiPS command syntax:
+
+            aggregate [interval total|avg {secs}] time {time filter}
+                {type} {parent regex} {child regex} {attribute regex}
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            period (str): time period to retrieve series from (default: &#39;last1h&#39;)
+            device (str): device name or pattern to match (default: &#39;*&#39;)
+            attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+            operator (str): aggregation operator, &#39;avg&#39; or &#39;total seconds&#39; (default: &#39;avg&#39;)
+            interval (str): interval in seconds for aggregation points (default: &#39;300&#39;)
+            group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A list of aggregate values, or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
         params = {
             &#34;cmds&#34;: f&#34;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#34;
@@ -976,8 +1318,18 @@ class AKIPS:
 
     def cmd(self, cmd, output=&#34;raw&#34;):
         &#34;&#34;&#34;
-        Send a direct console command to AKiPS and parse and return the
-        output accordingly.
+        Experimental and may be removed in future releases.  Currently only a shortcut
+        to send raw AKiPS api-db command strings to the server and return raw output for
+        debugging.
+
+        Args:
+            cmd (str): AKiPS command string to send
+            output (str): desired output format, currently only &#39;raw&#39; is supported
+        Returns:
+            The command output in the desired format, or None if no output
+        Raises:
+            ValueError: if an invalid output format is provided
+            AkipsError: if the AKiPS server returns an error
         &#34;&#34;&#34;
 
         params = {&#34;cmds&#34;: f&#34;{cmd}&#34;}
@@ -994,6 +1346,13 @@ class AKIPS:
     def _parse_enum(self, enum_string):
         &#34;&#34;&#34;
         Attributes with a type of enum return five values separated by commas.
+
+        Args:
+            enum_string (str): the raw enum string from AKiPS
+        Returns:
+            A dictionary with keys: number, value, created, modified, description
+        Raises:
+            AkipsError: if the provided string is not a valid enum type value
         &#34;&#34;&#34;
         match = re.match(r&#34;^(\S*),(\S*),(\S*),(\S*),(\S*)$&#34;, enum_string)
         if match:
@@ -1014,16 +1373,46 @@ class AKIPS:
         else:
             raise AkipsError(message=f&#34;Not a ENUM type value: {enum_string}&#34;)
 
-    def _get(self, section=&#34;/api-db/&#34;, params=None, timeout=30):
+    def _get(self, section=&#34;api-db&#34;, params=None, timeout=30):
         &#34;&#34;&#34;
-        Call HTTP GET against the AKiPS server
+        Base HTTP GET against the AKiPS server for web API calls.
+
+        Section options are individually enabled via the AKiPS Web API Settings page.
+            api-availability      : Availability, default off
+            api-db                : Config and Events, default off
+            api-config-viewer     : Config Viewer, default off
+            api-http-log          : HTTP Log, default off
+            api-flow              : NetFlow, default off
+            api-flow-timeseries   : NetFlow Time-series, default off
+            api-script            : Site Script Functions, default off
+            api-spm               : Switch Port Mapper, default off
+            api-msg               : Syslog and Traps, default off
+            api-unused-interfaces : Unused Interface, default off
+
+        Args:
+            section (str): API section to call (default: &#39;api-db&#39;)
+            params (dict): dictionary of parameters to pass to the server
+            timeout (int): HTTP timeout in seconds (default: 30)
+        Returns:
+            text output from the server
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+            requests.exceptions.HTTPError: for HTTP error responses
+            requests.exceptions.ConnectionError: for connection errors
+            requests.exceptions.Timeout: for request timeouts
+            requests.exceptions.RequestException: for HTTP request errors
         &#34;&#34;&#34;
-        server_url = &#34;https://&#34; + self.server + section
+        server_url = f&#34;https://{self.server}/{section}&#34;
         params[&#34;username&#34;] = self.username
         params[&#34;password&#34;] = self.password
 
-        if &#34;cmds&#34; in params:
-            logger.debug(&#34;akips command: {}&#34;.format(params[&#34;cmds&#34;]))
+        logger.debug(&#34;GET url: {}&#34;.format(server_url))
+        logger.debug(
+            &#34;GET params: {}&#34;.format(
+                {k: v for k, v in params.items() if k != &#34;password&#34;}
+            )
+        )
+
         try:
             r = self.session.get(
                 server_url, params=params, verify=self.verify, timeout=timeout
@@ -1056,16 +1445,44 @@ class AKIPS:
 <span>def <span class="ident">cmd</span></span>(<span>self, cmd, output='raw')</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Send a direct console command to AKiPS and parse and return the
-output accordingly.</p></div>
+<div class="desc"><p>Experimental and may be removed in future releases.
+Currently only a shortcut
+to send raw AKiPS api-db command strings to the server and return raw output for
+debugging.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>cmd</code></strong> :&ensp;<code>str</code></dt>
+<dd>AKiPS command string to send</dd>
+<dt><strong><code>output</code></strong> :&ensp;<code>str</code></dt>
+<dd>desired output format, currently only 'raw' is supported</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>The command output in the desired format, or None if no output</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>if an invalid output format is provided</dd>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def cmd(self, cmd, output=&#34;raw&#34;):
     &#34;&#34;&#34;
-    Send a direct console command to AKiPS and parse and return the
-    output accordingly.
+    Experimental and may be removed in future releases.  Currently only a shortcut
+    to send raw AKiPS api-db command strings to the server and return raw output for
+    debugging.
+
+    Args:
+        cmd (str): AKiPS command string to send
+        output (str): desired output format, currently only &#39;raw&#39; is supported
+    Returns:
+        The command output in the desired format, or None if no output
+    Raises:
+        ValueError: if an invalid output format is provided
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
 
     params = {&#34;cmds&#34;: f&#34;{cmd}&#34;}
@@ -1082,11 +1499,41 @@ output accordingly.</p></div>
 <span>def <span class="ident">get_aggregate</span></span>(<span>self, period='last1h', device='*', attribute='*', operator='avg', interval='300', group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Aggregate counter values in intervals over a period of time.</p>
-<p>AKiPS command syntax:
-<code>aggregate interval {avg|total seconds}
-time {time filter} type parent child attribute
-[any|all|not group {group name} ...]</code></p></div>
+<div class="desc"><p>Pull aggregate counter values over a period of time with optional filtering
+by device, attribute, and/or group membership.
+Defaults to all devices
+and attributes over the last hour with average aggregation every 300 seconds.
+Review
+AKiPS documentation for details on time filter syntax.</p>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>aggregate [interval total|avg {secs}] time {time filter}
+    {type} {parent regex} {child regex} {attribute regex}
+    [profile {profile name}] [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>period</code></strong> :&ensp;<code>str</code></dt>
+<dd>time period to retrieve series from (default: 'last1h')</dd>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>device name or pattern to match (default: '*')</dd>
+<dt><strong><code>attribute</code></strong> :&ensp;<code>str</code></dt>
+<dd>attribute name or pattern to match (default: '*')</dd>
+<dt><strong><code>operator</code></strong> :&ensp;<code>str</code></dt>
+<dd>aggregation operator, 'avg' or 'total seconds' (default: 'avg')</dd>
+<dt><strong><code>interval</code></strong> :&ensp;<code>str</code></dt>
+<dd>interval in seconds for aggregation points (default: '300')</dd>
+<dt><strong><code>group_filter</code></strong> :&ensp;<code>str</code></dt>
+<dd>'any', 'all', or 'not' operators for group filtering (default: 'any')</dd>
+<dt><strong><code>groups</code></strong> :&ensp;<code>list</code></dt>
+<dd>list of group names to filter by (if any)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A list of aggregate values, or None if no data found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1102,12 +1549,29 @@ time {time filter} type parent child attribute
     groups=[],
 ):
     &#34;&#34;&#34;
-    Aggregate counter values in intervals over a period of time.
+    Pull aggregate counter values over a period of time with optional filtering
+    by device, attribute, and/or group membership.  Defaults to all devices
+    and attributes over the last hour with average aggregation every 300 seconds.  Review
+    AKiPS documentation for details on time filter syntax.
 
-    AKiPS command syntax:
-        `aggregate interval {avg|total seconds}
-        time {time filter} type parent child attribute
-        [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        aggregate [interval total|avg {secs}] time {time filter}
+            {type} {parent regex} {child regex} {attribute regex}
+            [profile {profile name}] [any|all|not group {group name} ...]
+
+    Args:
+        period (str): time period to retrieve series from (default: &#39;last1h&#39;)
+        device (str): device name or pattern to match (default: &#39;*&#39;)
+        attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+        operator (str): aggregation operator, &#39;avg&#39; or &#39;total seconds&#39; (default: &#39;avg&#39;)
+        interval (str): interval in seconds for aggregation points (default: &#39;300&#39;)
+        group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+        groups (list): list of group names to filter by (if any)
+    Returns:
+        A list of aggregate values, or None if no data found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     params = {
         &#34;cmds&#34;: f&#34;aggregate interval {operator} {interval} time {period} * {device} * {attribute}&#34;
@@ -1129,13 +1593,41 @@ time {time filter} type parent child attribute
 <span>def <span class="ident">get_attributes</span></span>(<span>self, device='*', child='*', attribute='*', value=None, group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull multiple attribute values that match.
-Results can be filtered by
-'device', 'child', 'attribute', or attribute 'value'.</p>
-<p>AKiPS command syntax:
-<code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...]</code></p></div>
+<div class="desc"><p>Pull attribute values with variable search criteria.
+Search criteria defaults to
+a wildcard match but can be filtered by 'device' name or pattern, 'child' name or pattern,
+'attribute' name or pattern, and/or attribute 'value' or pattern.
+Additionally,
+results can be filtered by group membership using 'any', 'all', or 'not' operators
+along with one or more group names.</p>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+    [descr {/regex/}] [value {text|integer|/regex/}]
+    [profile {profile name}] [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>device name or pattern to match (default: '*')</dd>
+<dt><strong><code>child</code></strong> :&ensp;<code>str</code></dt>
+<dd>child name or pattern to match (default: '*')</dd>
+<dt><strong><code>attribute</code></strong> :&ensp;<code>str</code></dt>
+<dd>attribute name or pattern to match (default: '*')</dd>
+<dt><strong><code>value</code></strong> :&ensp;<code>str</code></dt>
+<dd>value or pattern to match (default: None)</dd>
+<dt><strong><code>group_filter</code></strong> :&ensp;<code>str</code></dt>
+<dd>'any', 'all', or 'not' operators for group filtering (default: 'any')</dd>
+<dt><strong><code>groups</code></strong> :&ensp;<code>list</code></dt>
+<dd>list of group names to filter by (if any)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A nested dictionary of device names to child names to attribute names and values,
+or None if no devices found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1150,13 +1642,30 @@ Results can be filtered by
     groups=[],
 ):
     &#34;&#34;&#34;
-    Pull multiple attribute values that match.  Results can be filtered by
-    &#39;device&#39;, &#39;child&#39;, &#39;attribute&#39;, or attribute &#39;value&#39;.
+    Pull attribute values with variable search criteria.  Search criteria defaults to
+    a wildcard match but can be filtered by &#39;device&#39; name or pattern, &#39;child&#39; name or pattern,
+    &#39;attribute&#39; name or pattern, and/or attribute &#39;value&#39; or pattern.  Additionally,
+    results can be filtered by group membership using &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators
+    along with one or more group names.
 
-    AKiPS command syntax:
-        `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [descr {/regex/}] [value {text|integer|/regex/}]
+            [profile {profile name}] [any|all|not group {group name} ...]
+
+    Args:
+        device (str): device name or pattern to match (default: &#39;*&#39;)
+        child (str): child name or pattern to match (default: &#39;*&#39;)
+        attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+        value (str): value or pattern to match (default: None)
+        group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+        groups (list): list of group names to filter by (if any)
+    Returns:
+        A nested dictionary of device names to child names to attribute names and values,
+        or None if no devices found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     params = {
         &#34;cmds&#34;: f&#34;mget * {device} {child} {attribute}&#34;,
@@ -1193,23 +1702,49 @@ Results can be filtered by
 <span>def <span class="ident">get_device</span></span>(<span>self, name)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull the entire configuration for a single device.</p>
-<p>AKiPS command syntax:
-<code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...]</code></p></div>
+<div class="desc"><p>Pull all configuration attributes for a single device.
+The name is the
+primary device key in AKiPS which might be an IP address or hostname
+depending on your AKiPS settings.</p>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+    [descr {/regex/}] [value {text|integer|/regex/}]
+    [profile {profile name}] [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The device name to retrieve</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A dictionary of device attributes, or None if the device was not found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_device(self, name):
     &#34;&#34;&#34;
-    Pull the entire configuration for a single device.
+    Pull all configuration attributes for a single device.  The name is the
+    primary device key in AKiPS which might be an IP address or hostname
+    depending on your AKiPS settings.
 
-    AKiPS command syntax:
-        `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [descr {/regex/}] [value {text|integer|/regex/}]
+            [profile {profile name}] [any|all|not group {group name} ...]
+
+    Args:
+        name (str): The device name to retrieve
+    Returns:
+        A dictionary of device attributes, or None if the device was not found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     params = {&#34;cmds&#34;: f&#34;mget * {name} * *&#34;}
     text = self._get(params=params)
@@ -1241,26 +1776,47 @@ Results can be filtered by
 <span>def <span class="ident">get_device_by_ip</span></span>(<span>self, ipaddr)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Devices may have additional IP addresses recorded in akips, but only one primary
-name and address.
-Search for a device name by an alternate IP address.</p>
-<p>AKiPS user "api-rw" is required to run api scripts.
-This call makes use of a
-special site script and not the normal web API commands.</p></div>
+<div class="desc"><p>Return the device name (primary key) for a device matching the given IP address.
+AKiPS records additional IP addresses when found on devices, so this function
+can be used to find the primary device name (primary key) from any known IP address.</p>
+<p>Supporting AKiPS site script function (which requires the api-rw user):</p>
+<pre><code>web_find_device_by_ip(ipaddr)
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>ipaddr</code></strong> :&ensp;<code>str</code></dt>
+<dd>IP address to search for</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>the device name (str) if found, or None if no match is found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_device_by_ip(self, ipaddr):
     &#34;&#34;&#34;
-    Devices may have additional IP addresses recorded in akips, but only one primary
-    name and address.  Search for a device name by an alternate IP address.
+    Return the device name (primary key) for a device matching the given IP address.
+    AKiPS records additional IP addresses when found on devices, so this function
+    can be used to find the primary device name (primary key) from any known IP address.
 
-    AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
-    special site script and not the normal web API commands.
+    Supporting AKiPS site script function (which requires the api-rw user):
+
+        web_find_device_by_ip(ipaddr)
+
+    Args:
+        ipaddr (str): IP address to search for
+    Returns:
+        the device name (str) if found, or None if no match is found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
-    text = self._get(section=&#34;/api-script/&#34;, params=params)
+    text = self._get(section=&#34;api-script&#34;, params=params)
     if text:
         lines = text.split(&#34;\n&#34;)
         for line in lines:
@@ -1277,26 +1833,50 @@ special site script and not the normal web API commands.</p></div>
 <span>def <span class="ident">get_devices</span></span>(<span>self, group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull a list of key attributes for multiple devices.
-Can be filtered by group
-but the default is all devices.</p>
-<p>AKiPS command syntax:
-<code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...]</code></p></div>
+<div class="desc"><p>Pull a list of all devices and their key attributes, optionally filtered by group
+membership.
+Key attributes include IP address, sysName, sysDescr, and sysLocation.</p>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+    [descr {/regex/}] [value {text|integer|/regex/}]
+    [profile {profile name}] [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>group_filter</code></strong> :&ensp;<code>str</code></dt>
+<dd>'any', 'all', or 'not' operators for group filtering (default: 'any')</dd>
+<dt><strong><code>groups</code></strong> :&ensp;<code>list</code></dt>
+<dd>list of group names to filter by (if any)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A dictionary of device names to attribute dictionaries, or None if no devices found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
     &#34;&#34;&#34;
-    Pull a list of key attributes for multiple devices.  Can be filtered by group
-    but the default is all devices.
+    Pull a list of all devices and their key attributes, optionally filtered by group
+    membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
 
-    AKiPS command syntax:
-        `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [descr {/regex/}] [value {text|integer|/regex/}]
+            [profile {profile name}] [any|all|not group {group name} ...]
+
+    Args:
+        group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+        groups (list): list of group names to filter by (if any)
+    Returns:
+        A dictionary of device names to attribute dictionaries, or None if no devices found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     attributes = [
         &#34;ip4addr&#34;,
@@ -1331,32 +1911,88 @@ but the default is all devices.</p>
 </details>
 </dd>
 <dt id="akips.AKIPS.get_events"><code class="name flex">
-<span>def <span class="ident">get_events</span></span>(<span>self, event_type='all', period='last1h', group_filter='any', groups=[])</span>
+<span>def <span class="ident">get_events</span></span>(<span>self, event_type='all', period='last1h', device='*', child='*', attribute='*', group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull a list of events.</p>
-<p>AKiPS command syntax:
-<code>mget event {all,critical,enum,threshold,uptime}
-time {time filter} [{parent regex} {child regex}
-{attribute regex}] [profile {profile name}]
-[any|all|not group {group name} ...]</code></p></div>
+<div class="desc"><p>Pull a list of events over a time period with optional filtering by device,
+child, attribute, and/or group membership.
+Defaults to all event types over
+the last hour.
+Review AKiPS documentation for details on event types and
+time filter syntax.</p>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>mget event {all,critical,enum,threshold,uptime}
+    time {time filter} [{parent regex} {child regex}
+    {attribute regex}] [profile {profile name}]
+    [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>event_type</code></strong> :&ensp;<code>str</code></dt>
+<dd>type of events to retrieve (default: 'all')</dd>
+<dt><strong><code>period</code></strong> :&ensp;<code>str</code></dt>
+<dd>time period to retrieve events from (default: 'last1h')</dd>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>device name or pattern to match (default: '*')</dd>
+<dt><strong><code>child</code></strong> :&ensp;<code>str</code></dt>
+<dd>child name or pattern to match (default: '*')</dd>
+<dt><strong><code>attribute</code></strong> :&ensp;<code>str</code></dt>
+<dd>attribute name or pattern to match (default: '*')</dd>
+<dt><strong><code>group_filter</code></strong> :&ensp;<code>str</code></dt>
+<dd>'any', 'all', or 'not' operators for group filtering (default: 'any')</dd>
+<dt><strong><code>groups</code></strong> :&ensp;<code>list</code></dt>
+<dd>list of group names to filter by (if any)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A list of event dictionaries, or None if no events found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_events(
-    self, event_type=&#34;all&#34;, period=&#34;last1h&#34;, group_filter=&#34;any&#34;, groups=[]
+    self,
+    event_type=&#34;all&#34;,
+    period=&#34;last1h&#34;,
+    device=&#34;*&#34;,
+    child=&#34;*&#34;,
+    attribute=&#34;*&#34;,
+    group_filter=&#34;any&#34;,
+    groups=[],
 ):
     &#34;&#34;&#34;
-    Pull a list of events.
+    Pull a list of events over a time period with optional filtering by device,
+    child, attribute, and/or group membership.  Defaults to all event types over
+    the last hour.  Review AKiPS documentation for details on event types and
+    time filter syntax.
 
-    AKiPS command syntax:
-        `mget event {all,critical,enum,threshold,uptime}
-        time {time filter} [{parent regex} {child regex}
-        {attribute regex}] [profile {profile name}]
-        [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        mget event {all,critical,enum,threshold,uptime}
+            time {time filter} [{parent regex} {child regex}
+            {attribute regex}] [profile {profile name}]
+            [any|all|not group {group name} ...]
+
+    Args:
+        event_type (str): type of events to retrieve (default: &#39;all&#39;)
+        period (str): time period to retrieve events from (default: &#39;last1h&#39;)
+        device (str): device name or pattern to match (default: &#39;*&#39;)
+        child (str): child name or pattern to match (default: &#39;*&#39;)
+        attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+        group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+        groups (list): list of group names to filter by (if any)
+    Returns:
+        A list of event dictionaries, or None if no events found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
-    params = {&#34;cmds&#34;: f&#34;mget event {event_type} time {period}&#34;}
+    params = {
+        &#34;cmds&#34;: f&#34;mget event {event_type} time {period} {device} {child} {attribute}&#34;
+    }
     if groups:
         # [any|all|not group {group name} ...]
         group_list = &#34; &#34;.join(groups)
@@ -1392,9 +2028,26 @@ time {time filter} [{parent regex} {child regex}
 <div class="desc"><p>Pull a list of device names to group memberships.
 Defaults to all devices
 and all groups (including the special 'maintenance_mode' group).</p>
-<p>AKiPS command syntax:
-<code>mgroup {type} [{parent regex}]
-[any|all|not group {group name} ...]</code></p></div>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>mgroup {type} [{parent regex}]
+    [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>device name or pattern to match (default: '*')</dd>
+<dt><strong><code>group_filter</code></strong> :&ensp;<code>str</code></dt>
+<dd>'any', 'all', or 'not' operators for group filtering (default: 'any')</dd>
+<dt><strong><code>groups</code></strong> :&ensp;<code>list</code></dt>
+<dd>list of group names to filter by (if any)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A dictionary of device names to lists of group names, or None if no devices found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1404,9 +2057,19 @@ and all groups (including the special 'maintenance_mode' group).</p>
     Pull a list of device names to group memberships.  Defaults to all devices
     and all groups (including the special &#39;maintenance_mode&#39; group).
 
-    AKiPS command syntax:
-        `mgroup {type} [{parent regex}]
-            [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        mgroup {type} [{parent regex}]
+            [any|all|not group {group name} ...]
+
+    Args:
+        device (str): device name or pattern to match (default: &#39;*&#39;)
+        group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+        groups (list): list of group names to filter by (if any)
+    Returns:
+        A dictionary of device names to lists of group names, or None if no devices found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     params = {
         &#34;cmds&#34;: f&#34;mgroup * {device}&#34;,
@@ -1436,11 +2099,41 @@ and all groups (including the special 'maintenance_mode' group).</p>
 <span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', time_interval=60, device='*', attribute='*', get_dict=True, group_filter='any', groups=[])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull a series of counter values.</p>
-<p>AKiPS command syntax:
-<code>cseries interval avg
-{time_interval} time {time filter} type parent child attribute
-[any|all|not group {group name} ...]</code></p></div>
+<div class="desc"><p>Pull a series of counter values with average values over a time period with optional
+filtering by device, attribute, and/or group membership.
+Defaults to all devices
+and attributes over the last hour with 60 second intervals.
+Review AKiPS documentation
+for details on time filter syntax.</p>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>cseries [interval total|avg {secs}] time {time filter}
+    {type} {parent regex} {child regex} {attribute regex}
+    [profile {profile name}] [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>period</code></strong> :&ensp;<code>str</code></dt>
+<dd>time period to retrieve series from (default: 'last1h')</dd>
+<dt><strong><code>time_interval</code></strong> :&ensp;<code>int</code></dt>
+<dd>interval in seconds for series data points (default: 60)</dd>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>device name or pattern to match (default: '*')</dd>
+<dt><strong><code>attribute</code></strong> :&ensp;<code>str</code></dt>
+<dd>attribute name or pattern to match (default: '*')</dd>
+<dt><strong><code>get_dict</code></strong> :&ensp;<code>bool</code></dt>
+<dd>return each row as a dictionary (default: True)</dd>
+<dt><strong><code>group_filter</code></strong> :&ensp;<code>str</code></dt>
+<dd>'any', 'all', or 'not' operators for group filtering (default: 'any')</dd>
+<dt><strong><code>groups</code></strong> :&ensp;<code>list</code></dt>
+<dd>list of group names to filter by (if any)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A list of series data rows (as dictionaries or lists), or None if no data found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1456,12 +2149,29 @@ and all groups (including the special 'maintenance_mode' group).</p>
     groups=[],
 ):
     &#34;&#34;&#34;
-    Pull a series of counter values.
+    Pull a series of counter values with average values over a time period with optional
+    filtering by device, attribute, and/or group membership.  Defaults to all devices
+    and attributes over the last hour with 60 second intervals.  Review AKiPS documentation
+    for details on time filter syntax.
 
-    AKiPS command syntax:
-        `cseries interval avg
-        {time_interval} time {time filter} type parent child attribute
-        [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        cseries [interval total|avg {secs}] time {time filter}
+            {type} {parent regex} {child regex} {attribute regex}
+            [profile {profile name}] [any|all|not group {group name} ...]
+
+    Args:
+        period (str): time period to retrieve series from (default: &#39;last1h&#39;)
+        time_interval (int): interval in seconds for series data points (default: 60)
+        device (str): device name or pattern to match (default: &#39;*&#39;)
+        attribute (str): attribute name or pattern to match (default: &#39;*&#39;)
+        get_dict (bool): return each row as a dictionary (default: True)
+        group_filter (str): &#39;any&#39;, &#39;all&#39;, or &#39;not&#39; operators for group filtering (default: &#39;any&#39;)
+        groups (list): list of group names to filter by (if any)
+    Returns:
+        A list of series data rows (as dictionaries or lists), or None if no data found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     params = {
         &#34;cmds&#34;: f&#34;cseries interval avg {time_interval} time {period} * {device} * {attribute}&#34;
@@ -1489,23 +2199,37 @@ and all groups (including the special 'maintenance_mode' group).</p>
 <span>def <span class="ident">get_unreachable</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Pull a list of unreachable IPv4 ping devices</p>
-<p>AKiPS command syntax:
-<code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-[value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-[any|all|not group {group name} ...]</code></p></div>
+<div class="desc"><p>Pull a list of unreachable devices by Ping and SNMP state.</p>
+<p>Supporting AKiPS command syntax:</p>
+<pre><code>mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+    [descr {/regex/}] [value {text|integer|/regex/}]
+    [profile {profile name}] [any|all|not group {group name} ...]
+</code></pre>
+<h2 id="returns">Returns</h2>
+<p>A dictionary of device names to their unreachable attributes</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_unreachable(self):
     &#34;&#34;&#34;
-    Pull a list of unreachable IPv4 ping devices
+    Pull a list of unreachable devices by Ping and SNMP state.
 
-    AKiPS command syntax:
-        `mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-            [value {text|/regex/|integer|ipaddr}] [profile {profile name}]
-            [any|all|not group {group name} ...]`
+    Supporting AKiPS command syntax:
+
+        mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+            [descr {/regex/}] [value {text|integer|/regex/}]
+            [profile {profile name}] [any|all|not group {group name} ...]
+
+    Returns:
+        A dictionary of device names to their unreachable attributes
+    Raises:
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     params = {
         &#34;cmds&#34;: &#34;mget * * * /PING.icmpState|SNMP.snmpState/ value /down/&#34;,
@@ -1567,25 +2291,52 @@ and all groups (including the special 'maintenance_mode' group).</p>
 <span>def <span class="ident">set_group_membership</span></span>(<span>self, device, group, mode)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Update manual grouping rules for a device, including the special
-'maintenance_mode' group.
-The web api script fails silently if the device or group
-does not exist.</p>
-<p>AKiPS user "api-rw" is required to run api scripts.
-This call makes use of a
-special site script and not the normal web API commands.</p></div>
+<div class="desc"><p>Update manual grouping rules for a device, including the special 'maintenance_mode'
+group.
+The web api script fails silently if the device or group does not exist.</p>
+<p>Supporting AKiPS site script function (which requires the api-rw user):</p>
+<pre><code>web_manual_grouping(type, group, mode, device)
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>device name to update</dd>
+<dt><strong><code>group</code></strong> :&ensp;<code>str</code></dt>
+<dd>group name to update</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code></dt>
+<dd>'assign' to add device to group, 'clear' to remove device from group</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>None</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>if invalid parameters are provided</dd>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def set_group_membership(self, device, group, mode):
     &#34;&#34;&#34;
-    Update manual grouping rules for a device, including the special
-    &#39;maintenance_mode&#39; group.  The web api script fails silently if the device or group
-    does not exist.
+    Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
+    group.  The web api script fails silently if the device or group does not exist.
 
-    AKiPS user &#34;api-rw&#34; is required to run api scripts.  This call makes use of a
-    special site script and not the normal web API commands.
+    Supporting AKiPS site script function (which requires the api-rw user):
+
+        web_manual_grouping(type, group, mode, device)
+
+    Args:
+        device (str): device name to update
+        group (str): group name to update
+        mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
+    Returns:
+        None
+    Raises:
+        ValueError: if invalid parameters are provided
+        AkipsError: if the AKiPS server returns an error
     &#34;&#34;&#34;
     if not device:
         raise ValueError(
@@ -1606,7 +2357,7 @@ special site script and not the normal web API commands.</p></div>
         &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
         &#34;device&#34;: device,  # device_name
     }
-    text = self._get(section=&#34;/api-script/&#34;, params=params)
+    text = self._get(section=&#34;api-script&#34;, params=params)
     if text:
         logger.error(&#34;Web API request failed: {}&#34;.format(text))
         raise AkipsError(message=text)
