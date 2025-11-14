@@ -628,6 +628,15 @@ class AKIPS:
         else:
             raise AkipsError(message=f"Not a ENUM type value: {enum_string}")
 
+    def _redact_sensitive_params(self, params):
+        """Return a copy of params with sensitive keys redacted from logging output."""
+        SENSITIVE_KEYS = ("password", "pass", "token", "secret", "key", "community")
+
+        def is_sensitive(k):
+            return any(s in k.lower() for s in SENSITIVE_KEYS)
+
+        return {k: ("****" if is_sensitive(k) else v) for k, v in params.items()}
+
     def _get(self, section="api-db", params=None, timeout=30):
         """
         Base HTTP GET against the AKiPS server for web API calls.
@@ -662,11 +671,7 @@ class AKIPS:
         params["password"] = self.password
 
         logger.debug("GET url: {}".format(server_url))
-        logger.debug(
-            "GET params: {}".format(
-                {k: v for k, v in params.items() if k != "password"}
-            )
-        )
+        logger.debug("GET params: {}".format(self._redact_sensitive_params(params)))
 
         try:
             r = self.session.get(

@@ -659,6 +659,15 @@ class AKIPS:
         else:
             raise AkipsError(message=f&#34;Not a ENUM type value: {enum_string}&#34;)
 
+    def _redact_sensitive_params(self, params):
+        &#34;&#34;&#34;Return a copy of params with sensitive keys redacted from logging output.&#34;&#34;&#34;
+        SENSITIVE_KEYS = (&#34;password&#34;, &#34;pass&#34;, &#34;token&#34;, &#34;secret&#34;, &#34;key&#34;, &#34;community&#34;)
+
+        def is_sensitive(k):
+            return any(s in k.lower() for s in SENSITIVE_KEYS)
+
+        return {k: (&#34;****&#34; if is_sensitive(k) else v) for k, v in params.items()}
+
     def _get(self, section=&#34;api-db&#34;, params=None, timeout=30):
         &#34;&#34;&#34;
         Base HTTP GET against the AKiPS server for web API calls.
@@ -693,11 +702,7 @@ class AKIPS:
         params[&#34;password&#34;] = self.password
 
         logger.debug(&#34;GET url: {}&#34;.format(server_url))
-        logger.debug(
-            &#34;GET params: {}&#34;.format(
-                {k: v for k, v in params.items() if k != &#34;password&#34;}
-            )
-        )
+        logger.debug(&#34;GET params: {}&#34;.format(self._redact_sensitive_params(params)))
 
         try:
             r = self.session.get(
@@ -1373,6 +1378,15 @@ class AKIPS:
         else:
             raise AkipsError(message=f&#34;Not a ENUM type value: {enum_string}&#34;)
 
+    def _redact_sensitive_params(self, params):
+        &#34;&#34;&#34;Return a copy of params with sensitive keys redacted from logging output.&#34;&#34;&#34;
+        SENSITIVE_KEYS = (&#34;password&#34;, &#34;pass&#34;, &#34;token&#34;, &#34;secret&#34;, &#34;key&#34;, &#34;community&#34;)
+
+        def is_sensitive(k):
+            return any(s in k.lower() for s in SENSITIVE_KEYS)
+
+        return {k: (&#34;****&#34; if is_sensitive(k) else v) for k, v in params.items()}
+
     def _get(self, section=&#34;api-db&#34;, params=None, timeout=30):
         &#34;&#34;&#34;
         Base HTTP GET against the AKiPS server for web API calls.
@@ -1407,11 +1421,7 @@ class AKIPS:
         params[&#34;password&#34;] = self.password
 
         logger.debug(&#34;GET url: {}&#34;.format(server_url))
-        logger.debug(
-            &#34;GET params: {}&#34;.format(
-                {k: v for k, v in params.items() if k != &#34;password&#34;}
-            )
-        )
+        logger.debug(&#34;GET params: {}&#34;.format(self._redact_sensitive_params(params)))
 
         try:
             r = self.session.get(
