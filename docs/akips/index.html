@@ -81,6 +81,9 @@ class AKIPS:
         if not verify:
             requests.packages.urllib3.disable_warnings()  # pylint: disable=no-member
 
+    # ---------------------------------------------------------------------------
+    # api-db interface methods, these use the &#39;api-ro&#39; or &#39;api-rw&#39; user
+
     def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
         Pull a list of all devices and their key attributes, optionally filtered by group
@@ -173,36 +176,6 @@ class AKIPS:
                 data[&#34;name&#34;] = name
             logger.debug(&#34;Found device {} in akips&#34;.format(data))
             return data
-        return None
-
-    def get_device_by_ip(self, ipaddr):
-        &#34;&#34;&#34;
-        Return the device name (primary key) for a device matching the given IP address.
-        AKiPS records additional IP addresses when found on devices, so this function
-        can be used to find the primary device name (primary key) from any known IP address.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_find_device_by_ip(ipaddr)
-
-        Args:
-            ipaddr (str): IP address to search for
-        Returns:
-            the device name (str) if found, or None if no match is found
-        Raises:
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            lines = text.split(&#34;\n&#34;)
-            for line in lines:
-                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
-                if match:
-                    address = match.group(1)
-                    device_name = match.group(2)
-                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
-                    return device_name
         return None
 
     def get_unreachable(self):
@@ -315,50 +288,6 @@ class AKIPS:
                 &#34;Found {} device and group mappings in akips&#34;.format(len(data.keys()))
             )
             return data
-        return None
-
-    def set_group_membership(self, device, group, mode):
-        &#34;&#34;&#34;
-        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
-        group.  The web api script fails silently if the device or group does not exist.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_manual_grouping(type, group, mode, device)
-
-        Args:
-            device (str): device name to update
-            group (str): group name to update
-            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
-        Returns:
-            None
-        Raises:
-            ValueError: if invalid parameters are provided
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        if not device:
-            raise ValueError(
-                &#34;a valid device name must be provided for manual grouping update&#34;
-            )
-        if not group:
-            raise ValueError(
-                &#34;a valid group name must be provided for manual grouping update&#34;
-            )
-        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
-            raise ValueError(
-                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
-            )
-        params = {
-            &#34;function&#34;: &#34;web_manual_grouping&#34;,
-            &#34;type&#34;: &#34;device&#34;,
-            &#34;group&#34;: group,  # group_name
-            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
-            &#34;device&#34;: device,  # device_name
-        }
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            logger.error(&#34;Web API request failed: {}&#34;.format(text))
-            raise AkipsError(message=text)
         return None
 
     def get_attributes(
@@ -600,7 +529,112 @@ class AKIPS:
             return values
         return None
 
-    # api-msg
+    # Low-level operations
+
+    def cmd(self, cmd, output=&#34;raw&#34;):
+        &#34;&#34;&#34;
+        Experimental and may be removed in future releases.  Currently only a shortcut
+        to send raw AKiPS api-db command strings to the server and return raw output for
+        debugging.
+
+        Args:
+            cmd (str): AKiPS command string to send
+            output (str): desired output format, currently only &#39;raw&#39; is supported
+        Returns:
+            The command output in the desired format, or None if no output
+        Raises:
+            ValueError: if an invalid output format is provided
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+
+        params = {&#34;cmds&#34;: f&#34;{cmd}&#34;}
+        text = self._get(params=params)
+        if text:
+            if output == &#34;raw&#34;:
+                return text
+            else:
+                raise ValueError(&#34;Invalid output value provided to cmd.&#34;)
+        return None
+
+    # ---------------------------------------------------------------------------
+    # api-script methods, these require the &#39;api-rw&#39; user
+
+    def get_device_by_ip(self, ipaddr):
+        &#34;&#34;&#34;
+        Return the device name (primary key) for a device matching the given IP address.
+        AKiPS records additional IP addresses when found on devices, so this function
+        can be used to find the primary device name (primary key) from any known IP address.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_find_device_by_ip(ipaddr)
+
+        Args:
+            ipaddr (str): IP address to search for
+        Returns:
+            the device name (str) if found, or None if no match is found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
+                if match:
+                    address = match.group(1)
+                    device_name = match.group(2)
+                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
+                    return device_name
+        return None
+
+    def set_group_membership(self, device, group, mode):
+        &#34;&#34;&#34;
+        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
+        group.  The web api script fails silently if the device or group does not exist.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_manual_grouping(type, group, mode, device)
+
+        Args:
+            device (str): device name to update
+            group (str): group name to update
+            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
+        Returns:
+            None
+        Raises:
+            ValueError: if invalid parameters are provided
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        if not device:
+            raise ValueError(
+                &#34;a valid device name must be provided for manual grouping update&#34;
+            )
+        if not group:
+            raise ValueError(
+                &#34;a valid group name must be provided for manual grouping update&#34;
+            )
+        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
+            raise ValueError(
+                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
+            )
+        params = {
+            &#34;function&#34;: &#34;web_manual_grouping&#34;,
+            &#34;type&#34;: &#34;device&#34;,
+            &#34;group&#34;: group,  # group_name
+            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#34;device&#34;: device,  # device_name
+        }
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            logger.error(&#34;Web API request failed: {}&#34;.format(text))
+            raise AkipsError(message=text)
+        return None
+
+    # ---------------------------------------------------------------------------
+    # api-msg methods, these require the &#39;api-ro&#39; user
 
     def get_msg(
         self, time=&#34;last1h&#34;, addr=None, type=None, device=None, regex=None, limit=None
@@ -673,33 +707,7 @@ class AKIPS:
             return data
         return None
 
-    # Low-level operations
-
-    def cmd(self, cmd, output=&#34;raw&#34;):
-        &#34;&#34;&#34;
-        Experimental and may be removed in future releases.  Currently only a shortcut
-        to send raw AKiPS api-db command strings to the server and return raw output for
-        debugging.
-
-        Args:
-            cmd (str): AKiPS command string to send
-            output (str): desired output format, currently only &#39;raw&#39; is supported
-        Returns:
-            The command output in the desired format, or None if no output
-        Raises:
-            ValueError: if an invalid output format is provided
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-
-        params = {&#34;cmds&#34;: f&#34;{cmd}&#34;}
-        text = self._get(params=params)
-        if text:
-            if output == &#34;raw&#34;:
-                return text
-            else:
-                raise ValueError(&#34;Invalid output value provided to cmd.&#34;)
-        return None
-
+    # ---------------------------------------------------------------------------
     # Base operations
 
     def _parse_enum(self, enum_string):
@@ -873,6 +881,9 @@ class AKIPS:
         if not verify:
             requests.packages.urllib3.disable_warnings()  # pylint: disable=no-member
 
+    # ---------------------------------------------------------------------------
+    # api-db interface methods, these use the &#39;api-ro&#39; or &#39;api-rw&#39; user
+
     def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
         Pull a list of all devices and their key attributes, optionally filtered by group
@@ -965,36 +976,6 @@ class AKIPS:
                 data[&#34;name&#34;] = name
             logger.debug(&#34;Found device {} in akips&#34;.format(data))
             return data
-        return None
-
-    def get_device_by_ip(self, ipaddr):
-        &#34;&#34;&#34;
-        Return the device name (primary key) for a device matching the given IP address.
-        AKiPS records additional IP addresses when found on devices, so this function
-        can be used to find the primary device name (primary key) from any known IP address.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_find_device_by_ip(ipaddr)
-
-        Args:
-            ipaddr (str): IP address to search for
-        Returns:
-            the device name (str) if found, or None if no match is found
-        Raises:
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            lines = text.split(&#34;\n&#34;)
-            for line in lines:
-                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
-                if match:
-                    address = match.group(1)
-                    device_name = match.group(2)
-                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
-                    return device_name
         return None
 
     def get_unreachable(self):
@@ -1107,50 +1088,6 @@ class AKIPS:
                 &#34;Found {} device and group mappings in akips&#34;.format(len(data.keys()))
             )
             return data
-        return None
-
-    def set_group_membership(self, device, group, mode):
-        &#34;&#34;&#34;
-        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
-        group.  The web api script fails silently if the device or group does not exist.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_manual_grouping(type, group, mode, device)
-
-        Args:
-            device (str): device name to update
-            group (str): group name to update
-            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
-        Returns:
-            None
-        Raises:
-            ValueError: if invalid parameters are provided
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        if not device:
-            raise ValueError(
-                &#34;a valid device name must be provided for manual grouping update&#34;
-            )
-        if not group:
-            raise ValueError(
-                &#34;a valid group name must be provided for manual grouping update&#34;
-            )
-        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
-            raise ValueError(
-                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
-            )
-        params = {
-            &#34;function&#34;: &#34;web_manual_grouping&#34;,
-            &#34;type&#34;: &#34;device&#34;,
-            &#34;group&#34;: group,  # group_name
-            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
-            &#34;device&#34;: device,  # device_name
-        }
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            logger.error(&#34;Web API request failed: {}&#34;.format(text))
-            raise AkipsError(message=text)
         return None
 
     def get_attributes(
@@ -1392,7 +1329,112 @@ class AKIPS:
             return values
         return None
 
-    # api-msg
+    # Low-level operations
+
+    def cmd(self, cmd, output=&#34;raw&#34;):
+        &#34;&#34;&#34;
+        Experimental and may be removed in future releases.  Currently only a shortcut
+        to send raw AKiPS api-db command strings to the server and return raw output for
+        debugging.
+
+        Args:
+            cmd (str): AKiPS command string to send
+            output (str): desired output format, currently only &#39;raw&#39; is supported
+        Returns:
+            The command output in the desired format, or None if no output
+        Raises:
+            ValueError: if an invalid output format is provided
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+
+        params = {&#34;cmds&#34;: f&#34;{cmd}&#34;}
+        text = self._get(params=params)
+        if text:
+            if output == &#34;raw&#34;:
+                return text
+            else:
+                raise ValueError(&#34;Invalid output value provided to cmd.&#34;)
+        return None
+
+    # ---------------------------------------------------------------------------
+    # api-script methods, these require the &#39;api-rw&#39; user
+
+    def get_device_by_ip(self, ipaddr):
+        &#34;&#34;&#34;
+        Return the device name (primary key) for a device matching the given IP address.
+        AKiPS records additional IP addresses when found on devices, so this function
+        can be used to find the primary device name (primary key) from any known IP address.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_find_device_by_ip(ipaddr)
+
+        Args:
+            ipaddr (str): IP address to search for
+        Returns:
+            the device name (str) if found, or None if no match is found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
+                if match:
+                    address = match.group(1)
+                    device_name = match.group(2)
+                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
+                    return device_name
+        return None
+
+    def set_group_membership(self, device, group, mode):
+        &#34;&#34;&#34;
+        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
+        group.  The web api script fails silently if the device or group does not exist.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_manual_grouping(type, group, mode, device)
+
+        Args:
+            device (str): device name to update
+            group (str): group name to update
+            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
+        Returns:
+            None
+        Raises:
+            ValueError: if invalid parameters are provided
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        if not device:
+            raise ValueError(
+                &#34;a valid device name must be provided for manual grouping update&#34;
+            )
+        if not group:
+            raise ValueError(
+                &#34;a valid group name must be provided for manual grouping update&#34;
+            )
+        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
+            raise ValueError(
+                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
+            )
+        params = {
+            &#34;function&#34;: &#34;web_manual_grouping&#34;,
+            &#34;type&#34;: &#34;device&#34;,
+            &#34;group&#34;: group,  # group_name
+            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#34;device&#34;: device,  # device_name
+        }
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            logger.error(&#34;Web API request failed: {}&#34;.format(text))
+            raise AkipsError(message=text)
+        return None
+
+    # ---------------------------------------------------------------------------
+    # api-msg methods, these require the &#39;api-ro&#39; user
 
     def get_msg(
         self, time=&#34;last1h&#34;, addr=None, type=None, device=None, regex=None, limit=None
@@ -1465,33 +1507,7 @@ class AKIPS:
             return data
         return None
 
-    # Low-level operations
-
-    def cmd(self, cmd, output=&#34;raw&#34;):
-        &#34;&#34;&#34;
-        Experimental and may be removed in future releases.  Currently only a shortcut
-        to send raw AKiPS api-db command strings to the server and return raw output for
-        debugging.
-
-        Args:
-            cmd (str): AKiPS command string to send
-            output (str): desired output format, currently only &#39;raw&#39; is supported
-        Returns:
-            The command output in the desired format, or None if no output
-        Raises:
-            ValueError: if an invalid output format is provided
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-
-        params = {&#34;cmds&#34;: f&#34;{cmd}&#34;}
-        text = self._get(params=params)
-        if text:
-            if output == &#34;raw&#34;:
-                return text
-            else:
-                raise ValueError(&#34;Invalid output value provided to cmd.&#34;)
-        return None
-
+    # ---------------------------------------------------------------------------
     # Base operations
 
     def _parse_enum(self, enum_string):
