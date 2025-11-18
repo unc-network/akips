@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 import csv
 import io
@@ -567,6 +567,79 @@ class AKIPS:
             values = lines[0].split(",")
             logger.debug("Found {} aggregate values".format(len(values)))
             return values
+        return None
+
+    # api-msg
+
+    def get_msg(
+        self, time="last1h", addr=None, type=None, device=None, regex=None, limit=None
+    ):
+        """
+        Retrieve syslog or trap messages from the AKiPS api-msg database. The api-msg
+        access requires username to be 'api-ro'.
+
+        Supporting AKiPS web API syntax:
+
+            https://{server}/api-msg?password={pw};time={time filter};
+                [addr={ip filter}];[type=syslog|trap];[device={name}|{regex}];
+                [regex={regex filter}];[limit={qty messages}]
+
+        Args:
+            time (str): Required, time period to retrieve messages from (default: 'last1h')
+            addr (str): IP address to filter messages by (default: None)
+            type (str): message type, 'syslog' or 'trap' (default: syslog and traps)
+            device (str): device name to filter messages by (default: None)
+            regex (str): regex pattern to filter message content by (default: None)
+            limit (int): maximum number of messages to return (default: None)
+        Returns:
+            A list of message values, or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+
+        params = {"time": time}
+        if type in ("syslog", "trap"):
+            params["type"] = type
+        if addr:
+            params["addr"] = addr
+        if device:
+            params["device"] = device
+        if regex:
+            params["regex"] = regex
+        if limit:
+            params["limit"] = str(limit)
+        text = self._get(section="api-msg", params=params)
+        if text:
+            # Each syslog or trap message contains:
+            #     header line: {system timestamp} {type} {IP version} {IP address}
+            #     message line: {message text}
+            #     blank terminating line
+            data = []
+            lines = text.split("\n")
+            for line in lines:
+                header = re.match(
+                    r"^(?P<time>\S+)\s(?P<type>\S+)\s(?P<ip_ver>[4|6])\s(?P<ip_addr>\S+)$",
+                    line,
+                )
+                if header:
+                    # header line
+                    entry = {
+                        "time": header.group("time"),
+                        "type": header.group("type"),
+                        "ip_ver": header.group("ip_ver"),
+                        "ip_addr": header.group("ip_addr"),
+                        "message": "",
+                    }
+                    data.append(entry)
+                elif re.match(r"^.*\S+.*$", line):
+                    # message line, anything else except a blank line
+                    entry = data.pop()
+                    if entry["message"]:
+                        entry["message"] += "\n"
+                    entry["message"] += line
+                    data.append(entry)
+            logger.debug("Found {} messages in akips".format(len(data)))
+            return data
         return None
 
     # Low-level operations
