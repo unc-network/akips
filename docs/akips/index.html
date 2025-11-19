@@ -34,7 +34,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 &#34;&#34;&#34;
 
-__version__ = &#34;0.5.0&#34;
+__version__ = &#34;0.5.1&#34;
 
 import csv
 import io
@@ -80,6 +80,9 @@ class AKIPS:
 
         if not verify:
             requests.packages.urllib3.disable_warnings()  # pylint: disable=no-member
+
+    # ---------------------------------------------------------------------------
+    # api-db interface methods, these use the &#39;api-ro&#39; or &#39;api-rw&#39; user
 
     def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
@@ -173,36 +176,6 @@ class AKIPS:
                 data[&#34;name&#34;] = name
             logger.debug(&#34;Found device {} in akips&#34;.format(data))
             return data
-        return None
-
-    def get_device_by_ip(self, ipaddr):
-        &#34;&#34;&#34;
-        Return the device name (primary key) for a device matching the given IP address.
-        AKiPS records additional IP addresses when found on devices, so this function
-        can be used to find the primary device name (primary key) from any known IP address.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_find_device_by_ip(ipaddr)
-
-        Args:
-            ipaddr (str): IP address to search for
-        Returns:
-            the device name (str) if found, or None if no match is found
-        Raises:
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            lines = text.split(&#34;\n&#34;)
-            for line in lines:
-                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
-                if match:
-                    address = match.group(1)
-                    device_name = match.group(2)
-                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
-                    return device_name
         return None
 
     def get_unreachable(self):
@@ -315,50 +288,6 @@ class AKIPS:
                 &#34;Found {} device and group mappings in akips&#34;.format(len(data.keys()))
             )
             return data
-        return None
-
-    def set_group_membership(self, device, group, mode):
-        &#34;&#34;&#34;
-        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
-        group.  The web api script fails silently if the device or group does not exist.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_manual_grouping(type, group, mode, device)
-
-        Args:
-            device (str): device name to update
-            group (str): group name to update
-            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
-        Returns:
-            None
-        Raises:
-            ValueError: if invalid parameters are provided
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        if not device:
-            raise ValueError(
-                &#34;a valid device name must be provided for manual grouping update&#34;
-            )
-        if not group:
-            raise ValueError(
-                &#34;a valid group name must be provided for manual grouping update&#34;
-            )
-        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
-            raise ValueError(
-                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
-            )
-        params = {
-            &#34;function&#34;: &#34;web_manual_grouping&#34;,
-            &#34;type&#34;: &#34;device&#34;,
-            &#34;group&#34;: group,  # group_name
-            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
-            &#34;device&#34;: device,  # device_name
-        }
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            logger.error(&#34;Web API request failed: {}&#34;.format(text))
-            raise AkipsError(message=text)
         return None
 
     def get_attributes(
@@ -627,6 +556,158 @@ class AKIPS:
                 raise ValueError(&#34;Invalid output value provided to cmd.&#34;)
         return None
 
+    # ---------------------------------------------------------------------------
+    # api-script methods, these require the &#39;api-rw&#39; user
+
+    def get_device_by_ip(self, ipaddr):
+        &#34;&#34;&#34;
+        Return the device name (primary key) for a device matching the given IP address.
+        AKiPS records additional IP addresses when found on devices, so this function
+        can be used to find the primary device name (primary key) from any known IP address.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_find_device_by_ip(ipaddr)
+
+        Args:
+            ipaddr (str): IP address to search for
+        Returns:
+            the device name (str) if found, or None if no match is found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
+                if match:
+                    address = match.group(1)
+                    device_name = match.group(2)
+                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
+                    return device_name
+        return None
+
+    def set_group_membership(self, device, group, mode):
+        &#34;&#34;&#34;
+        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
+        group.  The web api script fails silently if the device or group does not exist.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_manual_grouping(type, group, mode, device)
+
+        Args:
+            device (str): device name to update
+            group (str): group name to update
+            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
+        Returns:
+            None
+        Raises:
+            ValueError: if invalid parameters are provided
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        if not device:
+            raise ValueError(
+                &#34;a valid device name must be provided for manual grouping update&#34;
+            )
+        if not group:
+            raise ValueError(
+                &#34;a valid group name must be provided for manual grouping update&#34;
+            )
+        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
+            raise ValueError(
+                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
+            )
+        params = {
+            &#34;function&#34;: &#34;web_manual_grouping&#34;,
+            &#34;type&#34;: &#34;device&#34;,
+            &#34;group&#34;: group,  # group_name
+            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#34;device&#34;: device,  # device_name
+        }
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            logger.error(&#34;Web API request failed: {}&#34;.format(text))
+            raise AkipsError(message=text)
+        return None
+
+    # ---------------------------------------------------------------------------
+    # api-msg methods, these require the &#39;api-ro&#39; user
+
+    def get_msg(
+        self, time=&#34;last1h&#34;, addr=None, type=None, device=None, regex=None, limit=None
+    ):
+        &#34;&#34;&#34;
+        Retrieve syslog or trap messages from the AKiPS api-msg database. The api-msg
+        access requires username to be &#39;api-ro&#39;.
+
+        Supporting AKiPS web API syntax:
+
+            https://{server}/api-msg?password={pw};time={time filter};
+                [addr={ip filter}];[type=syslog|trap];[device={name}|{regex}];
+                [regex={regex filter}];[limit={qty messages}]
+
+        Args:
+            time (str): Required, time period to retrieve messages from (default: &#39;last1h&#39;)
+            addr (str): IP address to filter messages by (default: None)
+            type (str): message type, &#39;syslog&#39; or &#39;trap&#39; (default: syslog and traps)
+            device (str): device name to filter messages by (default: None)
+            regex (str): regex pattern to filter message content by (default: None)
+            limit (int): maximum number of messages to return (default: None)
+        Returns:
+            A list of message values, or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+
+        params = {&#34;time&#34;: time}
+        if type in (&#34;syslog&#34;, &#34;trap&#34;):
+            params[&#34;type&#34;] = type
+        if addr:
+            params[&#34;addr&#34;] = addr
+        if device:
+            params[&#34;device&#34;] = device
+        if regex:
+            params[&#34;regex&#34;] = regex
+        if limit:
+            params[&#34;limit&#34;] = str(limit)
+        text = self._get(section=&#34;api-msg&#34;, params=params)
+        if text:
+            # Each syslog or trap message contains:
+            #     header line: {system timestamp} {type} {IP version} {IP address}
+            #     message line: {message text}
+            #     blank terminating line
+            data = []
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                header = re.match(
+                    r&#34;^(?P&lt;time&gt;\S+)\s(?P&lt;type&gt;\S+)\s(?P&lt;ip_ver&gt;[4|6])\s(?P&lt;ip_addr&gt;\S+)$&#34;,
+                    line,
+                )
+                if header:
+                    # header line
+                    entry = {
+                        &#34;time&#34;: header.group(&#34;time&#34;),
+                        &#34;type&#34;: header.group(&#34;type&#34;),
+                        &#34;ip_ver&#34;: header.group(&#34;ip_ver&#34;),
+                        &#34;ip_addr&#34;: header.group(&#34;ip_addr&#34;),
+                        &#34;message&#34;: &#34;&#34;,
+                    }
+                    data.append(entry)
+                elif re.match(r&#34;^.*\S+.*$&#34;, line):
+                    # message line, anything else except a blank line
+                    entry = data.pop()
+                    if entry[&#34;message&#34;]:
+                        entry[&#34;message&#34;] += &#34;\n&#34;
+                    entry[&#34;message&#34;] += line
+                    data.append(entry)
+            logger.debug(&#34;Found {} messages in akips&#34;.format(len(data)))
+            return data
+        return None
+
+    # ---------------------------------------------------------------------------
     # Base operations
 
     def _parse_enum(self, enum_string):
@@ -800,6 +881,9 @@ class AKIPS:
         if not verify:
             requests.packages.urllib3.disable_warnings()  # pylint: disable=no-member
 
+    # ---------------------------------------------------------------------------
+    # api-db interface methods, these use the &#39;api-ro&#39; or &#39;api-rw&#39; user
+
     def get_devices(self, group_filter=&#34;any&#34;, groups=[]):
         &#34;&#34;&#34;
         Pull a list of all devices and their key attributes, optionally filtered by group
@@ -892,36 +976,6 @@ class AKIPS:
                 data[&#34;name&#34;] = name
             logger.debug(&#34;Found device {} in akips&#34;.format(data))
             return data
-        return None
-
-    def get_device_by_ip(self, ipaddr):
-        &#34;&#34;&#34;
-        Return the device name (primary key) for a device matching the given IP address.
-        AKiPS records additional IP addresses when found on devices, so this function
-        can be used to find the primary device name (primary key) from any known IP address.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_find_device_by_ip(ipaddr)
-
-        Args:
-            ipaddr (str): IP address to search for
-        Returns:
-            the device name (str) if found, or None if no match is found
-        Raises:
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            lines = text.split(&#34;\n&#34;)
-            for line in lines:
-                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
-                if match:
-                    address = match.group(1)
-                    device_name = match.group(2)
-                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
-                    return device_name
         return None
 
     def get_unreachable(self):
@@ -1034,50 +1088,6 @@ class AKIPS:
                 &#34;Found {} device and group mappings in akips&#34;.format(len(data.keys()))
             )
             return data
-        return None
-
-    def set_group_membership(self, device, group, mode):
-        &#34;&#34;&#34;
-        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
-        group.  The web api script fails silently if the device or group does not exist.
-
-        Supporting AKiPS site script function (which requires the api-rw user):
-
-            web_manual_grouping(type, group, mode, device)
-
-        Args:
-            device (str): device name to update
-            group (str): group name to update
-            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
-        Returns:
-            None
-        Raises:
-            ValueError: if invalid parameters are provided
-            AkipsError: if the AKiPS server returns an error
-        &#34;&#34;&#34;
-        if not device:
-            raise ValueError(
-                &#34;a valid device name must be provided for manual grouping update&#34;
-            )
-        if not group:
-            raise ValueError(
-                &#34;a valid group name must be provided for manual grouping update&#34;
-            )
-        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
-            raise ValueError(
-                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
-            )
-        params = {
-            &#34;function&#34;: &#34;web_manual_grouping&#34;,
-            &#34;type&#34;: &#34;device&#34;,
-            &#34;group&#34;: group,  # group_name
-            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
-            &#34;device&#34;: device,  # device_name
-        }
-        text = self._get(section=&#34;api-script&#34;, params=params)
-        if text:
-            logger.error(&#34;Web API request failed: {}&#34;.format(text))
-            raise AkipsError(message=text)
         return None
 
     def get_attributes(
@@ -1346,6 +1356,158 @@ class AKIPS:
                 raise ValueError(&#34;Invalid output value provided to cmd.&#34;)
         return None
 
+    # ---------------------------------------------------------------------------
+    # api-script methods, these require the &#39;api-rw&#39; user
+
+    def get_device_by_ip(self, ipaddr):
+        &#34;&#34;&#34;
+        Return the device name (primary key) for a device matching the given IP address.
+        AKiPS records additional IP addresses when found on devices, so this function
+        can be used to find the primary device name (primary key) from any known IP address.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_find_device_by_ip(ipaddr)
+
+        Args:
+            ipaddr (str): IP address to search for
+        Returns:
+            the device name (str) if found, or None if no match is found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        params = {&#34;function&#34;: &#34;web_find_device_by_ip&#34;, &#34;ipaddr&#34;: ipaddr}
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                match = re.match(r&#34;IP Address (\S+) is configured on (\S+)&#34;, line)
+                if match:
+                    address = match.group(1)
+                    device_name = match.group(2)
+                    logger.debug(f&#34;Found {address} on device {device_name}&#34;)
+                    return device_name
+        return None
+
+    def set_group_membership(self, device, group, mode):
+        &#34;&#34;&#34;
+        Update manual grouping rules for a device, including the special &#39;maintenance_mode&#39;
+        group.  The web api script fails silently if the device or group does not exist.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_manual_grouping(type, group, mode, device)
+
+        Args:
+            device (str): device name to update
+            group (str): group name to update
+            mode (str): &#39;assign&#39; to add device to group, &#39;clear&#39; to remove device from group
+        Returns:
+            None
+        Raises:
+            ValueError: if invalid parameters are provided
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+        if not device:
+            raise ValueError(
+                &#34;a valid device name must be provided for manual grouping update&#34;
+            )
+        if not group:
+            raise ValueError(
+                &#34;a valid group name must be provided for manual grouping update&#34;
+            )
+        if mode not in (&#34;assign&#34;, &#34;clear&#34;):
+            raise ValueError(
+                &#34;mode must be &#39;assign&#39; or &#39;clear&#39; for manual grouping update&#34;
+            )
+        params = {
+            &#34;function&#34;: &#34;web_manual_grouping&#34;,
+            &#34;type&#34;: &#34;device&#34;,
+            &#34;group&#34;: group,  # group_name
+            &#34;mode&#34;: mode,  # &#39;assign&#39; or &#39;clear&#39; for device memberships
+            &#34;device&#34;: device,  # device_name
+        }
+        text = self._get(section=&#34;api-script&#34;, params=params)
+        if text:
+            logger.error(&#34;Web API request failed: {}&#34;.format(text))
+            raise AkipsError(message=text)
+        return None
+
+    # ---------------------------------------------------------------------------
+    # api-msg methods, these require the &#39;api-ro&#39; user
+
+    def get_msg(
+        self, time=&#34;last1h&#34;, addr=None, type=None, device=None, regex=None, limit=None
+    ):
+        &#34;&#34;&#34;
+        Retrieve syslog or trap messages from the AKiPS api-msg database. The api-msg
+        access requires username to be &#39;api-ro&#39;.
+
+        Supporting AKiPS web API syntax:
+
+            https://{server}/api-msg?password={pw};time={time filter};
+                [addr={ip filter}];[type=syslog|trap];[device={name}|{regex}];
+                [regex={regex filter}];[limit={qty messages}]
+
+        Args:
+            time (str): Required, time period to retrieve messages from (default: &#39;last1h&#39;)
+            addr (str): IP address to filter messages by (default: None)
+            type (str): message type, &#39;syslog&#39; or &#39;trap&#39; (default: syslog and traps)
+            device (str): device name to filter messages by (default: None)
+            regex (str): regex pattern to filter message content by (default: None)
+            limit (int): maximum number of messages to return (default: None)
+        Returns:
+            A list of message values, or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        &#34;&#34;&#34;
+
+        params = {&#34;time&#34;: time}
+        if type in (&#34;syslog&#34;, &#34;trap&#34;):
+            params[&#34;type&#34;] = type
+        if addr:
+            params[&#34;addr&#34;] = addr
+        if device:
+            params[&#34;device&#34;] = device
+        if regex:
+            params[&#34;regex&#34;] = regex
+        if limit:
+            params[&#34;limit&#34;] = str(limit)
+        text = self._get(section=&#34;api-msg&#34;, params=params)
+        if text:
+            # Each syslog or trap message contains:
+            #     header line: {system timestamp} {type} {IP version} {IP address}
+            #     message line: {message text}
+            #     blank terminating line
+            data = []
+            lines = text.split(&#34;\n&#34;)
+            for line in lines:
+                header = re.match(
+                    r&#34;^(?P&lt;time&gt;\S+)\s(?P&lt;type&gt;\S+)\s(?P&lt;ip_ver&gt;[4|6])\s(?P&lt;ip_addr&gt;\S+)$&#34;,
+                    line,
+                )
+                if header:
+                    # header line
+                    entry = {
+                        &#34;time&#34;: header.group(&#34;time&#34;),
+                        &#34;type&#34;: header.group(&#34;type&#34;),
+                        &#34;ip_ver&#34;: header.group(&#34;ip_ver&#34;),
+                        &#34;ip_addr&#34;: header.group(&#34;ip_addr&#34;),
+                        &#34;message&#34;: &#34;&#34;,
+                    }
+                    data.append(entry)
+                elif re.match(r&#34;^.*\S+.*$&#34;, line):
+                    # message line, anything else except a blank line
+                    entry = data.pop()
+                    if entry[&#34;message&#34;]:
+                        entry[&#34;message&#34;] += &#34;\n&#34;
+                    entry[&#34;message&#34;] += line
+                    data.append(entry)
+            logger.debug(&#34;Found {} messages in akips&#34;.format(len(data)))
+            return data
+        return None
+
+    # ---------------------------------------------------------------------------
     # Base operations
 
     def _parse_enum(self, enum_string):
@@ -2105,6 +2267,115 @@ and all groups (including the special 'maintenance_mode' group).</p>
     return None</code></pre>
 </details>
 </dd>
+<dt id="akips.AKIPS.get_msg"><code class="name flex">
+<span>def <span class="ident">get_msg</span></span>(<span>self, time='last1h', addr=None, type=None, device=None, regex=None, limit=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Retrieve syslog or trap messages from the AKiPS api-msg database. The api-msg
+access requires username to be 'api-ro'.</p>
+<p>Supporting AKiPS web API syntax:</p>
+<pre><code>&lt;https://{server}/api-msg?password={pw};time={time&gt; filter};
+    [addr={ip filter}];[type=syslog|trap];[device={name}|{regex}];
+    [regex={regex filter}];[limit={qty messages}]
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>time</code></strong> :&ensp;<code>str</code></dt>
+<dd>Required, time period to retrieve messages from (default: 'last1h')</dd>
+<dt><strong><code>addr</code></strong> :&ensp;<code>str</code></dt>
+<dd>IP address to filter messages by (default: None)</dd>
+<dt><strong><code>type</code></strong> :&ensp;<code>str</code></dt>
+<dd>message type, 'syslog' or 'trap' (default: syslog and traps)</dd>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>device name to filter messages by (default: None)</dd>
+<dt><strong><code>regex</code></strong> :&ensp;<code>str</code></dt>
+<dd>regex pattern to filter message content by (default: None)</dd>
+<dt><strong><code>limit</code></strong> :&ensp;<code>int</code></dt>
+<dd>maximum number of messages to return (default: None)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A list of message values, or None if no data found</p>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>AkipsError</code></dt>
+<dd>if the AKiPS server returns an error</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_msg(
+    self, time=&#34;last1h&#34;, addr=None, type=None, device=None, regex=None, limit=None
+):
+    &#34;&#34;&#34;
+    Retrieve syslog or trap messages from the AKiPS api-msg database. The api-msg
+    access requires username to be &#39;api-ro&#39;.
+
+    Supporting AKiPS web API syntax:
+
+        https://{server}/api-msg?password={pw};time={time filter};
+            [addr={ip filter}];[type=syslog|trap];[device={name}|{regex}];
+            [regex={regex filter}];[limit={qty messages}]
+
+    Args:
+        time (str): Required, time period to retrieve messages from (default: &#39;last1h&#39;)
+        addr (str): IP address to filter messages by (default: None)
+        type (str): message type, &#39;syslog&#39; or &#39;trap&#39; (default: syslog and traps)
+        device (str): device name to filter messages by (default: None)
+        regex (str): regex pattern to filter message content by (default: None)
+        limit (int): maximum number of messages to return (default: None)
+    Returns:
+        A list of message values, or None if no data found
+    Raises:
+        AkipsError: if the AKiPS server returns an error
+    &#34;&#34;&#34;
+
+    params = {&#34;time&#34;: time}
+    if type in (&#34;syslog&#34;, &#34;trap&#34;):
+        params[&#34;type&#34;] = type
+    if addr:
+        params[&#34;addr&#34;] = addr
+    if device:
+        params[&#34;device&#34;] = device
+    if regex:
+        params[&#34;regex&#34;] = regex
+    if limit:
+        params[&#34;limit&#34;] = str(limit)
+    text = self._get(section=&#34;api-msg&#34;, params=params)
+    if text:
+        # Each syslog or trap message contains:
+        #     header line: {system timestamp} {type} {IP version} {IP address}
+        #     message line: {message text}
+        #     blank terminating line
+        data = []
+        lines = text.split(&#34;\n&#34;)
+        for line in lines:
+            header = re.match(
+                r&#34;^(?P&lt;time&gt;\S+)\s(?P&lt;type&gt;\S+)\s(?P&lt;ip_ver&gt;[4|6])\s(?P&lt;ip_addr&gt;\S+)$&#34;,
+                line,
+            )
+            if header:
+                # header line
+                entry = {
+                    &#34;time&#34;: header.group(&#34;time&#34;),
+                    &#34;type&#34;: header.group(&#34;type&#34;),
+                    &#34;ip_ver&#34;: header.group(&#34;ip_ver&#34;),
+                    &#34;ip_addr&#34;: header.group(&#34;ip_addr&#34;),
+                    &#34;message&#34;: &#34;&#34;,
+                }
+                data.append(entry)
+            elif re.match(r&#34;^.*\S+.*$&#34;, line):
+                # message line, anything else except a blank line
+                entry = data.pop()
+                if entry[&#34;message&#34;]:
+                    entry[&#34;message&#34;] += &#34;\n&#34;
+                entry[&#34;message&#34;] += line
+                data.append(entry)
+        logger.debug(&#34;Found {} messages in akips&#34;.format(len(data)))
+        return data
+    return None</code></pre>
+</details>
+</dd>
 <dt id="akips.AKIPS.get_series"><code class="name flex">
 <span>def <span class="ident">get_series</span></span>(<span>self, period='last1h', time_interval=60, device='*', attribute='*', get_dict=True, group_filter='any', groups=[])</span>
 </code></dt>
@@ -2403,6 +2674,7 @@ The web api script fails silently if the device or group does not exist.</p>
 <li><code><a title="akips.AKIPS.get_devices" href="#akips.AKIPS.get_devices">get_devices</a></code></li>
 <li><code><a title="akips.AKIPS.get_events" href="#akips.AKIPS.get_events">get_events</a></code></li>
 <li><code><a title="akips.AKIPS.get_group_membership" href="#akips.AKIPS.get_group_membership">get_group_membership</a></code></li>
+<li><code><a title="akips.AKIPS.get_msg" href="#akips.AKIPS.get_msg">get_msg</a></code></li>
 <li><code><a title="akips.AKIPS.get_series" href="#akips.AKIPS.get_series">get_series</a></code></li>
 <li><code><a title="akips.AKIPS.get_unreachable" href="#akips.AKIPS.get_unreachable">get_unreachable</a></code></li>
 <li><code><a title="akips.AKIPS.set_group_membership" href="#akips.AKIPS.set_group_membership">set_group_membership</a></code></li>
