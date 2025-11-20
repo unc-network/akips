@@ -161,6 +161,7 @@ cython_debug/
 
 # Other
 .DS_Store
+.vscode
 
 # temporary test file
 test_to_server.py
