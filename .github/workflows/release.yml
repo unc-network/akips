@@ -6,18 +6,13 @@ on:
     types: [published]
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
   build:
-    name: Upload release to PyPI
     runs-on: ubuntu-latest
     environment:
-      name: prod # This should match the environment name configured on PyPI
-      # url: https://pypi.org/p/akips
-    # permissions:
-    #   id-token: write # Crucial for trusted publishing
+      name: prod
 
     steps:
       - name: Checkout repository
@@ -58,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: prod
-      url: https://test.pypi.org/project/akips/
+      url: https://pypi.org/project/akips/
     permissions:
       id-token: write
 
@@ -72,6 +67,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
-          # No need for username or password with trusted publishing
-          # repository-url: https://upload.pypi.org/legacy/ # for PyPI
-          repository-url: https://test.pypi.org/legacy/  # for TestPyPI
+          repository-url: https://upload.pypi.org/legacy/ # for PyPI
