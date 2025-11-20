@@ -74,4 +74,4 @@ jobs:
           packages-dir: dist/
           # No need for username or password with trusted publishing
           # repository-url: https://upload.pypi.org/legacy/ # for PyPI
-          # repository-url: https://test.pypi.org/legacy/  # for TestPyPI
+          repository-url: https://test.pypi.org/legacy/  # for TestPyPI
