@@ -1,3 +1,7 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry]
 name = "akips"
 version = "0.5.1"
@@ -23,15 +27,9 @@ pytz = "*"
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 pytest = "^8.2.0"
-#flake8 = "^7.0.0"
 pdoc3 = "^0.10.0"
 pylama = "^8.4.1"
-# setuptools = "^75.8.0"
 setuptools = "^78.1.1"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 exclude = '''
