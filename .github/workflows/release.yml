@@ -1,4 +1,5 @@
-name: Publish to PyPI
+name: Publish Python Package to PyPI
+
 on:
   workflow_dispatch:
   release:
@@ -9,15 +10,21 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  build:
+    name: Upload release to PyPI
     runs-on: ubuntu-latest
-    environment: prod
+    environment:
+      name: prod # This should match the environment name configured on PyPI
+      # url: https://pypi.org/p/akips
+    # permissions:
+    #   id-token: write # Crucial for trusted publishing
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -41,35 +48,30 @@ jobs:
       - name: Build package
         run: poetry build
 
-      - uses: actions/download-artifact@v2
-        with: { name: package }
-      - id: package_name
-        run: |
-          P="$(ls dist/akips*)"
-          echo "::set-output name=path::${P}"
-          echo "::set-output name=name::$(basename $P)"
-      - uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ github.event.release.upload_url }} 
-          asset_path: ${{ steps.package_name.outputs.path }}
-          asset_name: ${{ steps.package_name.outputs.name }}
-          asset_content_type: application/octet-stream
+          name: dist
+          path: dist/
 
-      # - name: Upload Release Asset
-      #   uses: actions/upload-release-asset@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ github.event.release.upload_url }} 
-      #     asset_path: ./dist/akips*
-      #     asset_name: AssetName
-      #     asset_content_type: application/octet-stream
+  pypi-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: https://test.pypi.org/project/akips/
+    permissions:
+      id-token: write
 
-      - name: Publish package
-        env:
-          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          poetry config pypi-token.pypi ${PYPI_API_TOKEN}
-          poetry publish
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          # No need for username or password with trusted publishing
+          # repository-url: https://upload.pypi.org/legacy/ # for PyPI
+          # repository-url: https://test.pypi.org/legacy/  # for TestPyPI
