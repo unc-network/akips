@@ -5,9 +5,8 @@ on:
   # release:
   #   types: [published]
 
-# permissions:
-#   id-token: write
-#   contents: read
+permissions:
+  contents: read
 
 jobs:
   build:
