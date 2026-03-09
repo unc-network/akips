@@ -685,7 +685,7 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # api-availability methods for availability statistics
 
-    def get_group_availability(self, time='last1d', report='ping4', group=None):
+    def get_group_availability(self, time="last1d", report="ping4", group=None):
         """
         Retrieve availability statistics for a group of devices over a time period.
 
@@ -699,26 +699,34 @@ class AKIPS:
         ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00; sat 8:00 to 18:00
         """
         params = {
-            "maintenance": "off", # 'on' or 'off', show/hide maintenance mode devices
-            "mode": "group",      # 'group', 'device' or 'events'
-            "time": time,         # time filter, refer to programming guide
-            "report": report,    # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
-            # "entity": device,     # {device} [{child}] to filter by device or child
-            "group": group,       # {group name} to filter by group
-            # "profile": ""         # {profile name} to filter by profile
-            }
+            "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
+            "mode": "group",  # 'group', 'device' or 'events'
+            "time": time,  # time filter, refer to programming guide
+            "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
+            # "entity": device,    # {device} [{child}] to filter by device or child
+            "group": group,  # {group name} to filter by group
+            # "profile": ""        # {profile name} to filter by profile
+        }
         text = self._get(section="api-availability", params=params)
         if text:
             # Parse output in CSV format
             buff = io.StringIO(text)
-            column_headers = ['child','attr','group name','total time','match time','group target','tf']
+            column_headers = [
+                "child",
+                "attr",
+                "group name",
+                "total time",
+                "match time",
+                "group target",
+                "tf",
+            ]
             reader = csv.DictReader(buff, fieldnames=column_headers)
             csv_to_list = [row for row in reader]
             logger.debug("Found {} entries".format(len(csv_to_list)))
             return csv_to_list
         return None
 
-    def get_device_availability(self, time='last1d', report='ping4', device=None):
+    def get_device_availability(self, time="last1d", report="ping4", device=None):
         """
         Retrieve availability statistics for a device over a time period.
 
@@ -734,7 +742,7 @@ class AKIPS:
         """
         pass
 
-    def get_event_availability(self, time='last1d', report='ping4', device=None):
+    def get_event_availability(self, time="last1d", report="ping4", device=None):
         """
         Retrieve availability statistics for pairs of up/down events.
 
