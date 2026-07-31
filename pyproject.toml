@@ -42,8 +42,10 @@ line-length = 128
 select = ["E", "W", "F", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests assert; that is the point of them.
-"tests/*" = ["S101"]
+# Tests assert; that is the point of them. They also pass obviously fake
+# credentials to exercise redaction and request building, which S105 and S106
+# would otherwise read as hardcoded secrets.
+"tests/*" = ["S101", "S105", "S106"]
 
 [tool.black]
 exclude = '''

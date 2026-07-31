@@ -45,3 +45,60 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
         self.assertEqual(messages[2]["time"], "1436232275")
         self.assertEqual(messages[2]["type"], "trap")
         self.assertRegex(messages[2]["message"], r"^SNMPv2-MIB sysUpTime")
+
+    @patch("requests.Session.get")
+    def test_get_msg_builds_optional_filters(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_msg(
+            time="last4h",
+            addr="10.4.2.26",
+            type="syslog",
+            device="cisco-sw1",
+            regex="LINEPROTO",
+            limit=25,
+        )
+        args, kwargs = session_mock.call_args
+        self.assertTrue(args[0].endswith("/api-msg"))
+        params = kwargs["params"]
+        self.assertEqual(params["time"], "last4h")
+        self.assertEqual(params["addr"], "10.4.2.26")
+        self.assertEqual(params["type"], "syslog")
+        self.assertEqual(params["device"], "cisco-sw1")
+        self.assertEqual(params["regex"], "LINEPROTO")
+        self.assertEqual(params["limit"], "25")
+
+    @patch("requests.Session.get")
+    def test_get_msg_ignores_unknown_type(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_msg(type="netflow")
+        self.assertNotIn("type", session_mock.call_args.kwargs["params"])
+
+    @patch("requests.Session.get")
+    def test_get_msg_joins_multi_line_messages(self, session_mock: MagicMock):
+        r_text = """1436232275 trap 4 10.4.2.26
+SNMPv2-MIB sysUpTime 0 TimeTicks 54003
+OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        messages = api.get_msg()
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(
+            messages[0]["message"],
+            "SNMPv2-MIB sysUpTime 0 TimeTicks 54003\n"
+            "OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full",
+        )
+        self.assertEqual(messages[0]["ip_ver"], "4")
+        self.assertEqual(messages[0]["ip_addr"], "10.4.2.26")
+
+    @patch("requests.Session.get")
+    def test_get_msg_returns_none_for_empty_response(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        self.assertIsNone(api.get_msg())

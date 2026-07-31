@@ -125,3 +125,156 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
             attribute="WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients"
         )
         self.assertEqual(series[1], "31")
+
+    @patch("requests.Session.get")
+    def test_get_device(self, session_mock: MagicMock):
+        r_text = """TH840-A sys SNMPv2-MIB.sysName = TH840-A
+TH840-A sys SNMPv2-MIB.sysLocation = Datacenter A
+TH840-A Ethernet1 IF-MIB.ifDescr = Ethernet 1
+TH840-A Ethernet1 IF-MIB.ifAlias =
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        device = api.get_device("TH840-A")
+        self.assertEqual(device["sys"]["SNMPv2-MIB.sysName"], "TH840-A")
+        self.assertEqual(device["sys"]["SNMPv2-MIB.sysLocation"], "Datacenter A")
+        self.assertEqual(device["Ethernet1"]["IF-MIB.ifDescr"], "Ethernet 1")
+        # An attribute with nothing after the equals becomes an empty string
+        # here, where get_attributes stores None for the same input.
+        self.assertEqual(device["Ethernet1"]["IF-MIB.ifAlias"], "")
+        self.assertEqual(device["name"], "TH840-A")
+
+    @patch("requests.Session.get")
+    def test_get_device_returns_none_for_empty_response(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        self.assertIsNone(api.get_device("TH840-A"))
+
+    @patch("requests.Session.get")
+    def test_get_device_with_unparsable_response(self, session_mock: MagicMock):
+        session_mock.return_value.text = "no attribute lines here\n"
+
+        api = AKIPS("127.0.0.1")
+        device = api.get_device("TH840-A")
+        # Documents current behavior rather than endorsing it: the name
+        # parameter doubles as the loop variable, so a response that parses to
+        # nothing still returns a dict carrying the name that was asked for,
+        # which a caller cannot tell apart from a device with no attributes.
+        self.assertEqual(device, {"name": "TH840-A"})
+
+    @patch("requests.Session.get")
+    def test_get_events(self, session_mock: MagicMock):
+        r_text = """1706545348 TH840-A sys SNMP.snmpState Threshold Alert snmp state changed
+1706545350 TH840-B ping4 PING.icmpState Uptime Warning device unreachable
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        events = api.get_events()
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0]["epoch"], "1706545348")
+        self.assertEqual(events[0]["parent"], "TH840-A")
+        self.assertEqual(events[0]["child"], "sys")
+        self.assertEqual(events[0]["attribute"], "SNMP.snmpState")
+        self.assertEqual(events[0]["type"], "Threshold")
+        self.assertEqual(events[0]["flags"], "Alert")
+        self.assertEqual(events[0]["details"], "snmp state changed")
+        self.assertEqual(events[1]["parent"], "TH840-B")
+
+    @patch("requests.Session.get")
+    def test_get_events_builds_group_filter(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_events(event_type="critical", period="last4h", groups=["a10", "core"])
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertEqual(
+            cmds, "mget event critical time last4h * * * any group a10 core"
+        )
+
+    @patch("requests.Session.get")
+    def test_get_devices_builds_group_filter(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_devices(group_filter="not", groups=["a10"])
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertTrue(cmds.endswith(" not group a10"))
+
+    @patch("requests.Session.get")
+    def test_get_attributes_builds_value_and_group_filter(
+        self, session_mock: MagicMock
+    ):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_attributes(
+            device="TH840-A", child="sys", value="/down/", groups=["a10"]
+        )
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertEqual(cmds, "mget * TH840-A sys * value /down/ any group a10")
+
+    @patch("requests.Session.get")
+    def test_get_series_honours_interval(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_series(time_interval=300, period="last8h")
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertTrue(cmds.startswith("cseries interval avg 300 time last8h "))
+
+    @patch("requests.Session.get")
+    def test_get_series_as_lists(self, session_mock: MagicMock):
+        r_text = """parent,child,child description,attribute,2024-02-21 09:10
+CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        rows = api.get_series(get_dict=False)
+        self.assertEqual(rows[0][0], "parent")
+        self.assertEqual(rows[1][4], "4")
+
+    @patch("requests.Session.get")
+    def test_get_aggregate_honours_operator(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_aggregate(operator="total", interval="600")
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertTrue(cmds.startswith("aggregate interval total 600 "))
+
+    @patch("requests.Session.get")
+    def test_empty_responses_return_none(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        self.assertIsNone(api.get_devices())
+        self.assertIsNone(api.get_attributes())
+        self.assertIsNone(api.get_group_membership())
+        self.assertIsNone(api.get_events())
+        self.assertIsNone(api.get_series())
+        self.assertIsNone(api.get_aggregate())
+        self.assertIsNone(api.cmd("mget * * * *"))
+
+    @patch("requests.Session.get")
+    def test_cmd_returns_raw_text(self, session_mock: MagicMock):
+        r_text = "TH840-A sys ip4addr = 192.168.20.15\n"
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        self.assertEqual(api.cmd("mget * TH840-A sys ip4addr"), r_text)
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"],
+            "mget * TH840-A sys ip4addr",
+        )
+
+    @patch("requests.Session.get")
+    def test_cmd_rejects_unknown_output_format(self, session_mock: MagicMock):
+        session_mock.return_value.text = "some output\n"
+
+        api = AKIPS("127.0.0.1")
+        with self.assertRaises(ValueError):
+            api.cmd("mget * * * *", output="json")
