@@ -27,8 +27,8 @@ pytz = "*"
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.1"
 pytest = "^9.0.3"
-pdoc3 = "^0.10.0"
 ruff = "^0.16.1"
+pdoc = "^16.0.0"
 
 [tool.ruff]
 # Matches the line length the old pylama pycodestyle config allowed

@@ -15,7 +15,10 @@ poetry run pytest -v -s tests
 # to main, so the published site always matches main and never develop.
 #
 # To preview them locally before merging (writes to site/, which is ignored):
-poetry run pdoc3 --html --output-dir site/docs akips --force
+poetry run pdoc -o site/docs -d google akips
+
+# Or serve them with live reload while editing docstrings:
+poetry run pdoc -d google akips
 
 # Roll the version in BOTH pyproject.toml and akips/__init__.py.
 # CI fails the release if the two disagree.

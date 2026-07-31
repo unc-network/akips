@@ -180,7 +180,7 @@ akips.exceptions.AkipsError: ERROR: api-db invalid username/password
 
 ## API Documentation
 
-[API Documentation](https://unc-network.github.io/akips/docs/akips/index.html)
+[API Documentation](https://unc-network.github.io/akips/docs/akips.html)
 
 ## Contributing
 
