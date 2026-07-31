@@ -9,10 +9,12 @@ import csv
 import io
 import logging
 import re
+import warnings
 from datetime import datetime
 
 import pytz
 import requests
+import urllib3
 
 from akips.exceptions import AkipsError
 
@@ -47,15 +49,12 @@ class AKIPS:
         self.server_timezone = timezone
         self.session = requests.Session()
 
-        if not verify:
-            requests.packages.urllib3.disable_warnings()  # pylint: disable=no-member
-
     # ---------------------------------------------------------------------------
     # api-db interface methods, these use the 'api-ro' or 'api-rw' user
 
     # entities commands
 
-    def get_devices(self, group_filter="any", groups=[]):
+    def get_devices(self, group_filter="any", groups=None):
         """
         Pull a list of all devices and their key attributes, optionally filtered by group
         membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
@@ -226,7 +225,7 @@ class AKIPS:
         attribute="*",
         value=None,
         group_filter="any",
-        groups=[],
+        groups=None,
     ):
         """
         Pull attribute values with variable search criteria.  Search criteria defaults to
@@ -286,7 +285,7 @@ class AKIPS:
 
     # group commands
 
-    def get_group_membership(self, device="*", group_filter="any", groups=[]):
+    def get_group_membership(self, device="*", group_filter="any", groups=None):
         """
         Pull a list of device names to group memberships.  Defaults to all devices
         and all groups (including the special 'maintenance_mode' group).
@@ -338,7 +337,7 @@ class AKIPS:
         child="*",
         attribute="*",
         group_filter="any",
-        groups=[],
+        groups=None,
     ):
         """
         Pull a list of events over a time period with optional filtering by device,
@@ -392,7 +391,9 @@ class AKIPS:
                         "details": match.group(7),
                     }
                     data.append(entry)
-            logger.debug("Found {} events of type {} in akips".format(len(data), type))
+            logger.debug(
+                "Found {} events of type {} in akips".format(len(data), event_type)
+            )
             return data
         return None
 
@@ -406,7 +407,7 @@ class AKIPS:
         attribute="*",
         get_dict=True,
         group_filter="any",
-        groups=[],
+        groups=None,
     ):
         """
         Pull a series of counter values with average values over a time period with optional
@@ -462,7 +463,7 @@ class AKIPS:
         operator="avg",
         interval="300",
         group_filter="any",
-        groups=[],
+        groups=None,
     ):
         """
         Pull aggregate counter values over a period of time with optional filtering
@@ -522,13 +523,15 @@ class AKIPS:
             AkipsError: if the AKiPS server returns an error
         """
 
+        if output != "raw":
+            # Check before making the request, so an unsupported format fails
+            # the same way whether or not the server returned anything
+            raise ValueError("Invalid output value provided to cmd.")
+
         params = {"cmds": f"{cmd}"}
         text = self._get(params=params)
         if text:
-            if output == "raw":
-                return text
-            else:
-                raise ValueError("Invalid output value provided to cmd.")
+            return text
         return None
 
     # ---------------------------------------------------------------------------
@@ -673,11 +676,18 @@ class AKIPS:
                     data.append(entry)
                 elif re.match(r"^.*\S+.*$", line):
                     # message line, anything else except a blank line
-                    entry = data.pop()
+                    if not data:
+                        # A message line before any header means the response
+                        # did not start where we expected.  Skip it rather
+                        # than failing the whole call.
+                        logger.debug(
+                            "Skipping message line with no header: {}".format(line)
+                        )
+                        continue
+                    entry = data[-1]
                     if entry["message"]:
                         entry["message"] += "\n"
                     entry["message"] += line
-                    data.append(entry)
             logger.debug("Found {} messages in akips".format(len(data)))
             return data
         return None
@@ -771,7 +781,9 @@ class AKIPS:
         Raises:
             AkipsError: if the provided string is not a valid enum type value
         """
-        match = re.match(r"^(\S*),(\S*),(\S*),(\S*),(\S*)$", enum_string)
+        # The trailing description is free text and routinely contains spaces,
+        # so it takes the rest of the line rather than a non-whitespace run
+        match = re.match(r"^(\S*),(\S*),(\S*),(\S*),(.*)$", enum_string)
         if match:
             entry = {
                 "number": match.group(1),  # list number (from MIB)
@@ -829,6 +841,10 @@ class AKIPS:
             requests.exceptions.RequestException: for HTTP request errors
         """
         server_url = f"https://{self.server}/{section}"
+
+        # Work on a copy so credentials are never written into the dictionary
+        # the caller passed in, and so params is optional as documented
+        params = dict(params or {})
         params["username"] = self.username
         params["password"] = self.password
 
@@ -836,9 +852,19 @@ class AKIPS:
         logger.debug("GET params: {}".format(self._redact_sensitive_params(params)))
 
         try:
-            r = self.session.get(
-                server_url, params=params, verify=self.verify, timeout=timeout
-            )
+            with warnings.catch_warnings():
+                if not self.verify:
+                    # Scoped to this request on purpose.  Disabling urllib3
+                    # warnings globally would also silence them for every
+                    # other library in the calling application.  Note that
+                    # the warnings filter is process wide while this block
+                    # runs, so a concurrent thread could miss a warning.
+                    warnings.simplefilter(
+                        "ignore", urllib3.exceptions.InsecureRequestWarning
+                    )
+                r = self.session.get(
+                    server_url, params=params, verify=self.verify, timeout=timeout
+                )
             r.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             logger.error(errh)

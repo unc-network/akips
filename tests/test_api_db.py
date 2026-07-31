@@ -278,3 +278,16 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         api = AKIPS("127.0.0.1")
         with self.assertRaises(ValueError):
             api.cmd("mget * * * *", output="json")
+
+    @patch("requests.Session.get")
+    def test_cmd_rejects_unknown_output_before_requesting(
+        self, session_mock: MagicMock
+    ):
+        # An empty reply used to hide the error, so the format was only
+        # validated when the server happened to return something
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        with self.assertRaises(ValueError):
+            api.cmd("mget * * * *", output="json")
+        self.assertFalse(session_mock.called)

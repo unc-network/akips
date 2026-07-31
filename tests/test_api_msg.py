@@ -102,3 +102,23 @@ OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
 
         api = AKIPS("127.0.0.1")
         self.assertIsNone(api.get_msg())
+
+    @patch("requests.Session.get")
+    def test_get_msg_skips_message_lines_before_any_header(
+        self, session_mock: MagicMock
+    ):
+        # A body line arriving before a header used to pop an empty list and
+        # raise IndexError, failing the whole call
+        r_text = """continuation of something we never saw the header for
+1436232275 syslog 4 10.4.2.26
+notice local7 149: LINEPROTO-5-UPDOWN
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        messages = api.get_msg()
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]["ip_addr"], "10.4.2.26")
+        self.assertEqual(
+            messages[0]["message"], "notice local7 149: LINEPROTO-5-UPDOWN"
+        )

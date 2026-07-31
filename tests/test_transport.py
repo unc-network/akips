@@ -3,6 +3,7 @@ Tests for the shared request handling every call passes through.
 """
 
 import unittest
+import warnings
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -116,11 +117,51 @@ class TransportTest(unittest.TestCase):
         with self.assertRaises(AkipsError):
             api._parse_enum("not an enum value")
 
-    def test_parse_enum_cannot_handle_spaces_in_description(self):
-        # Documents a limitation rather than desired behavior: the trailing
-        # field is matched with \S*, so any child description containing a
-        # space is rejected as though it were not an enum at all. Child
-        # descriptions routinely contain spaces, e.g. "Ethernet 1".
+    def test_parse_enum_with_spaces_in_description(self):
+        # Child descriptions routinely contain spaces, e.g. "Ethernet 1", so
+        # the trailing field takes the rest of the line
         api = AKIPS("127.0.0.1")
-        with self.assertRaises(AkipsError):
-            api._parse_enum("8,full,1581605551,1706545348,uplink to core")
+        entry = api._parse_enum("8,full,1581605551,1706545348,uplink to core")
+        self.assertEqual(entry["value"], "full")
+        self.assertEqual(entry["description"], "uplink to core")
+
+    @patch("requests.Session.get")
+    def test_get_does_not_mutate_the_callers_params(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", password="secret")
+        caller_params = {"cmds": "mget * * * *"}
+        api._get(params=caller_params)
+        # Credentials belong on the request, not in the dictionary the caller
+        # still holds and may log or reuse
+        self.assertEqual(caller_params, {"cmds": "mget * * * *"})
+        self.assertEqual(session_mock.call_args.kwargs["params"]["password"], "secret")
+
+    @patch("requests.Session.get")
+    def test_get_accepts_no_params(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        # params is documented as optional, so omitting it must not raise
+        self.assertEqual(api._get(section="api-db"), "")
+        self.assertIn("username", session_mock.call_args.kwargs["params"])
+
+    @patch("requests.Session.get")
+    def test_verify_true_leaves_the_warning_filter_alone(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        before = list(warnings.filters)
+        api.get_devices()
+        self.assertEqual(list(warnings.filters), before)
+
+    @patch("requests.Session.get")
+    def test_verify_false_restores_the_warning_filter(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", verify=False)
+        before = list(warnings.filters)
+        api.get_devices()
+        # Suppression is scoped to the request; constructing a client with
+        # verify=False must not silence urllib3 for the whole process
+        self.assertEqual(list(warnings.filters), before)
