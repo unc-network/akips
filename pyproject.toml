@@ -37,7 +37,13 @@ line-length = 128
 [tool.ruff.lint]
 # pycodestyle (E, W) and pyflakes (F), the linters pylama was configured with.
 # Its third, mccabe, only contributes C901, which that config already ignored.
-select = ["E", "W", "F"]
+# S is flake8-bandit, which ports bandit's checks, so the security lint runs
+# in the same pass rather than as a separate tool.
+select = ["E", "W", "F", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert; that is the point of them.
+"tests/*" = ["S101"]
 
 [tool.black]
 exclude = '''
