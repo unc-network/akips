@@ -47,6 +47,12 @@ CrN-082-AP ping4 PING.icmpState = 1,down,1641624705,1646101757,192.168.94.112
         api = AKIPS("127.0.0.1")
         devices = api.get_unreachable()
         self.assertEqual(devices["192.168.248.54"]["snmp_state"], "down")
+        self.assertEqual(devices["192.168.248.54"]["ping_state"], "down")
+        # child is the matched string; it used to be a one element tuple,
+        # the only field in the structure with a surprising type
+        self.assertEqual(devices["192.168.248.54"]["child"], "sys")
+        self.assertEqual(devices["CrN-082-AP"]["child"], "ping4")
+        self.assertEqual(devices["192.168.248.54"]["index"], "1")
 
     @patch("requests.Session.get")
     def test_get_attributes(self, session_mock: MagicMock):
@@ -140,9 +146,10 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
         self.assertEqual(device["sys"]["SNMPv2-MIB.sysName"], "TH840-A")
         self.assertEqual(device["sys"]["SNMPv2-MIB.sysLocation"], "Datacenter A")
         self.assertEqual(device["Ethernet1"]["IF-MIB.ifDescr"], "Ethernet 1")
-        # An attribute with nothing after the equals becomes an empty string
-        # here, where get_attributes stores None for the same input.
-        self.assertEqual(device["Ethernet1"]["IF-MIB.ifAlias"], "")
+        # An attribute with nothing after the equals has no value, reported
+        # as None consistently across get_device, get_attributes and
+        # get_devices
+        self.assertIsNone(device["Ethernet1"]["IF-MIB.ifAlias"])
         self.assertEqual(device["name"], "TH840-A")
 
     @patch("requests.Session.get")
@@ -157,12 +164,10 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
         session_mock.return_value.text = "no attribute lines here\n"
 
         api = AKIPS("127.0.0.1")
-        device = api.get_device("TH840-A")
-        # Documents current behavior rather than endorsing it: the name
-        # parameter doubles as the loop variable, so a response that parses to
-        # nothing still returns a dict carrying the name that was asked for,
-        # which a caller cannot tell apart from a device with no attributes.
-        self.assertEqual(device, {"name": "TH840-A"})
+        # A response that parses to nothing is not found, and is reported the
+        # same way as an empty response rather than as a dict holding only the
+        # name that was asked for
+        self.assertIsNone(api.get_device("TH840-A"))
 
     @patch("requests.Session.get")
     def test_get_events(self, session_mock: MagicMock):
@@ -252,6 +257,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
 
         api = AKIPS("127.0.0.1")
         self.assertIsNone(api.get_devices())
+        self.assertIsNone(api.get_unreachable())
         self.assertIsNone(api.get_attributes())
         self.assertIsNone(api.get_group_membership())
         self.assertIsNone(api.get_events())
@@ -291,3 +297,23 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         with self.assertRaises(ValueError):
             api.cmd("mget * * * *", output="json")
         self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.get")
+    def test_empty_attribute_values_are_none_everywhere(self, session_mock: MagicMock):
+        # The same value-less line through all three parsers, which used to
+        # disagree: "" from get_device, None from get_attributes, and dropped
+        # entirely by get_devices
+        r_text = "TH840-A sys SNMPv2-MIB.sysLocation =\n"
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1")
+        self.assertIsNone(api.get_device("TH840-A")["sys"]["SNMPv2-MIB.sysLocation"])
+        self.assertIsNone(
+            api.get_attributes(device="TH840-A")["TH840-A"]["sys"][
+                "SNMPv2-MIB.sysLocation"
+            ]
+        )
+        devices = api.get_devices()
+        # the device is listed rather than dropped
+        self.assertIn("TH840-A", devices)
+        self.assertIsNone(devices["TH840-A"]["SNMPv2-MIB.sysLocation"])

@@ -11,6 +11,7 @@ import logging
 import re
 import warnings
 from datetime import datetime
+from typing import Any
 
 import pytz
 import requests
@@ -32,21 +33,26 @@ class AKIPS:
         password (str): The AKiPS API password
         verify (bool): Whether to verify SSL certificates (default: True)
         server_timezone (str): Timezone of the AKiPS server (default: "America/New_York")
+        timeout (int): HTTP timeout in seconds applied to every call
+            (default: 30).  Assign to it to change the timeout of an
+            existing client, e.g. api.timeout = 60
     """
 
     def __init__(
         self,
-        server,
-        username="api-ro",
-        password=None,
-        verify=True,
-        timezone="America/New_York",
-    ):
+        server: str,
+        username: str = "api-ro",
+        password: str | None = None,
+        verify: bool = True,
+        timezone: str = "America/New_York",
+        timeout: int = 30,
+    ) -> None:
         self.server = server
         self.username = username
         self.password = password
         self.verify = verify
         self.server_timezone = timezone
+        self.timeout = timeout
         self.session = requests.Session()
 
     # ---------------------------------------------------------------------------
@@ -54,7 +60,9 @@ class AKIPS:
 
     # entities commands
 
-    def get_devices(self, group_filter="any", groups=None):
+    def get_devices(
+        self, group_filter: str = "any", groups: list[str] | None = None
+    ) -> dict[str, dict[str, str | None]] | None:
         """
         Pull a list of all devices and their key attributes, optionally filtered by group
         membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
@@ -93,18 +101,20 @@ class AKIPS:
             # Data comes back as 'plain/text' type so we have to parse it
             lines = text.split("\n")
             for line in lines:
-                match = re.match(r"^(\S+)\s(\S+)\s(\S+)\s=\s(.*)$", line)
+                match = re.match(r"^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$", line)
                 if match:
                     if match.group(1) not in data:
                         # Populate a default entry for all desired fields
                         data[match.group(1)] = dict.fromkeys(attributes)
-                    # Save this attribute value to data
-                    data[match.group(1)][match.group(3)] = match.group(4)
+                    # An attribute with nothing after the equals has no value,
+                    # recorded as None to match get_device and get_attributes.
+                    # The device is still listed rather than dropped entirely.
+                    data[match.group(1)][match.group(3)] = match.group(5)
             logger.debug("Found {} devices in akips".format(len(data.keys())))
             return data
         return None
 
-    def get_device(self, name):
+    def get_device(self, name: str) -> dict[str, Any] | None:
         """
         Pull all configuration attributes for a single device.  The name is the
         primary device key in AKiPS which might be an IP address or hostname
@@ -126,29 +136,31 @@ class AKIPS:
         params = {"cmds": f"mget * {name} * *"}
         text = self._get(params=params)
         if text:
-            data = {}
+            data: dict[str, Any] = {}
+            # The device key comes back on every line.  Keep it in its own
+            # variable rather than reusing the name argument, so that a
+            # response parsing to nothing is reported as not found.
+            found_name = None
             # Data comes back as 'plain/text' type so we have to parse it.  Example:
             lines = text.split("\n")
             for line in lines:
                 match = re.match(r"^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$", line)
                 if match:
-                    name = match.group(1)
+                    found_name = match.group(1)
                     if match.group(2) not in data:
                         # initialize the dict of attributes
                         data[match.group(2)] = {}
-                    if match.group(5):
-                        # Save this attribute value to data
-                        data[match.group(2)][match.group(3)] = match.group(5)
-                    else:
-                        # save a blank string if there was nothing after equals
-                        data[match.group(2)][match.group(3)] = ""
-            if name:
-                data["name"] = name
+                    # An attribute with nothing after the equals has no value,
+                    # recorded as None to match get_attributes and get_devices
+                    data[match.group(2)][match.group(3)] = match.group(5)
+            if not found_name:
+                return None
+            data["name"] = found_name
             logger.debug("Found device {} in akips".format(data))
             return data
         return None
 
-    def get_unreachable(self):
+    def get_unreachable(self) -> dict[str, dict[str, Any]] | None:
         """
         Pull a list of unreachable devices by Ping and SNMP state.
 
@@ -159,7 +171,8 @@ class AKIPS:
                 [profile {profile name}] [any|all|not group {group name} ...]
 
         Returns:
-            A dictionary of device names to their unreachable attributes
+            A dictionary of device names to their unreachable attributes, or
+            None if nothing was reported as down
         Raises:
             AkipsError: if the AKiPS server returns an error
         """
@@ -167,8 +180,8 @@ class AKIPS:
             "cmds": "mget * * * /PING.icmpState|SNMP.snmpState/ value /down/",
         }
         text = self._get(params=params)
-        data = {}
         if text:
+            data: dict[str, dict[str, Any]] = {}
             lines = text.split("\n")
             for line in lines:
                 match = re.match(
@@ -190,7 +203,7 @@ class AKIPS:
                             "event_start": event_start,  # epoch in local timezone
                         }
                     if attribute == "PING.icmpState":
-                        data[name]["child"] = (match.group(2),)
+                        data[name]["child"] = match.group(2)
                         data[name]["ping_state"] = match.group(5)
                         data[name]["index"] = match.group(4)
                         data[name]["device_added"] = datetime.fromtimestamp(
@@ -201,7 +214,7 @@ class AKIPS:
                         )
                         data[name]["ip4addr"] = match.group(8)
                     elif attribute == "SNMP.snmpState":
-                        data[name]["child"] = (match.group(2),)
+                        data[name]["child"] = match.group(2)
                         data[name]["snmp_state"] = match.group(5)
                         data[name]["index"] = match.group(4)
                         data[name]["device_added"] = datetime.fromtimestamp(
@@ -215,18 +228,18 @@ class AKIPS:
                         data[name]["event_start"] = event_start
             logger.debug("Found {} devices in akips".format(len(data)))
             logger.debug("data: {}".format(data))
-
-        return data
+            return data
+        return None
 
     def get_attributes(
         self,
-        device="*",
-        child="*",
-        attribute="*",
-        value=None,
-        group_filter="any",
-        groups=None,
-    ):
+        device: str = "*",
+        child: str = "*",
+        attribute: str = "*",
+        value: str | None = None,
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, dict[str, str | None]]] | None:
         """
         Pull attribute values with variable search criteria.  Search criteria defaults to
         a wildcard match but can be filtered by 'device' name or pattern, 'child' name or pattern,
@@ -265,7 +278,7 @@ class AKIPS:
             params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
-            data = {}
+            data: dict[str, dict[str, dict[str, str | None]]] = {}
             lines = text.split("\n")
             for line in lines:
                 m = re.match(
@@ -285,7 +298,12 @@ class AKIPS:
 
     # group commands
 
-    def get_group_membership(self, device="*", group_filter="any", groups=None):
+    def get_group_membership(
+        self,
+        device: str = "*",
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, list[str]] | None:
         """
         Pull a list of device names to group memberships.  Defaults to all devices
         and all groups (including the special 'maintenance_mode' group).
@@ -331,14 +349,14 @@ class AKIPS:
 
     def get_events(
         self,
-        event_type="all",
-        period="last1h",
-        device="*",
-        child="*",
-        attribute="*",
-        group_filter="any",
-        groups=None,
-    ):
+        event_type: str = "all",
+        period: str = "last1h",
+        device: str = "*",
+        child: str = "*",
+        attribute: str = "*",
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> list[dict[str, str]] | None:
         """
         Pull a list of events over a time period with optional filtering by device,
         child, attribute, and/or group membership.  Defaults to all event types over
@@ -401,14 +419,14 @@ class AKIPS:
 
     def get_series(
         self,
-        period="last1h",
-        time_interval=60,
-        device="*",
-        attribute="*",
-        get_dict=True,
-        group_filter="any",
-        groups=None,
-    ):
+        period: str = "last1h",
+        time_interval: int = 60,
+        device: str = "*",
+        attribute: str = "*",
+        get_dict: bool = True,
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> list[dict[str, str]] | list[list[str]] | None:
         """
         Pull a series of counter values with average values over a time period with optional
         filtering by device, attribute, and/or group membership.  Defaults to all devices
@@ -444,27 +462,27 @@ class AKIPS:
         if text:
             # Parse output in CSV format
             buff = io.StringIO(text)
+            csv_to_list: list[dict[str, str]] | list[list[str]]
             if get_dict:
                 # parse each row as a dictionary, key will be column header
-                reader = csv.DictReader(buff)
+                csv_to_list = [row for row in csv.DictReader(buff)]
             else:
                 # parse each row as a list, will have a column header row
-                reader = csv.reader(buff)
-            csv_to_list = [row for row in reader]
+                csv_to_list = [row for row in csv.reader(buff)]
             logger.debug("Found {} series entries".format(len(csv_to_list)))
             return csv_to_list
         return None
 
     def get_aggregate(
         self,
-        period="last1h",
-        device="*",
-        attribute="*",
-        operator="avg",
-        interval="300",
-        group_filter="any",
-        groups=None,
-    ):
+        period: str = "last1h",
+        device: str = "*",
+        attribute: str = "*",
+        operator: str = "avg",
+        interval: str = "300",
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> list[str] | None:
         """
         Pull aggregate counter values over a period of time with optional filtering
         by device, attribute, and/or group membership.  Defaults to all devices
@@ -507,7 +525,7 @@ class AKIPS:
 
     # Low-level operations
 
-    def cmd(self, cmd, output="raw"):
+    def cmd(self, cmd: str, output: str = "raw") -> str | None:
         """
         Experimental and may be removed in future releases.  Currently only a shortcut
         to send raw AKiPS api-db command strings to the server and return raw output for
@@ -537,7 +555,7 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # api-script methods, these require the 'api-rw' user
 
-    def get_device_by_ip(self, ipaddr):
+    def get_device_by_ip(self, ipaddr: str) -> str | None:
         """
         Return the device name (primary key) for a device matching the given IP address.
         AKiPS records additional IP addresses when found on devices, so this function
@@ -567,7 +585,7 @@ class AKIPS:
                     return device_name
         return None
 
-    def set_group_membership(self, device, group, mode):
+    def set_group_membership(self, device: str, group: str, mode: str) -> None:
         """
         Update manual grouping rules for a device, including the special 'maintenance_mode'
         group.  The web api script fails silently if the device or group does not exist.
@@ -615,8 +633,14 @@ class AKIPS:
     # api-msg methods, these require the 'api-ro' user
 
     def get_msg(
-        self, time="last1h", addr=None, type=None, device=None, regex=None, limit=None
-    ):
+        self,
+        time: str = "last1h",
+        addr: str | None = None,
+        type: str | None = None,
+        device: str | None = None,
+        regex: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, str]] | None:
         """
         Retrieve syslog or trap messages from the AKiPS api-msg database. The api-msg
         access requires username to be 'api-ro'.
@@ -695,7 +719,9 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # api-availability methods for availability statistics
 
-    def get_group_availability(self, time="last1d", report="ping4", group=None):
+    def get_group_availability(
+        self, time: str = "last1d", report: str = "ping4", group: str | None = None
+    ) -> list[dict[str, str]] | None:
         """
         Retrieve availability statistics for a group of devices over a time period.
 
@@ -770,7 +796,7 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # Base operations
 
-    def _parse_enum(self, enum_string):
+    def _parse_enum(self, enum_string: str) -> dict[str, Any]:
         """
         Attributes with a type of enum return five values separated by commas.
 
@@ -802,16 +828,18 @@ class AKIPS:
         else:
             raise AkipsError(message=f"Not a ENUM type value: {enum_string}")
 
-    def _redact_sensitive_params(self, params):
+    def _redact_sensitive_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Return a copy of params with sensitive keys redacted from logging output."""
         SENSITIVE_KEYS = ("password", "pass", "token", "secret", "key", "community")
 
-        def is_sensitive(k):
+        def is_sensitive(k: str) -> bool:
             return any(s in k.lower() for s in SENSITIVE_KEYS)
 
         return {k: ("****" if is_sensitive(k) else v) for k, v in params.items()}
 
-    def _get(self, section="api-db", params=None, timeout=30):
+    def _get(
+        self, section: str = "api-db", params: dict[str, Any] | None = None
+    ) -> str:
         """
         Base HTTP GET against the AKiPS server for web API calls.
 
@@ -830,7 +858,6 @@ class AKIPS:
         Args:
             section (str): API section to call (default: 'api-db')
             params (dict): dictionary of parameters to pass to the server
-            timeout (int): HTTP timeout in seconds (default: 30)
         Returns:
             text output from the server
         Raises:
@@ -863,7 +890,7 @@ class AKIPS:
                         "ignore", urllib3.exceptions.InsecureRequestWarning
                     )
                 r = self.session.get(
-                    server_url, params=params, verify=self.verify, timeout=timeout
+                    server_url, params=params, verify=self.verify, timeout=self.timeout
                 )
             r.raise_for_status()
         except requests.exceptions.HTTPError as errh:

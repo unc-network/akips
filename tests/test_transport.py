@@ -165,3 +165,39 @@ class TransportTest(unittest.TestCase):
         # Suppression is scoped to the request; constructing a client with
         # verify=False must not silence urllib3 for the whole process
         self.assertEqual(list(warnings.filters), before)
+
+    @patch("requests.Session.get")
+    def test_default_timeout_is_thirty_seconds(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_devices()
+        self.assertEqual(session_mock.call_args.kwargs["timeout"], 30)
+
+    @patch("requests.Session.get")
+    def test_timeout_is_configurable_at_construction(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", timeout=5)
+        # applies to every section, not just api-db
+        api.get_devices()
+        self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
+        api.get_msg()
+        self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
+        api.get_device_by_ip(ipaddr="10.0.0.1")
+        self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
+        api.get_group_availability()
+        self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
+
+    @patch("requests.Session.get")
+    def test_timeout_can_be_changed_on_an_existing_client(
+        self, session_mock: MagicMock
+    ):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1")
+        api.get_devices()
+        self.assertEqual(session_mock.call_args.kwargs["timeout"], 30)
+        api.timeout = 120
+        api.get_devices()
+        self.assertEqual(session_mock.call_args.kwargs["timeout"], 120)
