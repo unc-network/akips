@@ -9,7 +9,14 @@ permissions:
   contents: read
 
 jobs:
+  tests:
+    name: Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/main_testing.yml
+
   build:
+    needs: tests
     runs-on: ubuntu-latest
 
     steps:
