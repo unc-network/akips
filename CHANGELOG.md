@@ -27,12 +27,25 @@ here, a breaking change means a 2.0.
 
 - Type annotations on every public method, and an `akips/py.typed` marker so
   consumers type checking their own code see real types instead of `Any`.
+  The annotations are checked with mypy in CI, so what the marker promises is
+  verified here rather than discovered downstream.
 - `timeout` on the client, defaulting to the 30 seconds already in use. It can
   be changed on an existing client with `api.timeout = 60`. Previously `_get`
   accepted a timeout that nothing forwarded, so callers had to subclass to
   reach it.
 - `get_group_availability()` — availability statistics for a group over a time
   period, from the `api-availability` section.
+- `call()` — send a request to any API section and parse the reply in one of
+  the shapes AKiPS replies in: `raw`, `lines`, `key_value`, `attributes`,
+  `csv` or `csv_dict`. It replaces `cmd()`, which could only reach `api-db`
+  and could only return the reply unparsed. Sections do not share a parameter
+  vocabulary, so `api-db` takes a command string while the others take their
+  own named parameters:
+
+  ```py
+  api.call("mget * TH840-A * *", output="attributes")
+  api.call(section="api-msg", params={"time": "last1h"}, output="lines")
+  ```
 
 ### Changed
 
@@ -52,6 +65,19 @@ here, a breaking change means a 2.0.
 - Suppressing TLS warnings for `verify=False` is scoped to this client's own
   requests. It previously disabled urllib3 warnings for the whole process,
   silencing them for every other library in the calling application.
+- `cmd()` is deprecated in favour of `call()`. It still works and still returns
+  the reply unparsed, but now raises a `DeprecationWarning`. It will be removed
+  in a future major release.
+- Each reply shape is now parsed in exactly one place, shared between the
+  specific methods and `call()`. `get_devices()`, `get_device()` and
+  `get_attributes()` had each carried their own copy of the same
+  `{parent} {child} {attribute} = {value}` parser, and three methods each
+  hand-rolled CSV. No behavior changed; the existing tests passed untouched
+  across the rewiring.
+- The private `_get()` no longer takes a `timeout` argument; it reads the
+  client's. This is internal, but noted because reaching into `_get` was the
+  only way to change the timeout before, so anyone who subclassed to do that
+  should pass `timeout` to the constructor instead and drop the subclass.
 
 ### Fixed
 

@@ -263,15 +263,16 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         self.assertIsNone(api.get_events())
         self.assertIsNone(api.get_series())
         self.assertIsNone(api.get_aggregate())
-        self.assertIsNone(api.cmd("mget * * * *"))
+        self.assertIsNone(api.call("mget * * * *"))
 
     @patch("requests.Session.get")
-    def test_cmd_returns_raw_text(self, session_mock: MagicMock):
+    def test_cmd_still_works_but_warns(self, session_mock: MagicMock):
         r_text = "TH840-A sys ip4addr = 192.168.20.15\n"
         session_mock.return_value.text = r_text
 
         api = AKIPS("127.0.0.1")
-        self.assertEqual(api.cmd("mget * TH840-A sys ip4addr"), r_text)
+        with self.assertWarns(DeprecationWarning):
+            self.assertEqual(api.cmd("mget * TH840-A sys ip4addr"), r_text)
         self.assertEqual(
             session_mock.call_args.kwargs["params"]["cmds"],
             "mget * TH840-A sys ip4addr",
@@ -282,20 +283,9 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         session_mock.return_value.text = "some output\n"
 
         api = AKIPS("127.0.0.1")
-        with self.assertRaises(ValueError):
+        with self.assertWarns(DeprecationWarning), self.assertRaises(ValueError):
             api.cmd("mget * * * *", output="json")
-
-    @patch("requests.Session.get")
-    def test_cmd_rejects_unknown_output_before_requesting(
-        self, session_mock: MagicMock
-    ):
-        # An empty reply used to hide the error, so the format was only
-        # validated when the server happened to return something
-        session_mock.return_value.text = ""
-
-        api = AKIPS("127.0.0.1")
-        with self.assertRaises(ValueError):
-            api.cmd("mget * * * *", output="json")
+        # cmd only ever supported raw; call() is where the other formats live
         self.assertFalse(session_mock.called)
 
     @patch("requests.Session.get")

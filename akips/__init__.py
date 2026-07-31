@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "0.6.0"
+__version__ = "1.0.0"
 
 import csv
 import io
@@ -11,7 +11,7 @@ import logging
 import re
 import warnings
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import pytz
 import requests
@@ -97,19 +97,14 @@ class AKIPS:
             params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
-            data = {}
-            # Data comes back as 'plain/text' type so we have to parse it
-            lines = text.split("\n")
-            for line in lines:
-                match = re.match(r"^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$", line)
-                if match:
-                    if match.group(1) not in data:
-                        # Populate a default entry for all desired fields
-                        data[match.group(1)] = dict.fromkeys(attributes)
-                    # An attribute with nothing after the equals has no value,
-                    # recorded as None to match get_device and get_attributes.
-                    # The device is still listed rather than dropped entirely.
-                    data[match.group(1)][match.group(3)] = match.group(5)
+            data: dict[str, dict[str, str | None]] = {}
+            for parent, children in self._parse_attributes(text).items():
+                # Every requested attribute is present, as None where the
+                # device reported no value for it
+                entry: dict[str, str | None] = dict.fromkeys(attributes)
+                for child_attributes in children.values():
+                    entry.update(child_attributes)
+                data[parent] = entry
             logger.debug("Found {} devices in akips".format(len(data.keys())))
             return data
         return None
@@ -136,26 +131,17 @@ class AKIPS:
         params = {"cmds": f"mget * {name} * *"}
         text = self._get(params=params)
         if text:
-            data: dict[str, Any] = {}
-            # The device key comes back on every line.  Keep it in its own
-            # variable rather than reusing the name argument, so that a
-            # response parsing to nothing is reported as not found.
-            found_name = None
-            # Data comes back as 'plain/text' type so we have to parse it.  Example:
-            lines = text.split("\n")
-            for line in lines:
-                match = re.match(r"^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$", line)
-                if match:
-                    found_name = match.group(1)
-                    if match.group(2) not in data:
-                        # initialize the dict of attributes
-                        data[match.group(2)] = {}
-                    # An attribute with nothing after the equals has no value,
-                    # recorded as None to match get_attributes and get_devices
-                    data[match.group(2)][match.group(3)] = match.group(5)
-            if not found_name:
+            parsed = self._parse_attributes(text)
+            if not parsed:
+                # A reply that parses to nothing is not found, rather than a
+                # device that happens to have no attributes
                 return None
-            data["name"] = found_name
+            data: dict[str, Any] = {}
+            for children in parsed.values():
+                for child, child_attributes in children.items():
+                    data.setdefault(child, {}).update(child_attributes)
+            # The device key repeats on every line of the reply
+            data["name"] = list(parsed)[-1]
             logger.debug("Found device {} in akips".format(data))
             return data
         return None
@@ -278,20 +264,7 @@ class AKIPS:
             params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
-            data: dict[str, dict[str, dict[str, str | None]]] = {}
-            lines = text.split("\n")
-            for line in lines:
-                m = re.match(
-                    r"^(?P<d>\S+)\s(?P<c>\S+)\s(?P<a>\S+)\s=(\s(?P<v>.*))?$", line
-                )
-                if m:
-                    if m.group("d") not in data:
-                        # add device key if needed
-                        data[m.group("d")] = {}
-                    if m.group("c") not in data[m.group("d")]:
-                        # add child key if needed
-                        data[m.group("d")][m.group("c")] = {}
-                    data[m.group("d")][m.group("c")][m.group("a")] = m.group("v")
+            data = self._parse_attributes(text)
             logger.debug("Found {} devices in akips".format(len(data.keys())))
             return data
         return None
@@ -330,15 +303,10 @@ class AKIPS:
             params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
-            data = {}
-            # Data comes back as 'plain/text' type so we have to parse it
-            lines = text.split("\n")
-            for line in lines:
-                match = re.match(r"^(\S+)\s=\s(.*)$", line)
-                if match:
-                    if match.group(1) not in data:
-                        # Populate a default entry for all desired fields
-                        data[match.group(1)] = match.group(2).split(",")
+            data = {
+                device_name: groups_value.split(",")
+                for device_name, groups_value in self._parse_key_value(text).items()
+            }
             logger.debug(
                 "Found {} device and group mappings in akips".format(len(data.keys()))
             )
@@ -460,15 +428,9 @@ class AKIPS:
             params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
-            # Parse output in CSV format
-            buff = io.StringIO(text)
-            csv_to_list: list[dict[str, str]] | list[list[str]]
-            if get_dict:
-                # parse each row as a dictionary, key will be column header
-                csv_to_list = [row for row in csv.DictReader(buff)]
-            else:
-                # parse each row as a list, will have a column header row
-                csv_to_list = [row for row in csv.reader(buff)]
+            # Rows as dictionaries keyed by the header row, or as plain lists
+            # with that header row kept as the first entry
+            csv_to_list = self._parse_csv(text, header=get_dict)
             logger.debug("Found {} series entries".format(len(csv_to_list)))
             return csv_to_list
         return None
@@ -516,41 +478,116 @@ class AKIPS:
             params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
-            # Text should be one CSV line followed by one blank line
-            lines = text.split("\n")
-            values = lines[0].split(",")
+            # One CSV row of values, followed by a blank line
+            rows = cast(list[list[str]], self._parse_csv(text))
+            values = rows[0] if rows else []
             logger.debug("Found {} aggregate values".format(len(values)))
             return values
         return None
 
     # Low-level operations
 
+    # The reply shapes call() can parse, mapped to the parser for each
+    OUTPUT_FORMATS = ("raw", "lines", "key_value", "attributes", "csv", "csv_dict")
+
+    def call(
+        self,
+        cmd: str | None = None,
+        section: str = "api-db",
+        params: dict[str, Any] | None = None,
+        output: str = "raw",
+    ) -> Any:
+        """
+        Send an arbitrary request to any AKiPS web API section and parse the
+        reply in one of the shapes AKiPS replies in.
+
+        This is the general purpose call for anything the specific methods do
+        not cover.  It parses with the same routines they use, so an ad-hoc
+        query returns the same shape its dedicated method would.
+
+        Sections do not share a parameter vocabulary.  api-db takes a command
+        string, while api-script, api-msg and api-availability each take their
+        own named parameters, so pass 'cmd' for the first and 'params' for the
+        others.  Passing both adds the command to the given parameters.
+
+        Output formats, and where each one occurs:
+
+            raw        the reply unchanged, as a string
+            lines      a list of non-blank lines
+            key_value  '{key} = {value}' lines, as from mgroup
+            attributes '{parent} {child} {attribute} = {value}' lines, as from
+                       mget, nested by parent, child, then attribute
+            csv        CSV rows as lists, for replies with no header row
+            csv_dict   CSV rows as dictionaries keyed by the header row
+
+        Args:
+            cmd (str): command string for the api-db section, shorthand for
+                params={'cmds': cmd}
+            section (str): API section to call (default: 'api-db')
+            params (dict): parameters for sections that take no command string
+            output (str): one of the formats listed above (default: 'raw')
+        Returns:
+            The reply in the requested shape, or None if the server returned
+            nothing
+        Raises:
+            ValueError: if output is not a supported format, or if neither cmd
+                nor params was provided
+            AkipsError: if the AKiPS server returns an error
+        """
+        # Check before making the request, so a bad argument fails the same way
+        # whether or not the server returned anything
+        if output not in self.OUTPUT_FORMATS:
+            raise ValueError(
+                "Invalid output value provided to call, expected one of {}".format(
+                    ", ".join(self.OUTPUT_FORMATS)
+                )
+            )
+        if cmd is None and params is None:
+            raise ValueError("call requires either a cmd or a params dictionary")
+
+        request_params = dict(params or {})
+        if cmd is not None:
+            request_params["cmds"] = cmd
+
+        text = self._get(section=section, params=request_params)
+        if not text:
+            return None
+
+        if output == "raw":
+            return text
+        if output == "lines":
+            return self._parse_lines(text)
+        if output == "key_value":
+            return self._parse_key_value(text)
+        if output == "attributes":
+            return self._parse_attributes(text)
+        if output == "csv_dict":
+            return self._parse_csv(text, header=True)
+        return self._parse_csv(text)
+
     def cmd(self, cmd: str, output: str = "raw") -> str | None:
         """
-        Experimental and may be removed in future releases.  Currently only a shortcut
-        to send raw AKiPS api-db command strings to the server and return raw output for
-        debugging.
+        Deprecated since 1.0.0, use call() instead, which reaches every API
+        section and can parse the reply rather than only returning it raw.
 
         Args:
             cmd (str): AKiPS command string to send
-            output (str): desired output format, currently only 'raw' is supported
+            output (str): desired output format, only 'raw' is supported
         Returns:
-            The command output in the desired format, or None if no output
+            The command output, or None if no output
         Raises:
             ValueError: if an invalid output format is provided
             AkipsError: if the AKiPS server returns an error
         """
-
+        warnings.warn(
+            "cmd() is deprecated and will be removed in a future release, "
+            "use call() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if output != "raw":
-            # Check before making the request, so an unsupported format fails
-            # the same way whether or not the server returned anything
             raise ValueError("Invalid output value provided to cmd.")
-
-        params = {"cmds": f"{cmd}"}
-        text = self._get(params=params)
-        if text:
-            return text
-        return None
+        return cast("str | None", self.call(cmd=cmd))
 
     # ---------------------------------------------------------------------------
     # api-script methods, these require the 'api-rw' user
@@ -792,6 +829,91 @@ class AKIPS:
     #     cisco-131-16-1,ping4,1603060380,1603060498,2389764,2388341
     #     """
     #     pass
+
+    # ---------------------------------------------------------------------------
+    # Response parsers
+    #
+    # AKiPS replies in a handful of shapes.  Each one is parsed in exactly one
+    # place here, so the specific methods above and the generic call() below
+    # cannot drift apart in how they read the same reply.
+
+    @staticmethod
+    def _parse_lines(text: str) -> list[str]:
+        """
+        Split a reply into its non-blank lines.
+
+        Args:
+            text (str): the raw reply from AKiPS
+        Returns:
+            A list of lines with blank ones removed
+        """
+        return [line for line in text.split("\n") if line.strip()]
+
+    @staticmethod
+    def _parse_key_value(text: str) -> dict[str, str]:
+        """
+        Parse lines of '{key} = {value}', the shape mgroup replies in.
+
+        Args:
+            text (str): the raw reply from AKiPS
+        Returns:
+            A dictionary of keys to their unsplit values
+        """
+        data = {}
+        for line in text.split("\n"):
+            match = re.match(r"^(\S+)\s=\s(.*)$", line)
+            if match:
+                data[match.group(1)] = match.group(2)
+        return data
+
+    @staticmethod
+    def _parse_attributes(text: str) -> dict[str, dict[str, dict[str, str | None]]]:
+        """
+        Parse lines of '{parent} {child} {attribute} = {value}', the shape
+        mget replies in.  An attribute with nothing after the equals has no
+        value and is recorded as None.
+
+        Args:
+            text (str): the raw reply from AKiPS
+        Returns:
+            A nested dictionary of parent, child, attribute to value
+        """
+        data: dict[str, dict[str, dict[str, str | None]]] = {}
+        for line in text.split("\n"):
+            match = re.match(r"^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$", line)
+            if match:
+                parent, child, attribute = (
+                    match.group(1),
+                    match.group(2),
+                    match.group(3),
+                )
+                data.setdefault(parent, {}).setdefault(child, {})[attribute] = (
+                    match.group(5)
+                )
+        return data
+
+    @staticmethod
+    def _parse_csv(
+        text: str, fieldnames: list[str] | None = None, header: bool = False
+    ) -> list[dict[str, str]] | list[list[str]]:
+        """
+        Parse a CSV reply.  AKiPS is not consistent about header rows, so the
+        caller says which shape to expect rather than this guessing.
+
+        Args:
+            text (str): the raw reply from AKiPS
+            fieldnames (list): column names for a reply that carries no header
+            header (bool): treat the first row as the header row
+        Returns:
+            A list of rows, as dictionaries when column names are known from
+            either fieldnames or a header row, otherwise as lists
+        """
+        buff = io.StringIO(text)
+        if fieldnames is not None:
+            return list(csv.DictReader(buff, fieldnames=fieldnames))
+        if header:
+            return list(csv.DictReader(buff))
+        return [row for row in csv.reader(buff) if row]
 
     # ---------------------------------------------------------------------------
     # Base operations
