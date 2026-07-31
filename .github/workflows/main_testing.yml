@@ -1,9 +1,13 @@
 name: Code Quality and Testing
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ develop ]
   pull_request:
     branches: [ main, develop ]
+  # Called by release.yml so a publish is gated on the full matrix passing.
+  # This is why push above no longer lists main: pushes to main reach these
+  # same jobs through the release workflow instead of running them twice.
+  workflow_call:
 
 permissions:
   contents: read

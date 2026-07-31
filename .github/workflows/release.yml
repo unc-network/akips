@@ -1,15 +1,142 @@
 name: Publish Python Package to PyPI
 
+# Three ways in:
+#   push to main   - if the version in pyproject.toml has no tag yet, tag it,
+#                    create the GitHub release, and publish
+#   release        - published by hand from an existing tag
+#   workflow_dispatch - manual re-run
+#
+# Note that the tag and release created here are made with GITHUB_TOKEN, and
+# GitHub does not start new workflow runs from events raised by that token.
+# That is why this workflow publishes in the same run rather than relying on
+# its own "release: published" trigger to fire.
+
 on:
   workflow_dispatch:
   release:
     types: [published]
+  push:
+    branches: [ main ]
 
 permissions:
   contents: read
 
 jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      should_release: ${{ steps.check.outputs.should_release }}
+      should_tag: ${{ steps.check.outputs.should_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Resolve version and decide whether to release
+        id: check
+        env:
+          EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['tool']['poetry']['version'])")
+          module=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('akips/__init__.py').read()).group(1))")
+          echo "pyproject.toml     ${version}"
+          echo "akips/__init__.py  ${module}"
+
+          if [ "${version}" != "${module}" ]; then
+            echo "::error::Version mismatch: pyproject.toml says ${version}, akips/__init__.py says ${module}"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          if [ "${EVENT}" = "release" ] && [ "${RELEASE_TAG}" != "v${version}" ]; then
+            echo "::error::Release tag ${RELEASE_TAG} does not match project version v${version}"
+            exit 1
+          fi
+
+          if [ "${EVENT}" != "push" ]; then
+            echo "Triggered by ${EVENT}, publishing v${version}."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_tag=false" >> "$GITHUB_OUTPUT"
+          elif git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
+            echo "Tag v${version} already exists, nothing to release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "should_tag=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version v${version} has no tag yet, tagging and publishing."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_tag=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  tests:
+    name: Tests
+    needs: version
+    if: needs.version.outputs.should_release == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/main_testing.yml
+
+  tag:
+    name: Tag and release
+    needs: [version, tests]
+    if: needs.version.outputs.should_tag == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Pull this version's section out of the changelog for release notes
+          python3 - <<'PY' > release-notes.md
+          import os
+          import re
+
+          version = os.environ["VERSION"]
+          try:
+              with open("CHANGELOG.md", encoding="utf-8") as handle:
+                  text = handle.read()
+          except OSError:
+              text = ""
+          match = re.search(
+              r"^## \[" + re.escape(version) + r"\][^\n]*\n(.*?)(?=^## \[|\Z)",
+              text,
+              re.S | re.M,
+          )
+          print(match.group(1).strip() if match else "See CHANGELOG.md for details.")
+          PY
+
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes-file release-notes.md \
+            --verify-tag
+
   build:
+    needs: [version, tests, tag]
+    # tag is skipped when the release already exists; a skipped dependency
+    # would normally skip this job too, so check the statuses explicitly
+    if: ${{ !failure() && !cancelled() && needs.version.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
