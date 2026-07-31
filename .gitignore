@@ -165,3 +165,6 @@ cython_debug/
 
 # temporary test file
 test_to_server.py
+
+# notes brought in from downstream projects, not part of this repo
+docs/upstream-akips-requests.md

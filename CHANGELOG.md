@@ -1,0 +1,203 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+While the version stays below 1.0, breaking changes may appear in a minor
+release; those are marked **Breaking** below.
+
+> Entries for 0.5.1 and earlier were reconstructed from git history and release
+> tags after the fact, by comparing the public API at each tag. They record the
+> user-visible changes but are not as detailed as entries written at the time.
+
+## [Unreleased]
+
+### Added
+
+- `get_group_availability()` — group availability statistics from the
+  `api-availability` section.
+- Stubs for `get_device_availability()` and `get_event_availability()`. These
+  are not implemented yet and currently return `None`.
+
+### Changed
+
+- Poetry dependency refresh.
+
+## [0.5.1] - 2025-11-19
+
+### Added
+
+- `get_msg()` — retrieve syslog and trap messages from the `api-msg` section.
+
+### Changed
+
+- Reorganized the source so methods are grouped by the AKiPS API section they
+  use (`api-db`, `api-script`, `api-msg`).
+
+## [0.5.0] - 2025-11-14
+
+### Added
+
+- Redaction of sensitive request parameters in debug logging, so passwords no
+  longer appear in `logger.debug` output.
+
+### Changed
+
+- Documentation updates.
+
+## [0.4.5] - 2025-10-06
+
+### Changed
+
+- Expanded the README usage examples and regenerated the API documentation.
+- Poetry dependency updates.
+
+## [0.4.4] - 2025-10-02
+
+### Added
+
+- Group filtering (`group_filter` and `groups`) on `get_events()`.
+
+### Fixed
+
+- `get_group_membership()` when querying a specific device key.
+
+## [0.4.3] - 2025-10-02
+
+### Fixed
+
+- Typo in the `mget` command built by `get_attributes()`. Thanks to
+  [@kvncampos](https://github.com/kvncampos).
+
+## [0.4.2] - 2025-04-01
+
+### Added
+
+- `get_attributes()` — attribute queries filtered by device, child, attribute,
+  value, and group membership.
+
+### Removed
+
+- `get_status()`, superseded by `get_attributes()`. **Breaking.**
+
+## [0.4.1] - 2025-04-01
+
+Published to PyPI at the time, but not tagged until later. The `v0.4.1` tag was
+added retroactively, pointing at the commit whose contents match the published
+0.4.1 wheel.
+
+### Added
+
+- `cmd()` — experimental low-level passthrough for raw api-db command strings.
+- `time_interval` parameter on `get_series()`. Thanks to
+  [@kvncampos](https://github.com/kvncampos).
+
+## [0.4.0] - 2025-02-20
+
+### Added
+
+- GitHub Actions workflows for code quality (pylama, black) and pytest across
+  the supported Python matrix.
+- Contributing guide.
+
+### Changed
+
+- Formatted the codebase with black.
+- Updated repository references to the `unc-network` organization.
+
+### Removed
+
+- Python 3.8 support. The minimum supported version is now 3.9.
+
+## [0.3.1] - 2024-09-17
+
+### Changed
+
+- Packaging and publish workflow updates following the repository move to the
+  `unc-network` organization.
+
+## [0.3.0] - 2024-05-14
+
+### Added
+
+- `set_group_membership()` — assign or clear manual group membership through the
+  `web_manual_grouping` site script, with validation of the device, group, and
+  mode arguments.
+- `device` filter on `get_group_membership()`.
+
+### Changed
+
+- `get_device_by_ip()` now resolves names through the `web_find_device_by_ip`
+  site script in the `api-script` section.
+
+### Removed
+
+- `get_maintenance_mode()` and `set_maintenance_mode()`, replaced by
+  `set_group_membership()` against the `maintenance_mode` group. **Breaking.**
+
+## [0.2.3] - 2024-05-14
+
+### Added
+
+- `timezone` constructor option for the AKiPS server timezone, defaulting to
+  `America/New_York`.
+- Internal helper for parsing enum-typed attribute values.
+
+## [0.2.2] - 2024-05-13
+
+### Added
+
+- `get_aggregate()` — aggregate counter values over a time period.
+
+## [0.2.1] - 2024-04-12
+
+### Changed
+
+- Widened the supported Python range from `^3.10` to `>=3.8.1,<4.0`.
+
+## [0.2.0] - 2024-04-11
+
+### Added
+
+- `get_series()` — time-series counter values via the `cseries` command.
+- Group filtering on device and attribute queries.
+
+## [0.1.5] - 2023-10-11
+
+### Added
+
+- Device and group membership queries.
+- Mock-based unit tests for the response parsers.
+
+### Changed
+
+- Renamed the request helper `akips_get()` to `_get()`, making it private.
+  **Breaking** for anyone who called it directly.
+
+## [0.1.4] - 2023-09-25
+
+First tagged release. Provides the `AKIPS` client with `get_devices()`,
+`get_device()`, `get_device_by_ip()`, `get_unreachable()`,
+`get_group_membership()`, `get_maintenance_mode()`, `set_maintenance_mode()`,
+`get_status()`, and `get_events()`, along with the `AkipsError` exception.
+
+Releases before this one are not tagged in git and are not recorded here.
+
+[Unreleased]: https://github.com/unc-network/akips/compare/v0.5.1...develop
+[0.5.1]: https://github.com/unc-network/akips/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/unc-network/akips/compare/v0.4.5...v0.5.0
+[0.4.5]: https://github.com/unc-network/akips/compare/v0.4.4...v0.4.5
+[0.4.4]: https://github.com/unc-network/akips/compare/v0.4.3...v0.4.4
+[0.4.3]: https://github.com/unc-network/akips/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/unc-network/akips/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/unc-network/akips/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/unc-network/akips/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/unc-network/akips/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/unc-network/akips/compare/v0.2.3...v0.3.0
+[0.2.3]: https://github.com/unc-network/akips/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/unc-network/akips/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/unc-network/akips/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/unc-network/akips/compare/v0.1.5...v0.2.0
+[0.1.5]: https://github.com/unc-network/akips/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/unc-network/akips/releases/tag/v0.1.4

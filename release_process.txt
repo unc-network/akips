@@ -5,7 +5,7 @@ poetry install
 
 # Run quality checks
 poetry run pylama .
-poetry run black --check . 
+poetry run black --check .
 poetry run pytest -v -s tests
 
 # Fix errors before proceeding.
@@ -13,12 +13,25 @@ poetry run pytest -v -s tests
 # Update docs
 poetry run pdoc3 --html --output-dir docs akips --force
 
-# Make sure you have rolled the version in pyproject.toml and __init__.py
+# Roll the version in BOTH pyproject.toml and akips/__init__.py.
+# CI fails the release if the two disagree.
 
-# Merge into master via pull request
+# Move the CHANGELOG.md [Unreleased] entries under the new version and date,
+# then add the compare link at the bottom of the file
 
-# Create a tag and release for the version
+# Merge into main via pull request.
+#
+# From here the release workflow takes over.  On merge it checks whether the
+# version already has a tag, and if not it runs the full test matrix, creates
+# the tag and the GitHub release (notes come from the CHANGELOG section for
+# that version), then builds and publishes to pypi.
+#
+# Nothing happens for a merge that does not change the version, so there is no
+# need to time merges around releases.
 
-# Publish to pypi
-poetry build
-poetry publish
+# To release without a merge, publish a GitHub release by hand from a tag whose
+# name matches the version in pyproject.toml, e.g. v0.6.0.  The same workflow
+# picks it up.
+
+# TestPyPI is a manual run of the "Publish Python Package to TestPyPI" workflow
+# from the Actions tab.
