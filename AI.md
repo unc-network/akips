@@ -23,19 +23,13 @@ Every public method in the client, every response parser, every regular
 expression, and every unit test was written by hand before any AI touched this
 repository.
 
-## What AI has actually changed
+## What AI has changed, and when that changed
 
-As of this writing, AI-assisted commits have not altered the behavior of the
-library. The complete diff to the `akips/` package since AI involvement began is
-a single line: the `__version__` string, updated as part of a version bump.
+There are two distinct phases, and the boundary is worth stating plainly.
 
-```console
-$ git diff 646ba4a..HEAD -- akips/
--__version__ = "0.5.1"
-+__version__ = "0.6.0.dev2"
-```
-
-The work has been confined to the scaffolding around the library:
+**Through 0.6.0, the library itself was untouched.** Every AI-assisted change
+was scaffolding around it. The complete diff to the `akips/` package across that
+entire release was a single line, the `__version__` string:
 
 | Area | Examples |
 | --- | --- |
@@ -43,6 +37,24 @@ The work has been confined to the scaffolding around the library:
 | Dependencies | Updating the lock file to clear security advisories, raising the Python floor to 3.10, replacing the unmaintained pylama with ruff |
 | Documentation | Backfilling `CHANGELOG.md` from git history, updating the release process notes and contributing guide |
 | Packaging metadata | Version bumps, trove classifiers |
+
+**From 1.0.0, AI does change library code.** That release fixes long standing
+bugs, settles inconsistent return shapes, adds type annotations throughout, and
+ships a `py.typed` marker. Those are real changes to behavior that callers can
+observe, and they were drafted with AI assistance.
+
+Two things make that a different activity from the AI writing the library:
+
+- The maintainer reviews every change before it is committed. Work is left in
+  the working tree and discussed; nothing is committed or published until it has
+  been read and approved. Several proposals were rejected or reshaped at that
+  point, including an earlier version of the configurable timeout that added a
+  parameter to thirteen methods where one setting on the client was what was
+  actually wanted.
+- The changes land against a test suite that grew from 11 tests to 59 while
+  covering them, alongside ruff, black, and mypy. Where a fix altered an
+  existing contract, the test asserting the old behavior was written first, so
+  the change had to break a test on purpose rather than pass unnoticed.
 
 ## How the collaboration works
 
@@ -59,7 +71,7 @@ action runtimes are read from the actions' own manifests, and shell logic
 embedded in workflows is extracted and executed locally before being committed.
 
 Every AI-assisted change passes the same gates as any other change: ruff, black,
-and the full pytest matrix.
+mypy, and the full pytest matrix.
 
 ## Why Claude appears in the contributor list
 
@@ -80,13 +92,16 @@ rather than invisible:
 $ git log --grep="Co-Authored-By: Claude"
 ```
 
-At present 13 of 172 commits carry this trailer.
-
 ## Working rules
 
-- Changes to the library source in `akips/` are reviewed line by line before
-  being committed, and the bar for accepting them is higher than for tooling
-  and documentation.
+- Nothing is committed until the maintainer has reviewed it. AI-assisted work
+  is left in the working tree and discussed first; committing and publishing
+  are separate decisions, taken by the maintainer.
+- Changes to the library source in `akips/` are reviewed line by line, and the
+  bar for accepting them is higher than for tooling and documentation.
+- Behavioral changes arrive with tests. Where a change alters an existing
+  contract, the test covering the old behavior is written first so the change
+  cannot pass silently.
 - AI does not publish releases. Publishing is gated behind CI checks and a
   human merge to `main`.
 - Credentials and secrets are never shared with AI tooling.
