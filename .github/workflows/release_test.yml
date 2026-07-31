@@ -43,7 +43,7 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     environment:
-      name: prod
+      name: testpypi
       url: https://test.pypi.org/project/akips/
     permissions:
       id-token: write
