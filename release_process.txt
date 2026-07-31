@@ -3,12 +3,22 @@
 # Install poetry
 poetry install
 
-# Run quality checks
+# Run quality checks.  These are the same four the pipeline runs, so anything
+# failing here will fail there.
 poetry run ruff check .
 poetry run black --check .
+poetry run mypy
 poetry run pytest -v -s tests
 
 # Fix errors before proceeding.
+#
+# mypy checks the akips package against its own type annotations.  It matters
+# because the package ships an akips/py.typed marker, which tells anyone type
+# checking their own code that our annotations can be trusted.  If they are
+# wrong, the breakage shows up in someone else's build, not ours.
+#
+# If mypy complains about missing stubs for a newly added dependency, the fix
+# is usually to add the matching types-* package to the dev dependencies.
 
 # Docs publish themselves.  The documentation workflow regenerates the API
 # docs and deploys them to https://unc-network.github.io/akips/ on every push
