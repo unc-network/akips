@@ -19,6 +19,7 @@ release; those are marked **Breaking** below.
   `api-availability` section.
 - Stubs for `get_device_availability()` and `get_event_availability()`. These
   are not implemented yet and currently return `None`.
+- Python 3.14 to the supported and tested versions.
 
 ### Changed
 
