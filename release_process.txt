@@ -34,4 +34,8 @@ poetry run pdoc3 --html --output-dir docs akips --force
 # picks it up.
 
 # TestPyPI is a manual run of the "Publish Python Package to TestPyPI" workflow
-# from the Actions tab.
+# from the Actions tab.  Pre-release versions such as 0.6.0.dev1 are fine there,
+# and are the way to rehearse the pipeline without burning a real version.
+#
+# The production workflow refuses any pre-release version, on every trigger, so
+# a dev build cannot reach pypi by accident.
