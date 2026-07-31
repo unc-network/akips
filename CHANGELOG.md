@@ -4,14 +4,70 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-While the version stays below 1.0, breaking changes may appear in a minor
-release; those are marked **Breaking** below.
+From 1.0.0 onward, a breaking change requires a major release. Releases before
+1.0.0 could break compatibility in a minor release; those are marked
+**Breaking** below.
 
 > Entries for 0.5.1 and earlier were reconstructed from git history and release
 > tags after the fact, by comparing the public API at each tag. They record the
 > user-visible changes but are not as detailed as entries written at the time.
 
-## [Unreleased]
+## [1.0.0] - unreleased
+
+The first release to commit to a stable API. Return shapes that disagreed with
+each other are settled, the public methods are annotated, and the package ships
+a `py.typed` marker, so what a caller gets back is now something a type checker
+can see rather than something to be discovered at runtime.
+
+Those corrections are breaking, and they are gathered here deliberately: better
+to face them once than to meet them one at a time across several releases. From
+here, a breaking change means a 2.0.
+
+### Added
+
+- Type annotations on every public method, and an `akips/py.typed` marker so
+  consumers type checking their own code see real types instead of `Any`.
+- `timeout` on the client, defaulting to the 30 seconds already in use. It can
+  be changed on an existing client with `api.timeout = 60`. Previously `_get`
+  accepted a timeout that nothing forwarded, so callers had to subclass to
+  reach it.
+- `get_group_availability()` — availability statistics for a group over a time
+  period, from the `api-availability` section.
+
+### Changed
+
+- `get_unreachable()` reports `child` as the matched string. It was a one
+  element tuple, the only field in that structure with a surprising type.
+  **Breaking.**
+- `get_device()` returns `None` when a response parses to nothing, instead of a
+  dictionary holding only the name that was asked for, which a caller could not
+  tell apart from a device that has no attributes. **Breaking.**
+- An attribute with nothing after the equals is `None` from every method. It
+  was `""` from `get_device()`, `None` from `get_attributes()`, and
+  `get_devices()` dropped the line entirely, which could leave a device out of
+  its own listing. **Breaking.**
+- `get_unreachable()` returns `None` when nothing is reported down. It was the
+  only one of eleven methods returning an empty container rather than `None`.
+  **Breaking.**
+- Suppressing TLS warnings for `verify=False` is scoped to this client's own
+  requests. It previously disabled urllib3 warnings for the whole process,
+  silencing them for every other library in the calling application.
+
+### Fixed
+
+- `get_msg()` no longer raises `IndexError` when a message line arrives before
+  any header. It popped an empty list, failing the entire call.
+- `cmd()` validates its output format before making the request, so an
+  unsupported format fails whether or not the server returned anything.
+- `_get()` takes a copy of the parameters it is given. Credentials were written
+  into the dictionary the caller passed in, leaving the password somewhere
+  redaction could not reach.
+- `_parse_enum()` accepts descriptions containing spaces, such as
+  `Ethernet 1`, which it previously rejected as not being an enum at all.
+- `get_events()` logs the event type it was asked for rather than the built-in
+  `type`.
+- The six methods taking a `groups` list no longer share a mutable default
+  argument.
 
 ## [0.6.0] - 2026-07-31
 
@@ -231,7 +287,7 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v0.6.0...develop
+[1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...develop
 [0.6.0]: https://github.com/unc-network/akips/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/unc-network/akips/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/unc-network/akips/compare/v0.4.5...v0.5.0

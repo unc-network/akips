@@ -33,8 +33,10 @@ poetry run pdoc -d google akips
 # Roll the version in BOTH pyproject.toml and akips/__init__.py.
 # CI fails the release if the two disagree.
 
-# Move the CHANGELOG.md [Unreleased] entries under the new version and date,
-# then add the compare link at the bottom of the file
+# In CHANGELOG.md, put the release date on the version heading in place of
+# "unreleased", and point that version's compare link at the new tag instead
+# of develop.  The release workflow lifts its notes from this section, so
+# whatever is written here is what appears on the GitHub release.
 
 # Merge into main via pull request.
 #
