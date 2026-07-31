@@ -168,3 +168,6 @@ test_to_server.py
 
 # notes brought in from downstream projects, not part of this repo
 docs/upstream-akips-requests.md
+
+# generated documentation build directory, published by the docs workflow
+site/

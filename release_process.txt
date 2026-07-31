@@ -10,8 +10,12 @@ poetry run pytest -v -s tests
 
 # Fix errors before proceeding.
 
-# Update docs
-poetry run pdoc3 --html --output-dir docs akips --force
+# Docs publish themselves.  The documentation workflow regenerates the API
+# docs and deploys them to https://unc-network.github.io/akips/ on every push
+# to main, so the published site always matches main and never develop.
+#
+# To preview them locally before merging (writes to site/, which is ignored):
+poetry run pdoc3 --html --output-dir site/docs akips --force
 
 # Roll the version in BOTH pyproject.toml and akips/__init__.py.
 # CI fails the release if the two disagree.
