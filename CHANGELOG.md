@@ -22,7 +22,19 @@ release; those are marked **Breaking** below.
 
 ### Changed
 
-- Poetry dependency refresh.
+- Updated all locked dependencies, clearing eleven security advisories.
+  Every remaining fix required Python 3.10 or newer, which is what prompted
+  the version floor below.
+- Replaced pylama with ruff for linting. pylama has been unreleased since
+  2022 and depends on `pkg_resources`, which recent setuptools removed. The
+  same rules carry over: pycodestyle, pyflakes, and a 128 character line
+  length. `setup.cfg` is gone, since it only held pylama's configuration.
+
+### Removed
+
+- Python 3.9 support. The minimum supported version is now 3.10.
+  **Breaking** for anyone still on 3.9, which reached end of life in
+  October 2025.
 
 ## [0.5.1] - 2025-11-19
 
