@@ -1,0 +1,48 @@
+# Use dev machine
+
+# Install poetry
+poetry install
+
+# Run quality checks
+poetry run ruff check .
+poetry run black --check .
+poetry run pytest -v -s tests
+
+# Fix errors before proceeding.
+
+# Docs publish themselves.  The documentation workflow regenerates the API
+# docs and deploys them to https://unc-network.github.io/akips/ on every push
+# to main, so the published site always matches main and never develop.
+#
+# To preview them locally before merging (writes to site/, which is ignored):
+poetry run pdoc -o site/docs -d google akips
+
+# Or serve them with live reload while editing docstrings:
+poetry run pdoc -d google akips
+
+# Roll the version in BOTH pyproject.toml and akips/__init__.py.
+# CI fails the release if the two disagree.
+
+# Move the CHANGELOG.md [Unreleased] entries under the new version and date,
+# then add the compare link at the bottom of the file
+
+# Merge into main via pull request.
+#
+# From here the release workflow takes over.  On merge it checks whether the
+# version already has a tag, and if not it runs the full test matrix, creates
+# the tag and the GitHub release (notes come from the CHANGELOG section for
+# that version), then builds and publishes to pypi.
+#
+# Nothing happens for a merge that does not change the version, so there is no
+# need to time merges around releases.
+
+# To release without a merge, publish a GitHub release by hand from a tag whose
+# name matches the version in pyproject.toml, e.g. v0.6.0.  The same workflow
+# picks it up.
+
+# TestPyPI is a manual run of the "Publish Python Package to TestPyPI" workflow
+# from the Actions tab.  Pre-release versions such as 0.6.0.dev1 are fine there,
+# and are the way to rehearse the pipeline without burning a real version.
+#
+# The production workflow refuses any pre-release version, on every trigger, so
+# a dev build cannot reach pypi by accident.

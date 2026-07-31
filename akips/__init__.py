@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 import csv
 import io
@@ -52,6 +52,8 @@ class AKIPS:
 
     # ---------------------------------------------------------------------------
     # api-db interface methods, these use the 'api-ro' or 'api-rw' user
+
+    # entities commands
 
     def get_devices(self, group_filter="any", groups=[]):
         """
@@ -217,48 +219,6 @@ class AKIPS:
 
         return data
 
-    def get_group_membership(self, device="*", group_filter="any", groups=[]):
-        """
-        Pull a list of device names to group memberships.  Defaults to all devices
-        and all groups (including the special 'maintenance_mode' group).
-
-        Supporting AKiPS command syntax:
-
-            mgroup {type} [{parent regex}]
-                [any|all|not group {group name} ...]
-
-        Args:
-            device (str): device name or pattern to match (default: '*')
-            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
-            groups (list): list of group names to filter by (if any)
-        Returns:
-            A dictionary of device names to lists of group names, or None if no devices found
-        Raises:
-            AkipsError: if the AKiPS server returns an error
-        """
-        params = {
-            "cmds": f"mgroup * {device}",
-        }
-        if groups:
-            group_list = " ".join(groups)
-            params["cmds"] += f" {group_filter} group {group_list}"
-        text = self._get(params=params)
-        if text:
-            data = {}
-            # Data comes back as 'plain/text' type so we have to parse it
-            lines = text.split("\n")
-            for line in lines:
-                match = re.match(r"^(\S+)\s=\s(.*)$", line)
-                if match:
-                    if match.group(1) not in data:
-                        # Populate a default entry for all desired fields
-                        data[match.group(1)] = match.group(2).split(",")
-            logger.debug(
-                "Found {} device and group mappings in akips".format(len(data.keys()))
-            )
-            return data
-        return None
-
     def get_attributes(
         self,
         device="*",
@@ -323,6 +283,52 @@ class AKIPS:
             logger.debug("Found {} devices in akips".format(len(data.keys())))
             return data
         return None
+
+    # group commands
+
+    def get_group_membership(self, device="*", group_filter="any", groups=[]):
+        """
+        Pull a list of device names to group memberships.  Defaults to all devices
+        and all groups (including the special 'maintenance_mode' group).
+
+        Supporting AKiPS command syntax:
+
+            mgroup {type} [{parent regex}]
+                [any|all|not group {group name} ...]
+
+        Args:
+            device (str): device name or pattern to match (default: '*')
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to lists of group names, or None if no devices found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        params = {
+            "cmds": f"mgroup * {device}",
+        }
+        if groups:
+            group_list = " ".join(groups)
+            params["cmds"] += f" {group_filter} group {group_list}"
+        text = self._get(params=params)
+        if text:
+            data = {}
+            # Data comes back as 'plain/text' type so we have to parse it
+            lines = text.split("\n")
+            for line in lines:
+                match = re.match(r"^(\S+)\s=\s(.*)$", line)
+                if match:
+                    if match.group(1) not in data:
+                        # Populate a default entry for all desired fields
+                        data[match.group(1)] = match.group(2).split(",")
+            logger.debug(
+                "Found {} device and group mappings in akips".format(len(data.keys()))
+            )
+            return data
+        return None
+
+    # event commands
 
     def get_events(
         self,
@@ -390,7 +396,7 @@ class AKIPS:
             return data
         return None
 
-    # Time-series commands
+    # time series commands
 
     def get_series(
         self,
@@ -675,6 +681,82 @@ class AKIPS:
             logger.debug("Found {} messages in akips".format(len(data)))
             return data
         return None
+
+    # ---------------------------------------------------------------------------
+    # api-availability methods for availability statistics
+
+    # Commented out for now till it can be fully tested.
+    # def get_group_availability(self, time="last1d", report="ping4", group=None):
+    #     """
+    #     Retrieve availability statistics for a group of devices over a time period.
+
+    #     # output format: {child},{attr},{group name},{total time},{match time},{group target},{tf}[;{group tf}]
+    #     # example: nm-availability mode group time last1w report ping4
+
+    #     ping4,PING.icmpState,1-Building-4,11688115,11687711,9990,last1w
+    #     ping4,PING.icmpState,1-Fraser,8213270,8213190,9990,last1w
+    #     ping4,PING.icmpState,1-Building-16,44541195,44540002,9990,last1w
+    #     ping4,PING.icmpState,Accedian,1766635,1766635,9890,last1w;mon to sat 6:00 to 20:00
+    #     ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00; sat 8:00 to 18:00
+    #     """
+    #     params = {
+    #         "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
+    #         "mode": "group",  # 'group', 'device' or 'events'
+    #         "time": time,  # time filter, refer to programming guide
+    #         "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
+    #         # "entity": device,    # {device} [{child}] to filter by device or child
+    #         "group": group,  # {group name} to filter by group
+    #         # "profile": ""        # {profile name} to filter by profile
+    #     }
+    #     text = self._get(section="api-availability", params=params)
+    #     if text:
+    #         # Parse output in CSV format
+    #         buff = io.StringIO(text)
+    #         column_headers = [
+    #             "child",
+    #             "attr",
+    #             "group name",
+    #             "total time",
+    #             "match time",
+    #             "group target",
+    #             "tf",
+    #         ]
+    #         reader = csv.DictReader(buff, fieldnames=column_headers)
+    #         csv_to_list = [row for row in reader]
+    #         logger.debug("Found {} entries".format(len(csv_to_list)))
+    #         return csv_to_list
+    #     return None
+
+    # Commented out for now till it can be fully tested.
+    # def get_device_availability(self, time="last1d", report="ping4", device=None):
+    #     """
+    #     Retrieve availability statistics for a device over a time period.
+
+    #     # output format: {parent},{child},{attr},{total time},{match time},{group target}
+    #     # example: nm-availability mode device time last1w report snmp,ping4 group Accedian
+
+    #     accedian-131-2-7,ping4,PING.icmpState,136020,136020,9890
+    #     accedian-131-2-7,sys,SNMP.snmpState,136020,136020,9890
+    #     accedian-131-2-8,ping4,PING.icmpState,136020,136020,9890
+    #     accedian-131-2-8,sys,SNMP.snmpState,136020,136020,9890
+    #     accedian-131-2-9,ping4,PING.icmpState,136020,136020,9890
+    #     accedian-131-2-9,sys,SNMP.snmpState,136020,136020,9890
+    #     """
+    #     pass
+
+    # Commented out for now till it can be fully tested.
+    # def get_event_availability(self, time="last1d", report="ping4", device=None):
+    #     """
+    #     Retrieve availability statistics for pairs of up/down events.
+
+    #     # output format: {parent},{child},{down},{up},{total time},{match_time}
+    #     # example: nm-availability mode events time last1M report ping4 entity cisco-131-16-1
+
+    #     cisco-131-16-1,ping4,1603822871,1603822916,2389764,2388341
+    #     cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
+    #     cisco-131-16-1,ping4,1603060380,1603060498,2389764,2388341
+    #     """
+    #     pass
 
     # ---------------------------------------------------------------------------
     # Base operations

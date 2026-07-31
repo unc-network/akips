@@ -1,0 +1,61 @@
+name: Security Audit
+
+# Audits the locked dependency set for known advisories.
+#
+# This is deliberately not part of the release gate. A new advisory published
+# against a locked package should not block shipping a release, which may
+# itself be the fix. It runs on a schedule as well as on changes, because
+# advisories appear without anyone touching the repository.
+#
+# The static security lint that would otherwise be bandit runs in the code
+# quality workflow instead: ruff's S rules are a port of bandit's checks.
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Mondays at 13:00 UTC
+    - cron: '0 13 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pip-audit:
+    name: Audit locked dependencies
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install poetry
+        run: |
+          pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: 'poetry'
+
+      # Installing from the lock file gives pip-audit the exact resolved
+      # versions to audit, which is what poetry.lock pins and what CI runs.
+      - name: Install dependencies
+        run: |
+          poetry install
+
+      - name: Install pip-audit
+        run: |
+          pipx install pip-audit
+
+      - name: Audit the resolved environment
+        run: |
+          pip-audit --path "$(poetry env info --path)"

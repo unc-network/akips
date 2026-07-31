@@ -1,0 +1,96 @@
+name: Publish API Documentation
+
+# The published site tracks main only. Pushing to develop no longer changes
+# what is live at https://unc-network.github.io/akips/, which is the drift
+# this replaces.
+#
+# This requires the repository Pages source to be set to "GitHub Actions"
+# under Settings -> Pages -> Build and deployment -> Source. While the source
+# is still "Deploy from a branch", this workflow's deploy step will fail.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one that is already in flight
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install poetry
+        run: |
+          pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: |
+          poetry install
+
+      # -d google renders the Args/Returns/Raises sections as structured
+      # lists rather than flat text.
+      - name: Generate API documentation
+        run: |
+          poetry run pdoc -o site/docs -d google akips
+
+      # pdoc puts the module page at docs/akips.html, where pdoc3 used
+      # docs/akips/index.html. The second redirect keeps that older path
+      # alive, because the doc link in the READMEs of releases already on
+      # PyPI points at it and cannot be edited after the fact.
+      - name: Add redirects for the site root and the previous module path
+        run: |
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>akips API documentation</title>
+          <meta http-equiv="refresh" content="0; url=./docs/akips.html">
+          <link rel="canonical" href="./docs/akips.html">
+          <p><a href="./docs/akips.html">akips API documentation</a></p>
+          HTML
+
+          cat > site/docs/akips/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>akips API documentation</title>
+          <meta http-equiv="refresh" content="0; url=../akips.html">
+          <link rel="canonical" href="../akips.html">
+          <p><a href="../akips.html">akips API documentation</a></p>
+          HTML
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

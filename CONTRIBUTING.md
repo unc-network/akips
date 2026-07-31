@@ -89,24 +89,24 @@ All done! ✨ 🍰 ✨
 5 files would be left unchanged.
 
 # Linter should report nothing (at this point)
-$ pylama .
+$ ruff check .
+All checks passed!
 ```
 
 Unit tests should pass (once again we are testing on unchanged 'develop' branch at this point so everything should pass)
 
 ```console
 % py.test tests/
-=============================== test session starts ================================
-platform darwin -- Python 3.10.2, pytest-8.2.0, pluggy-1.5.0
+============================= test session starts ==============================
+platform darwin -- Python 3.10.2, pytest-9.1.1, pluggy-1.6.0
 rootdir: /Users/wew/project/akips
 configfile: pyproject.toml
-plugins: pylama-8.4.1
-collected 9 items                                                                  
+collected 11 items
 
-tests/test_connection.py ........                                            [ 88%]
-tests/test_import_akips.py .                                                 [100%]
+tests/test_connection.py ..........                                      [ 90%]
+tests/test_import_akips.py .                                             [100%]
 
-================================ 9 passed in 0.07s =================================
+============================== 11 passed in 0.11s ==============================
 ```
 
 ## Create a branch for your work
@@ -127,7 +127,7 @@ At the end of your changes the linters and unit tests MUST all pass.
 % black .
 
 # Fix any linting errors
-% pylama .
+% ruff check .
 
 # Unit tests
 % py.test tests

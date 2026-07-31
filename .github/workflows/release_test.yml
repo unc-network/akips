@@ -1,45 +1,62 @@
-name: Publish to TestPyPI
+name: Publish Python Package to TestPyPI
+
 on:
   workflow_dispatch:
-  # push:
-  #   tags:
-  #     - '*.*.*'
+  # release:
+  #   types: [published]
+
+permissions:
+  contents: read
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    environment: prod
+  tests:
+    name: Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/main_testing.yml
+
+  build:
+    needs: tests
+    runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-    - name: Setup python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        virtualenvs-create: true
-        virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
 
-    - name: Cache Poetry virtualenv
-      uses: actions/cache@v3
-      id: cached-poetry-dependencies
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+      - name: Build package
+        run: poetry build
 
-    - name: Install Dependencies
-      run: poetry install
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
 
-    - run: poetry config repositories.testpypi https://test.pypi.org/legacy/
-    - run: poetry config pypi-token.testpypi ${{ secrets.TEST_PYPI_API_KEY }}
+  pypi-publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/akips/
+    permissions:
+      id-token: write
 
-    - name: Poetry Build
-      run: poetry build
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
 
-    - name: Publish package
-      run: poetry publish -r testpypi
+      - name: Publish package distributions to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          packages-dir: dist/
+          repository-url: https://test.pypi.org/legacy/  # for TestPyPI
