@@ -685,47 +685,46 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # api-availability methods for availability statistics
 
-    # Commented out for now till it can be fully tested.
-    # def get_group_availability(self, time="last1d", report="ping4", group=None):
-    #     """
-    #     Retrieve availability statistics for a group of devices over a time period.
+    def get_group_availability(self, time="last1d", report="ping4", group=None):
+        """
+        Retrieve availability statistics for a group of devices over a time period.
 
-    #     # output format: {child},{attr},{group name},{total time},{match time},{group target},{tf}[;{group tf}]
-    #     # example: nm-availability mode group time last1w report ping4
+        # output format: {child},{attr},{group name},{total time},{match time},{group target},{tf}[;{group tf}]
+        # example: nm-availability mode group time last1w report ping4
 
-    #     ping4,PING.icmpState,1-Building-4,11688115,11687711,9990,last1w
-    #     ping4,PING.icmpState,1-Fraser,8213270,8213190,9990,last1w
-    #     ping4,PING.icmpState,1-Building-16,44541195,44540002,9990,last1w
-    #     ping4,PING.icmpState,Accedian,1766635,1766635,9890,last1w;mon to sat 6:00 to 20:00
-    #     ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00; sat 8:00 to 18:00
-    #     """
-    #     params = {
-    #         "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
-    #         "mode": "group",  # 'group', 'device' or 'events'
-    #         "time": time,  # time filter, refer to programming guide
-    #         "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
-    #         # "entity": device,    # {device} [{child}] to filter by device or child
-    #         "group": group,  # {group name} to filter by group
-    #         # "profile": ""        # {profile name} to filter by profile
-    #     }
-    #     text = self._get(section="api-availability", params=params)
-    #     if text:
-    #         # Parse output in CSV format
-    #         buff = io.StringIO(text)
-    #         column_headers = [
-    #             "child",
-    #             "attr",
-    #             "group name",
-    #             "total time",
-    #             "match time",
-    #             "group target",
-    #             "tf",
-    #         ]
-    #         reader = csv.DictReader(buff, fieldnames=column_headers)
-    #         csv_to_list = [row for row in reader]
-    #         logger.debug("Found {} entries".format(len(csv_to_list)))
-    #         return csv_to_list
-    #     return None
+        ping4,PING.icmpState,1-Building-4,11688115,11687711,9990,last1w
+        ping4,PING.icmpState,1-Fraser,8213270,8213190,9990,last1w
+        ping4,PING.icmpState,1-Building-16,44541195,44540002,9990,last1w
+        ping4,PING.icmpState,Accedian,1766635,1766635,9890,last1w;mon to sat 6:00 to 20:00
+        ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00; sat 8:00 to 18:00
+        """
+        params = {
+            "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
+            "mode": "group",  # 'group', 'device' or 'events'
+            "time": time,  # time filter, refer to programming guide
+            "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
+            # "entity": device,    # {device} [{child}] to filter by device or child
+            "group": group,  # {group name} to filter by group
+            # "profile": ""        # {profile name} to filter by profile
+        }
+        text = self._get(section="api-availability", params=params)
+        if text:
+            # Parse output in CSV format
+            buff = io.StringIO(text)
+            column_headers = [
+                "child",
+                "attr",
+                "group name",
+                "total time",
+                "match time",
+                "group target",
+                "tf",
+            ]
+            reader = csv.DictReader(buff, fieldnames=column_headers)
+            csv_to_list = [row for row in reader]
+            logger.debug("Found {} entries".format(len(csv_to_list)))
+            return csv_to_list
+        return None
 
     # Commented out for now till it can be fully tested.
     # def get_device_availability(self, time="last1d", report="ping4", device=None):
