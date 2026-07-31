@@ -9,6 +9,10 @@ name: Publish Python Package to PyPI
 # All three reject pre-release versions, so a .devN or rcN cannot reach
 # production PyPI by any route. Those belong on TestPyPI via release_test.yml.
 #
+# Runner images are pinned rather than using -latest, so that moving to a new
+# Ubuntu is a deliberate commit instead of something that happens to the
+# release path on GitHub's schedule.
+#
 # Note that the tag and release created here are made with GITHUB_TOKEN, and
 # GitHub does not start new workflow runs from events raised by that token.
 # That is why this workflow publishes in the same run rather than relying on
@@ -27,7 +31,7 @@ permissions:
 jobs:
   version:
     name: Resolve version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.check.outputs.version }}
       should_release: ${{ steps.check.outputs.should_release }}
@@ -103,7 +107,7 @@ jobs:
     name: Tag and release
     needs: [version, tests]
     if: needs.version.outputs.should_tag == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
@@ -149,7 +153,7 @@ jobs:
     # tag is skipped when the release already exists; a skipped dependency
     # would normally skip this job too, so check the statuses explicitly
     if: ${{ !failure() && !cancelled() && needs.version.outputs.should_release == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -173,7 +177,7 @@ jobs:
 
   pypi-publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: prod
       url: https://pypi.org/project/akips/
