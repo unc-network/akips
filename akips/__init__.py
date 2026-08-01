@@ -366,6 +366,107 @@ class AKIPS:
             return data
         return None
 
+    # UPS output sources other than 'normal'.  A UPS reporting any of these is
+    # not running on mains, which is what an operator wants to know about.
+    UPS_ABNORMAL_OUTPUT_SOURCES = ("bypass", "battery", "booster", "reducer")
+
+    # The attribute Liebert and Vertiv equipment reports battery test results
+    # in.  Battery test results are not in the standard UPS-MIB, so every
+    # vendor uses its own; this one is named in the method that reads it.
+    LIEBERT_BATTERY_TEST_ATTRIBUTE = "LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult"
+
+    def get_ups_output_source(
+        self,
+        states: tuple[str, ...] | list[str] | None = UPS_ABNORMAL_OUTPUT_SOURCES,
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, Any]] | None:
+        """
+        Pull the UPS devices that are not running on mains power.
+
+        UPS-MIB reports where a UPS is drawing its output from, which is
+        'normal' when all is well.  By default this returns only the other
+        values, so the result is the list of UPSes worth looking at.
+
+        Note this is the output source, not the battery's own health, which
+        UPS-MIB reports separately as upsBatteryStatus.
+
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            states (list): output sources to report, defaulting to everything
+                except 'normal'.  Pass None for every UPS whatever its state
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to the parsed state, or None if no
+            device matched.  Each entry carries the enum fields described on
+            _parse_enum, where 'value' is the output source and 'modified' is
+            when it last changed, plus the device 'name' and 'child'
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        return self._get_enum_attribute(
+            "UPS-MIB.upsOutputSource",
+            values=states,
+            group_filter=group_filter,
+            groups=groups,
+        )
+
+    def get_liebert_battery_test(
+        self,
+        results: tuple[str, ...] | list[str] | None = ("failed",),
+        attribute: str = LIEBERT_BATTERY_TEST_ATTRIBUTE,
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, Any]] | None:
+        """
+        Pull the results of the last battery self test on Liebert and Vertiv
+        UPS equipment.
+
+        By default this returns only the failures, which is the list of
+        batteries to replace.  Pass results=None for every UPS and its last
+        result.
+
+        The vendor is in the name on purpose.  Battery test results are not in
+        the standard UPS-MIB, so this reads an attribute only Liebert and
+        Vertiv equipment reports.  Run against another vendor's fleet it
+        returns nothing, which would otherwise read as good news.  Another
+        vendor's equivalent attribute can be passed to reuse the same parsing
+        and shape.
+
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            results (list): test results to report, defaulting to failures
+                only.  Pass None for every UPS whatever its last result
+            attribute (str): the vendor attribute holding the result
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to the parsed result, or None if no
+            device matched.  Each entry carries the enum fields described on
+            _parse_enum, where 'value' is the test result and 'modified' is
+            when it last changed, plus the device 'name' and 'child'
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        return self._get_enum_attribute(
+            attribute,
+            child="battery",
+            values=results,
+            group_filter=group_filter,
+            groups=groups,
+        )
+
     # group commands
 
     def get_group_membership(
@@ -1058,6 +1159,82 @@ class AKIPS:
             return entry
         else:
             raise AkipsError(message=f"Not a ENUM type value: {enum_string}")
+
+    def _get_enum_attribute(
+        self,
+        attribute: str,
+        child: str = "*",
+        values: tuple[str, ...] | list[str] | None = None,
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, Any]] | None:
+        """
+        Pull one enum typed attribute and return it parsed, keyed by device.
+
+        Shared by the methods that ask 'which devices are in a bad state', in
+        which the interesting answer is the enum's text value and when it last
+        changed.  Filtering by value is done by AKiPS rather than here, so a
+        fleet wide query does not fetch every device to discard most of them.
+
+        Args:
+            attribute (str): the attribute to read
+            child (str): child name or pattern to match (default: '*')
+            values (list): only report these enum values, or None for all
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to the parsed enum with the device
+            'name' and 'child' added, or None if nothing matched
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        params = {"cmds": f"mget * * {child} {attribute}"}
+        if values:
+            # [value {text|/regex/|integer|ipaddr}]
+            params["cmds"] += " value /{}/".format("|".join(values))
+        if groups:
+            # [any|all|not group {group name} ...]
+            params["cmds"] += f" {group_filter} group {' '.join(groups)}"
+        text = self._get(params=params)
+        if not text:
+            return None
+
+        data: dict[str, dict[str, Any]] = {}
+        unparsed = []
+        for parent, children in self._parse_attributes(text).items():
+            for child_name, attributes in children.items():
+                for value in attributes.values():
+                    if value is None:
+                        continue
+                    try:
+                        entry = self._parse_enum(value)
+                    except AkipsError:
+                        # One device reporting something unexpected should not
+                        # cost the answer for every other device
+                        unparsed.append(f"{parent} {child_name} = {value}")
+                        continue
+                    entry["name"] = parent
+                    entry["child"] = child_name
+                    if parent in data:
+                        # Keyed by device, so a device reporting this on more
+                        # than one child would quietly lose all but one
+                        logger.warning(
+                            "{} reports {} on more than one child, "
+                            "keeping {!r} and discarding {!r}".format(
+                                parent, attribute, data[parent]["child"], child_name
+                            )
+                        )
+                        continue
+                    data[parent] = entry
+        if unparsed:
+            logger.warning(
+                "Could not parse {} of {} {} values from akips, those devices "
+                "are missing from the result.  First: {}".format(
+                    len(unparsed), len(unparsed) + len(data), attribute, unparsed[0]
+                )
+            )
+        logger.debug("Found {} devices reporting {}".format(len(data), attribute))
+        return data
 
     def _credentials_for(
         self, section: str, user: str | None = None

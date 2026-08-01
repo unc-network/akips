@@ -73,6 +73,23 @@ and after for each one.
   reach it.
 - `get_group_availability()` — availability statistics for a group over a time
   period, from the `api-availability` section.
+- `get_ups_output_source()` — which UPS devices are not running on mains
+  power. Returns the abnormal sources by default (`bypass`, `battery`,
+  `booster`, `reducer`), since that is the list worth acting on; pass
+  `states=None` for every UPS whatever its state. Note this is the output
+  source rather than the battery's own health, which UPS-MIB reports
+  separately as `upsBatteryStatus`.
+- `get_liebert_battery_test()` — the result of the last UPS battery self test,
+  defaulting to failures only. The vendor is in the name deliberately:
+  battery test results are not in the standard UPS-MIB, so this reads an
+  attribute only Liebert and Vertiv equipment reports, and against another
+  vendor's fleet it would return nothing, which reads as good news. Another
+  vendor's equivalent attribute can be passed to reuse the same parsing.
+
+  Both return the parsed enum, so a caller gets the state and when it last
+  changed rather than a raw string. These are the first callers of the enum
+  parser, which had been kept unused pending evidence that the format
+  generalised beyond ping and SNMP state; it does.
 - `call()` — send a request to any API section and parse the reply in one of
   the shapes AKiPS replies in: `raw`, `lines`, `key_value`, `attributes`,
   `csv` or `csv_dict`. It replaces `cmd()`, which could only reach `api-db`
