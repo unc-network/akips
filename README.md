@@ -76,10 +76,10 @@ and that pair is used for every section.
 
 ### List all devices, the inventory view (with an optional group filter)
 
-The same handful of fields for every device, present even when a device did not
-report one, so the result is a rectangle you can list or tabulate without
-checking each key. For everything a single device holds, see `get_device`
-below.
+Every device carries the same handful of fields, as `None` where it reported no
+value, so you can list or tabulate them without checking each key first.
+Anything else the server returns for a device is kept alongside them. For
+everything a single device holds, see `get_device` below.
 
 ```py
 devices = api.get_devices(groups=['a10'])

@@ -49,8 +49,10 @@ CrN-082-AP ping4 PING.icmpState = 1,down,1641624705,1646101757,192.168.94.112
         self.assertEqual(devices["192.168.248.54"]["snmp_state"], "down")
         self.assertEqual(devices["192.168.248.54"]["ping_state"], "down")
         # child is the matched string; it used to be a one element tuple,
-        # the only field in the structure with a surprising type
-        self.assertEqual(devices["192.168.248.54"]["child"], "sys")
+        # the only field in the structure with a surprising type.  For a device
+        # down on both checks the ping line wins, so it does not depend on
+        # which line the server happened to send last.
+        self.assertEqual(devices["192.168.248.54"]["child"], "ping4")
         self.assertEqual(devices["CrN-082-AP"]["child"], "ping4")
         self.assertEqual(devices["192.168.248.54"]["index"], "1")
 
@@ -356,3 +358,65 @@ dev-1 sys SNMP.snmpState = 1,down,1484685257,1657029400,
         session_mock.return_value.text = "\n".join(reversed(r_text.strip().split("\n")))
         devices = api.get_unreachable()
         self.assertEqual(devices["dev-1"]["event_start"].timestamp(), 1657029400)
+
+    @patch("requests.Session.get")
+    def test_get_unreachable_warns_about_lines_it_cannot_parse(
+        self, session_mock: MagicMock
+    ):
+        # A device reported down that this cannot read must not vanish:
+        # under reporting an outage is the worst thing this call can do
+        r_text = """dev1 ping4 PING.icmpState = 1,down,1690000000,1753970052
+dev2 ping4 PING.icmpState = 1,down here,1690000000,1753970052,10.0.0.2
+dev3 ping4 PING.icmpState = 1,down,1690000000,1753970052,10.0.0.3
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        with self.assertLogs("akips", level="WARNING") as logged:
+            devices = api.get_unreachable()
+        self.assertEqual(list(devices), ["dev3"])
+        self.assertIn("Could not parse 2 of 3", logged.output[0])
+        # the warning carries a sample so the cause is diagnosable
+        self.assertIn("dev1 ping4", logged.output[0])
+
+    @patch("requests.Session.get")
+    def test_get_unreachable_fields_do_not_depend_on_line_order(
+        self, session_mock: MagicMock
+    ):
+        ping = "dev1 ping4 PING.icmpState = 1,down,1690000000,1753970052,10.0.0.1\n"
+        snmp = "dev1 sys SNMP.snmpState = 2,down,1690000000,1753970052,\n"
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        seen = []
+        for text in (ping + snmp, snmp + ping):
+            session_mock.return_value.text = text
+            entry = api.get_unreachable()["dev1"]
+            seen.append(
+                (entry["ip4addr"], entry["child"], entry["index"], entry["ping_state"])
+            )
+        # the ping line carries the address, so it wins the shared fields
+        # whichever order the server sent them in
+        self.assertEqual(seen[0], seen[1])
+        self.assertEqual(seen[0], ("10.0.0.1", "ping4", "1", "down"))
+
+    @patch("requests.Session.get")
+    def test_get_devices_keeps_attributes_beyond_the_requested_set(
+        self, session_mock: MagicMock
+    ):
+        # The four requested keys are always present; anything else the server
+        # sends is kept rather than dropped
+        r_text = """dev1 sys ip4addr = 10.0.0.1
+dev1 sys SNMPv2-MIB.sysContact = Networking
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        entry = api.get_devices()["dev1"]
+        for requested in (
+            "ip4addr",
+            "SNMPv2-MIB.sysName",
+            "SNMPv2-MIB.sysDescr",
+            "SNMPv2-MIB.sysLocation",
+        ):
+            self.assertIn(requested, entry)
+        self.assertEqual(entry["SNMPv2-MIB.sysContact"], "Networking")

@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev1"
+__version__ = "1.0.0.dev2"
 
 import csv
 import io
@@ -116,10 +116,11 @@ class AKIPS:
         Pull a list of all devices and their key attributes, optionally filtered by group
         membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
 
-        This is the inventory view: the same fields for every device, present
-        even when a device did not report one, so the result is a rectangle
-        that can be listed or tabulated without checking each key.  For
-        everything a single device holds, see get_device().
+        This is the inventory view: every device carries all four of the
+        attributes above, as None where it reported no value, so they can be
+        listed or tabulated without checking each key first.  Anything else
+        the server returns for a device is kept alongside them rather than
+        dropped.  For everything a single device holds, see get_device().
 
         Supporting AKiPS command syntax:
 
@@ -228,49 +229,67 @@ class AKIPS:
         text = self._get(params=params)
         if text:
             data: dict[str, dict[str, Any]] = {}
+            unparsed = []
             lines = text.split("\n")
             for line in lines:
                 match = re.match(
                     r"^(\S+)\s(\S+)\s(\S+)\s=\s(\S+),(\S+),(\S+),(\S+),(\S+)?$", line
                 )
-                if match:
-                    # epoch fields are in the server's timezone
-                    name = match.group(1)
-                    attribute = match.group(3)
-                    event_start = datetime.fromtimestamp(
-                        int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                if not match:
+                    if line.strip():
+                        # A line reporting a device down that this does not
+                        # understand must not vanish: under reporting an
+                        # outage is the worst thing this call can do.
+                        unparsed.append(line)
+                    continue
+                # epoch fields are in the server's timezone
+                name = match.group(1)
+                attribute = match.group(3)
+                event_start = datetime.fromtimestamp(
+                    int(match.group(7)), tz=pytz.timezone(self.server_timezone)
+                )
+                device_added = datetime.fromtimestamp(
+                    int(match.group(6)), tz=pytz.timezone(self.server_timezone)
+                )
+                if name not in data:
+                    # populate a starting point for this device
+                    data[name] = {
+                        "name": name,
+                        "ping_state": "n/a",
+                        "snmp_state": "n/a",
+                        "event_start": event_start,  # epoch in local timezone
+                    }
+                if attribute == "PING.icmpState":
+                    data[name]["ping_state"] = match.group(5)
+                    # A device down on both checks reports one child, index
+                    # and address.  Ping wins them, because it is the only
+                    # line carrying an address, and assigning here while the
+                    # SNMP branch below only fills gaps makes the result the
+                    # same whichever order the lines arrive in.
+                    data[name]["child"] = match.group(2)
+                    data[name]["index"] = match.group(4)
+                    data[name]["device_added"] = device_added
+                    data[name]["ip4addr"] = match.group(8)
+                elif attribute == "SNMP.snmpState":
+                    data[name]["snmp_state"] = match.group(5)
+                    data[name].setdefault("child", match.group(2))
+                    data[name].setdefault("index", match.group(4))
+                    data[name].setdefault("device_added", device_added)
+                    data[name].setdefault("ip4addr", None)
+                # A device down on both ping and SNMP has two start times; the
+                # outage began at the earlier of them.  This has to be the only
+                # place event_start is set, or the comparison is against the
+                # value just written from this same line and the last line seen
+                # would always win.
+                if event_start < data[name]["event_start"]:
+                    data[name]["event_start"] = event_start
+            if unparsed:
+                logger.warning(
+                    "Could not parse {} of {} unreachable lines from akips, "
+                    "those devices are missing from the result.  First: {}".format(
+                        len(unparsed), len(unparsed) + len(data), unparsed[0][:200]
                     )
-                    if name not in data:
-                        # populate a starting point for this device
-                        data[name] = {
-                            "name": name,
-                            "ping_state": "n/a",
-                            "snmp_state": "n/a",
-                            "event_start": event_start,  # epoch in local timezone
-                        }
-                    if attribute == "PING.icmpState":
-                        data[name]["child"] = match.group(2)
-                        data[name]["ping_state"] = match.group(5)
-                        data[name]["index"] = match.group(4)
-                        data[name]["device_added"] = datetime.fromtimestamp(
-                            int(match.group(6)), tz=pytz.timezone(self.server_timezone)
-                        )
-                        data[name]["ip4addr"] = match.group(8)
-                    elif attribute == "SNMP.snmpState":
-                        data[name]["child"] = match.group(2)
-                        data[name]["snmp_state"] = match.group(5)
-                        data[name]["index"] = match.group(4)
-                        data[name]["device_added"] = datetime.fromtimestamp(
-                            int(match.group(6)), tz=pytz.timezone(self.server_timezone)
-                        )
-                        data[name]["ip4addr"] = None
-                    # A device down on both ping and SNMP has two start
-                    # times; the outage began at the earlier of them.  This
-                    # has to be the only place event_start is set, or the
-                    # comparison is against the value just written from this
-                    # same line and the last line seen would always win.
-                    if event_start < data[name]["event_start"]:
-                        data[name]["event_start"] = event_start
+                )
             logger.debug("Found {} devices in akips".format(len(data)))
             logger.debug("data: {}".format(data))
             return data
@@ -783,39 +802,44 @@ class AKIPS:
         if text:
             # Each syslog or trap message contains:
             #     header line: {system timestamp} {type} {IP version} {IP address}
-            #     message line: {message text}
+            #     message line(s): {message text}
             #     blank terminating line
+            #
+            # Records are split on that blank line rather than by recognising
+            # each header, because a body line can look exactly like a header
+            # and would otherwise start a new record in the middle of a
+            # message, turning one message into two with empty bodies.
             data = []
-            lines = text.split("\n")
-            for line in lines:
+            unparsed = 0
+            for record in re.split(r"\n\s*\n", text):
+                lines = [line for line in record.split("\n") if line.strip()]
+                if not lines:
+                    continue
                 header = re.match(
-                    r"^(?P<time>\S+)\s(?P<type>\S+)\s(?P<ip_ver>[4|6])\s(?P<ip_addr>\S+)$",
-                    line,
+                    r"^(?P<time>\S+)\s(?P<type>\S+)\s(?P<ip_ver>[46])\s(?P<ip_addr>\S+)$",
+                    lines[0],
                 )
-                if header:
-                    # header line
-                    entry = {
+                if not header:
+                    unparsed += 1
+                    continue
+                data.append(
+                    {
                         "time": header.group("time"),
                         "type": header.group("type"),
                         "ip_ver": header.group("ip_ver"),
                         "ip_addr": header.group("ip_addr"),
-                        "message": "",
+                        # Everything after the header is the message, whatever
+                        # any of those lines happen to look like
+                        "message": "\n".join(lines[1:]),
                     }
-                    data.append(entry)
-                elif re.match(r"^.*\S+.*$", line):
-                    # message line, anything else except a blank line
-                    if not data:
-                        # A message line before any header means the response
-                        # did not start where we expected.  Skip it rather
-                        # than failing the whole call.
-                        logger.debug(
-                            "Skipping message line with no header: {}".format(line)
-                        )
-                        continue
-                    entry = data[-1]
-                    if entry["message"]:
-                        entry["message"] += "\n"
-                    entry["message"] += line
+                )
+            if unparsed:
+                logger.warning(
+                    "Could not parse {} of {} message records from akips, "
+                    "those messages are missing from the result".format(
+                        unparsed, unparsed + len(data)
+                    )
+                )
             logger.debug("Found {} messages in akips".format(len(data)))
             return data
         return None

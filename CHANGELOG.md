@@ -118,6 +118,23 @@ here, a breaking change means a 2.0.
 
 ### Fixed
 
+- `get_unreachable()` warns when it cannot parse a line instead of dropping it
+  silently. That call is how a consumer learns what is broken, so a dropped
+  line meant a device reported down was invisible, and under reporting an
+  outage is the worst thing it can do. The warning carries a count and a
+  sample.
+- `get_unreachable()` no longer loses `ip4addr` depending on the order the
+  server sent its lines. The SNMP branch set the address to None
+  unconditionally, so it survived only when the SNMP line came first. `child`
+  and `index` were the same last writer wins; the ping line now wins all
+  three, since it is the only one carrying an address.
+- `get_msg()` splits records on the blank line that terminates each one,
+  rather than by recognising header lines. A message body line can look
+  exactly like a header — `OSPF-MIB ospfNbrState 4 full` does — and turned one
+  message into two, both with empty bodies. Records it cannot read are counted
+  and warned about rather than dropped silently.
+- `get_msg()` accepts only 4 or 6 as the IP version. The character class was
+  `[4|6]`, which also matched a literal pipe.
 - `get_unreachable()` reports the earliest event start for a device that is
   down on both ping and SNMP. Both branches overwrote the value before the
   comparison meant to keep the earlier one ran, so it compared a value against
