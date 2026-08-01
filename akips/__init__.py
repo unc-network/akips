@@ -17,7 +17,7 @@ import pytz
 import requests
 import urllib3
 
-from akips.exceptions import AkipsError
+from akips.exceptions import AkipsCredentialError, AkipsError
 
 # Logging configuration
 logger = logging.getLogger(__name__)
@@ -27,16 +27,38 @@ class AKIPS:
     """
     A class to handle interactions with the AKiPS Web API
 
+    AKiPS ships two API accounts, api-ro and api-rw, and its sections do not
+    all accept the same one.  Supply the passwords for whichever accounts you
+    need and each call uses the right one; see SECTION_USERS below for the
+    mapping.  A caller only reading data needs ro_password alone.
+
+        api = AKIPS('akips.example.com', ro_password='...', rw_password='...')
+
     Attributes:
         server (str): The AKiPS server hostname or IP address
-        username (str): The AKiPS API username (default: "api-ro")
-        password (str): The AKiPS API password
+        ro_password (str): password for the api-ro account
+        rw_password (str): password for the api-rw account
+        username (str): kept for callers who set it directly.  With 'api-ro'
+            or 'api-rw' the password given alongside fills that account; with
+            any other name, that pair is used for every section, which is how
+            to use a custom AKiPS API account
+        password (str): the password paired with username
         verify (bool): Whether to verify SSL certificates (default: True)
         server_timezone (str): Timezone of the AKiPS server (default: "America/New_York")
         timeout (int): HTTP timeout in seconds applied to every call
             (default: 30).  Assign to it to change the timeout of an
             existing client, e.g. api.timeout = 60
     """
+
+    # The account each section requires.  None means either will do, in which
+    # case the read only account is preferred.  Sections absent from this
+    # table are treated as None; pass user= to call() to override.
+    SECTION_USERS: dict[str, str | None] = {
+        "api-db": None,
+        "api-script": "api-rw",
+        "api-msg": "api-ro",
+        "api-availability": None,
+    }
 
     def __init__(
         self,
@@ -46,14 +68,41 @@ class AKIPS:
         verify: bool = True,
         timezone: str = "America/New_York",
         timeout: int = 30,
+        ro_password: str | None = None,
+        rw_password: str | None = None,
     ) -> None:
         self.server = server
         self.username = username
         self.password = password
+        self.ro_password = ro_password
+        self.rw_password = rw_password
         self.verify = verify
         self.server_timezone = timezone
         self.timeout = timeout
         self.session = requests.Session()
+
+        # A username other than the two built in accounts is used for every
+        # section.  AKiPS does not offer custom API accounts yet, but this is
+        # where they will land, and it keeps working for anyone already
+        # passing username and password directly.
+        self._account_override: tuple[str, str] | None = None
+        if password is not None:
+            if username == "api-ro" and self.ro_password is None:
+                self.ro_password = password
+            elif username == "api-rw" and self.rw_password is None:
+                self.rw_password = password
+            elif username not in ("api-ro", "api-rw"):
+                self._account_override = (username, password)
+
+        if (
+            self._account_override is None
+            and self.ro_password is None
+            and self.rw_password is None
+        ):
+            raise AkipsCredentialError(
+                "No AKiPS password provided.  Pass ro_password, rw_password, "
+                "or a username and password pair."
+            )
 
     # ---------------------------------------------------------------------------
     # api-db interface methods, these use the 'api-ro' or 'api-rw' user
@@ -66,6 +115,11 @@ class AKIPS:
         """
         Pull a list of all devices and their key attributes, optionally filtered by group
         membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
+
+        This is the inventory view: the same fields for every device, present
+        even when a device did not report one, so the result is a rectangle
+        that can be listed or tabulated without checking each key.  For
+        everything a single device holds, see get_device().
 
         Supporting AKiPS command syntax:
 
@@ -109,11 +163,22 @@ class AKIPS:
             return data
         return None
 
-    def get_device(self, name: str) -> dict[str, Any] | None:
+    def get_device(
+        self, name: str
+    ) -> dict[str, dict[str, dict[str, str | None]]] | None:
         """
         Pull all configuration attributes for a single device.  The name is the
         primary device key in AKiPS which might be an IP address or hostname
         depending on your AKiPS settings.
+
+        This is the deep dive: every child and attribute this device holds,
+        which varies by device type.  For the same fields across every device,
+        see get_devices().
+
+        The reply keeps the parent, child and attribute levels AKiPS stores it
+        in, so the result is keyed by device name exactly as get_devices and
+        get_attributes are.  Asking for one device gives a dictionary with one
+        key rather than a differently shaped one.
 
         Supporting AKiPS command syntax:
 
@@ -124,24 +189,19 @@ class AKIPS:
         Args:
             name (str): The device name to retrieve
         Returns:
-            A dictionary of device attributes, or None if the device was not found
+            A dictionary of the device name to its child names to attribute
+            names and values, or None if the device was not found
         Raises:
             AkipsError: if the AKiPS server returns an error
         """
         params = {"cmds": f"mget * {name} * *"}
         text = self._get(params=params)
         if text:
-            parsed = self._parse_attributes(text)
-            if not parsed:
+            data = self._parse_attributes(text)
+            if not data:
                 # A reply that parses to nothing is not found, rather than a
                 # device that happens to have no attributes
                 return None
-            data: dict[str, Any] = {}
-            for children in parsed.values():
-                for child, child_attributes in children.items():
-                    data.setdefault(child, {}).update(child_attributes)
-            # The device key repeats on every line of the reply
-            data["name"] = list(parsed)[-1]
             logger.debug("Found device {} in akips".format(data))
             return data
         return None
@@ -195,9 +255,6 @@ class AKIPS:
                         data[name]["device_added"] = datetime.fromtimestamp(
                             int(match.group(6)), tz=pytz.timezone(self.server_timezone)
                         )
-                        data[name]["event_start"] = datetime.fromtimestamp(
-                            int(match.group(7)), tz=pytz.timezone(self.server_timezone)
-                        )
                         data[name]["ip4addr"] = match.group(8)
                     elif attribute == "SNMP.snmpState":
                         data[name]["child"] = match.group(2)
@@ -206,10 +263,12 @@ class AKIPS:
                         data[name]["device_added"] = datetime.fromtimestamp(
                             int(match.group(6)), tz=pytz.timezone(self.server_timezone)
                         )
-                        data[name]["event_start"] = datetime.fromtimestamp(
-                            int(match.group(7)), tz=pytz.timezone(self.server_timezone)
-                        )
                         data[name]["ip4addr"] = None
+                    # A device down on both ping and SNMP has two start
+                    # times; the outage began at the earlier of them.  This
+                    # has to be the only place event_start is set, or the
+                    # comparison is against the value just written from this
+                    # same line and the last line seen would always win.
                     if event_start < data[name]["event_start"]:
                         data[name]["event_start"] = event_start
             logger.debug("Found {} devices in akips".format(len(data)))
@@ -492,10 +551,11 @@ class AKIPS:
 
     def call(
         self,
-        cmd: str | None = None,
+        command: str | None = None,
         section: str = "api-db",
         params: dict[str, Any] | None = None,
         output: str = "raw",
+        user: str | None = None,
     ) -> Any:
         """
         Send an arbitrary request to any AKiPS web API section and parse the
@@ -507,7 +567,7 @@ class AKIPS:
 
         Sections do not share a parameter vocabulary.  api-db takes a command
         string, while api-script, api-msg and api-availability each take their
-        own named parameters, so pass 'cmd' for the first and 'params' for the
+        own named parameters, so pass 'command' for the first and 'params' for the
         others.  Passing both adds the command to the given parameters.
 
         Output formats, and where each one occurs:
@@ -521,17 +581,20 @@ class AKIPS:
             csv_dict   CSV rows as dictionaries keyed by the header row
 
         Args:
-            cmd (str): command string for the api-db section, shorthand for
-                params={'cmds': cmd}
+            command (str): command string for the api-db section, shorthand
+                for params={'cmds': command}
             section (str): API section to call (default: 'api-db')
             params (dict): parameters for sections that take no command string
             output (str): one of the formats listed above (default: 'raw')
+            user (str): force the 'ro' or 'rw' account, for a section
+                whose requirement is not in SECTION_USERS, or a command
+                needing more rights than its section usually does
         Returns:
             The reply in the requested shape, or None if the server returned
             nothing
         Raises:
-            ValueError: if output is not a supported format, or if neither cmd
-                nor params was provided
+            ValueError: if output is not a supported format, or if neither
+                command nor params was provided
             AkipsError: if the AKiPS server returns an error
         """
         # Check before making the request, so a bad argument fails the same way
@@ -542,14 +605,14 @@ class AKIPS:
                     ", ".join(self.OUTPUT_FORMATS)
                 )
             )
-        if cmd is None and params is None:
-            raise ValueError("call requires either a cmd or a params dictionary")
+        if command is None and params is None:
+            raise ValueError("call requires either a command or a params dictionary")
 
         request_params = dict(params or {})
-        if cmd is not None:
-            request_params["cmds"] = cmd
+        if command is not None:
+            request_params["cmds"] = command
 
-        text = self._get(section=section, params=request_params)
+        text = self._get(section=section, params=request_params, user=user)
         if not text:
             return None
 
@@ -587,7 +650,7 @@ class AKIPS:
         )
         if output != "raw":
             raise ValueError("Invalid output value provided to cmd.")
-        return cast("str | None", self.call(cmd=cmd))
+        return cast("str | None", self.call(command=cmd))
 
     # ---------------------------------------------------------------------------
     # api-script methods, these require the 'api-rw' user
@@ -669,11 +732,15 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # api-msg methods, these require the 'api-ro' user
 
+    # 'period' and 'msg_type' map to the AKiPS query parameters 'time' and
+    # 'type'.  They are deliberately named apart from those, because 'type' is
+    # a builtin and 'time' a standard library module, and because 'period' is
+    # what the rest of this module already calls a time filter.
     def get_msg(
         self,
-        time: str = "last1h",
+        period: str = "last1h",
         addr: str | None = None,
-        type: str | None = None,
+        msg_type: str | None = None,
         device: str | None = None,
         regex: str | None = None,
         limit: int | None = None,
@@ -689,9 +756,9 @@ class AKIPS:
                 [regex={regex filter}];[limit={qty messages}]
 
         Args:
-            time (str): Required, time period to retrieve messages from (default: 'last1h')
+            period (str): Required, time period to retrieve messages from (default: 'last1h')
             addr (str): IP address to filter messages by (default: None)
-            type (str): message type, 'syslog' or 'trap' (default: syslog and traps)
+            msg_type (str): message type, 'syslog' or 'trap' (default: syslog and traps)
             device (str): device name to filter messages by (default: None)
             regex (str): regex pattern to filter message content by (default: None)
             limit (int): maximum number of messages to return (default: None)
@@ -701,9 +768,9 @@ class AKIPS:
             AkipsError: if the AKiPS server returns an error
         """
 
-        params = {"time": time}
-        if type in ("syslog", "trap"):
-            params["type"] = type
+        params = {"time": period}
+        if msg_type in ("syslog", "trap"):
+            params["type"] = msg_type
         if addr:
             params["addr"] = addr
         if device:
@@ -757,7 +824,7 @@ class AKIPS:
     # api-availability methods for availability statistics
 
     def get_group_availability(
-        self, time: str = "last1d", report: str = "ping4", group: str | None = None
+        self, period: str = "last1d", report: str = "ping4", group: str | None = None
     ) -> list[dict[str, str]] | None:
         """
         Retrieve availability statistics for a group of devices over a time period.
@@ -774,7 +841,7 @@ class AKIPS:
         params = {
             "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
             "mode": "group",  # 'group', 'device' or 'events'
-            "time": time,  # time filter, refer to programming guide
+            "time": period,  # time filter, refer to programming guide
             "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
             # "entity": device,    # {device} [{child}] to filter by device or child
             "group": group,  # {group name} to filter by group
@@ -782,8 +849,8 @@ class AKIPS:
         }
         text = self._get(section="api-availability", params=params)
         if text:
-            # Parse output in CSV format
-            buff = io.StringIO(text)
+            # This endpoint sends no header row, so the column names come from
+            # here rather than from the reply
             column_headers = [
                 "child",
                 "attr",
@@ -793,10 +860,9 @@ class AKIPS:
                 "group target",
                 "tf",
             ]
-            reader = csv.DictReader(buff, fieldnames=column_headers)
-            csv_to_list = [row for row in reader]
+            csv_to_list = self._parse_csv(text, fieldnames=column_headers)
             logger.debug("Found {} entries".format(len(csv_to_list)))
-            return csv_to_list
+            return cast("list[dict[str, str]]", csv_to_list)
         return None
 
     # Commented out for now till it can be fully tested.
@@ -950,6 +1016,51 @@ class AKIPS:
         else:
             raise AkipsError(message=f"Not a ENUM type value: {enum_string}")
 
+    def _credentials_for(
+        self, section: str, user: str | None = None
+    ) -> tuple[str, str]:
+        """
+        Pick the AKiPS account a request should authenticate as.
+
+        Args:
+            section (str): API section being called
+            user (str): force an account, 'ro' or 'rw', for a section whose
+                requirement is not known or differs from the usual one
+        Returns:
+            A tuple of the username and password to send
+        Raises:
+            AkipsCredentialError: if the account this call needs has no password
+            ValueError: if user names an account that does not exist
+        """
+        if self._account_override is not None:
+            # A custom account stands in for both
+            return self._account_override
+
+        required = user if user is not None else self.SECTION_USERS.get(section)
+        if required in ("ro", "api-ro"):
+            required = "api-ro"
+        elif required in ("rw", "api-rw"):
+            required = "api-rw"
+        elif required is not None:
+            raise ValueError(
+                f"Unknown AKiPS account {required!r}, expected 'ro' or 'rw'"
+            )
+
+        if required is None:
+            # Either account works here, so use the lesser privileged one
+            if self.ro_password is not None:
+                return ("api-ro", self.ro_password)
+            return ("api-rw", str(self.rw_password))
+
+        password = self.ro_password if required == "api-ro" else self.rw_password
+        if password is None:
+            argument = "ro_password" if required == "api-ro" else "rw_password"
+            raise AkipsCredentialError(
+                f"{section} requires the {required} account, but no {argument} "
+                f"was given to AKIPS()"
+            )
+        return (required, password)
+
     def _redact_sensitive_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Return a copy of params with sensitive keys redacted from logging output."""
         SENSITIVE_KEYS = ("password", "pass", "token", "secret", "key", "community")
@@ -960,7 +1071,10 @@ class AKIPS:
         return {k: ("****" if is_sensitive(k) else v) for k, v in params.items()}
 
     def _get(
-        self, section: str = "api-db", params: dict[str, Any] | None = None
+        self,
+        section: str = "api-db",
+        params: dict[str, Any] | None = None,
+        user: str | None = None,
     ) -> str:
         """
         Base HTTP GET against the AKiPS server for web API calls.
@@ -980,9 +1094,12 @@ class AKIPS:
         Args:
             section (str): API section to call (default: 'api-db')
             params (dict): dictionary of parameters to pass to the server
+            user (str): force the 'ro' or 'rw' account for this request
         Returns:
             text output from the server
         Raises:
+            AkipsCredentialError: if the account this section needs has no
+                password
             AkipsError: if the AKiPS server returns an error
             requests.exceptions.HTTPError: for HTTP error responses
             requests.exceptions.ConnectionError: for connection errors
@@ -994,8 +1111,9 @@ class AKIPS:
         # Work on a copy so credentials are never written into the dictionary
         # the caller passed in, and so params is optional as documented
         params = dict(params or {})
-        params["username"] = self.username
-        params["password"] = self.password
+        username, password = self._credentials_for(section, user)
+        params["username"] = username
+        params["password"] = password
 
         logger.debug("GET url: {}".format(server_url))
         logger.debug("GET params: {}".format(self._redact_sensitive_params(params)))

@@ -18,7 +18,7 @@ class ApiScriptTest(unittest.TestCase):
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
         device_name = api.get_device_by_ip(ipaddr="10.194.200.65")
         self.assertEqual(device_name, "cisco-sw1")
 
@@ -29,7 +29,7 @@ class ApiScriptTest(unittest.TestCase):
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
         output = api.set_group_membership("10.10.10.146", "test_group", "assign")
         self.assertIsNone(output)
 
@@ -39,14 +39,14 @@ class ApiScriptTest(unittest.TestCase):
     ):
         session_mock.return_value.text = "No device found\n"
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
         self.assertIsNone(api.get_device_by_ip(ipaddr="10.194.200.65"))
 
     @patch("requests.Session.get")
     def test_get_device_by_ip_sends_site_script_params(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
         api.get_device_by_ip(ipaddr="10.194.200.65")
         args, kwargs = session_mock.call_args
         self.assertTrue(args[0].endswith("/api-script"))
@@ -59,7 +59,7 @@ class ApiScriptTest(unittest.TestCase):
     ):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
         api.set_group_membership("10.10.10.146", "test_group", "clear")
         params = session_mock.call_args.kwargs["params"]
         self.assertEqual(params["function"], "web_manual_grouping")
@@ -75,12 +75,12 @@ class ApiScriptTest(unittest.TestCase):
         # The site script is silent on success, so any output is a failure
         session_mock.return_value.text = "group does not exist\n"
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
         with self.assertRaises(AkipsError):
             api.set_group_membership("10.10.10.146", "test_group", "assign")
 
     def test_set_group_membership_validates_arguments(self):
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
         with self.assertRaises(ValueError):
             api.set_group_membership("", "test_group", "assign")
         with self.assertRaises(ValueError):

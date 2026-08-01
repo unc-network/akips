@@ -19,7 +19,7 @@ ping4,PING.icmpState,1-Building-16,44541195,44540002,9990,last1w
 """  # noqa
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         rows = api.get_group_availability()
         self.assertEqual(len(rows), 3)
         self.assertEqual(rows[0]["child"], "ping4")
@@ -43,8 +43,8 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
 """  # noqa
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
-        rows = api.get_group_availability(time="last1w")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        rows = api.get_group_availability(period="last1w")
         self.assertEqual(rows[0]["tf"], "last1w;mon to sat 6:00 to 20:00")
         self.assertEqual(
             rows[1]["tf"], "last1w;mon to fri 7:00 to 19:00; sat 8:00 to 18:00"
@@ -58,8 +58,10 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
     ):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
-        api.get_group_availability(time="last1w", report="snmp,ping4", group="Accedian")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_group_availability(
+            period="last1w", report="snmp,ping4", group="Accedian"
+        )
         args, kwargs = session_mock.call_args
         self.assertTrue(args[0].endswith("/api-availability"))
         params = kwargs["params"]
@@ -73,7 +75,7 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
     def test_get_group_availability_defaults(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_group_availability()
         params = session_mock.call_args.kwargs["params"]
         self.assertEqual(params["time"], "last1d")
@@ -87,5 +89,5 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
     ):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         self.assertIsNone(api.get_group_availability())

@@ -21,7 +21,7 @@ class ApiDbTest(unittest.TestCase):
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         devices = api.get_devices()
         self.assertEqual(devices["192.168.1.29"]["ip4addr"], "192.168.1.29")
         self.assertEqual(
@@ -44,7 +44,7 @@ CrN-082-AP ping4 PING.icmpState = 1,down,1641624705,1646101757,192.168.94.112
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         devices = api.get_unreachable()
         self.assertEqual(devices["192.168.248.54"]["snmp_state"], "down")
         self.assertEqual(devices["192.168.248.54"]["ping_state"], "down")
@@ -77,7 +77,7 @@ TH840-F Ethernet1 IF-MIB.ifPhysAddress = 001fa008d411
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         attr = api.get_attributes(device="TH840-F")
         self.assertEqual(
             attr["TH840-F"]["cpu"]["A10-AX-MIB.axSysAverageDataCpuUsage"], "1"
@@ -97,7 +97,7 @@ TH840-F Ethernet1 IF-MIB.ifPhysAddress = 001fa008d411
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         list = api.get_group_membership(groups=["maintenance_mode"])
         self.assertEqual(list["10.10.10.146"][0], "admin")
 
@@ -111,7 +111,7 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         series = api.get_series(
             attribute="WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients"
         )
@@ -126,7 +126,7 @@ CrN-638-AP_111B,radio.0.11.134.253.238.238.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssoci
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         series = api.get_aggregate(
             attribute="WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients"
         )
@@ -141,29 +141,38 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
 """  # noqa
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         device = api.get_device("TH840-A")
-        self.assertEqual(device["sys"]["SNMPv2-MIB.sysName"], "TH840-A")
-        self.assertEqual(device["sys"]["SNMPv2-MIB.sysLocation"], "Datacenter A")
-        self.assertEqual(device["Ethernet1"]["IF-MIB.ifDescr"], "Ethernet 1")
+        # Keyed by device name, keeping the parent, child and attribute levels
+        # AKiPS stores.  Asking for one device gives one key rather than a
+        # differently shaped result.
+        self.assertEqual(list(device), ["TH840-A"])
+        self.assertEqual(device["TH840-A"]["sys"]["SNMPv2-MIB.sysName"], "TH840-A")
+        self.assertEqual(
+            device["TH840-A"]["sys"]["SNMPv2-MIB.sysLocation"], "Datacenter A"
+        )
+        self.assertEqual(device["TH840-A"]["Ethernet1"]["IF-MIB.ifDescr"], "Ethernet 1")
         # An attribute with nothing after the equals has no value, reported
         # as None consistently across get_device, get_attributes and
         # get_devices
-        self.assertIsNone(device["Ethernet1"]["IF-MIB.ifAlias"])
-        self.assertEqual(device["name"], "TH840-A")
+        self.assertIsNone(device["TH840-A"]["Ethernet1"]["IF-MIB.ifAlias"])
+        # every value is a dictionary of children; nothing else is mixed in
+        for children in device.values():
+            for attributes in children.values():
+                self.assertIsInstance(attributes, dict)
 
     @patch("requests.Session.get")
     def test_get_device_returns_none_for_empty_response(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         self.assertIsNone(api.get_device("TH840-A"))
 
     @patch("requests.Session.get")
     def test_get_device_with_unparsable_response(self, session_mock: MagicMock):
         session_mock.return_value.text = "no attribute lines here\n"
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         # A response that parses to nothing is not found, and is reported the
         # same way as an empty response rather than as a dict holding only the
         # name that was asked for
@@ -176,7 +185,7 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
 """  # noqa
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         events = api.get_events()
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0]["epoch"], "1706545348")
@@ -192,7 +201,7 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
     def test_get_events_builds_group_filter(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_events(event_type="critical", period="last4h", groups=["a10", "core"])
         cmds = session_mock.call_args.kwargs["params"]["cmds"]
         self.assertEqual(
@@ -203,7 +212,7 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
     def test_get_devices_builds_group_filter(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_devices(group_filter="not", groups=["a10"])
         cmds = session_mock.call_args.kwargs["params"]["cmds"]
         self.assertTrue(cmds.endswith(" not group a10"))
@@ -214,7 +223,7 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
     ):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_attributes(
             device="TH840-A", child="sys", value="/down/", groups=["a10"]
         )
@@ -225,7 +234,7 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
     def test_get_series_honours_interval(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_series(time_interval=300, period="last8h")
         cmds = session_mock.call_args.kwargs["params"]["cmds"]
         self.assertTrue(cmds.startswith("cseries interval avg 300 time last8h "))
@@ -237,7 +246,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
 """  # noqa
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         rows = api.get_series(get_dict=False)
         self.assertEqual(rows[0][0], "parent")
         self.assertEqual(rows[1][4], "4")
@@ -246,7 +255,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
     def test_get_aggregate_honours_operator(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_aggregate(operator="total", interval="600")
         cmds = session_mock.call_args.kwargs["params"]["cmds"]
         self.assertTrue(cmds.startswith("aggregate interval total 600 "))
@@ -255,7 +264,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
     def test_empty_responses_return_none(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         self.assertIsNone(api.get_devices())
         self.assertIsNone(api.get_unreachable())
         self.assertIsNone(api.get_attributes())
@@ -270,7 +279,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         r_text = "TH840-A sys ip4addr = 192.168.20.15\n"
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertWarns(DeprecationWarning):
             self.assertEqual(api.cmd("mget * TH840-A sys ip4addr"), r_text)
         self.assertEqual(
@@ -282,7 +291,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
     def test_cmd_rejects_unknown_output_format(self, session_mock: MagicMock):
         session_mock.return_value.text = "some output\n"
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertWarns(DeprecationWarning), self.assertRaises(ValueError):
             api.cmd("mget * * * *", output="json")
         # cmd only ever supported raw; call() is where the other formats live
@@ -296,8 +305,10 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         r_text = "TH840-A sys SNMPv2-MIB.sysLocation =\n"
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
-        self.assertIsNone(api.get_device("TH840-A")["sys"]["SNMPv2-MIB.sysLocation"])
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        self.assertIsNone(
+            api.get_device("TH840-A")["TH840-A"]["sys"]["SNMPv2-MIB.sysLocation"]
+        )
         self.assertIsNone(
             api.get_attributes(device="TH840-A")["TH840-A"]["sys"][
                 "SNMPv2-MIB.sysLocation"
@@ -307,3 +318,41 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         # the device is listed rather than dropped
         self.assertIn("TH840-A", devices)
         self.assertIsNone(devices["TH840-A"]["SNMPv2-MIB.sysLocation"])
+
+    @patch("requests.Session.get")
+    def test_get_series_builds_group_filter(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_series(groups=["a10", "core"], group_filter="all")
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertTrue(cmds.endswith(" all group a10 core"))
+
+    @patch("requests.Session.get")
+    def test_get_aggregate_builds_group_filter(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_aggregate(groups=["a10"])
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertTrue(cmds.endswith(" any group a10"))
+
+    @patch("requests.Session.get")
+    def test_get_unreachable_keeps_the_earliest_event_start(
+        self, session_mock: MagicMock
+    ):
+        # Two states down for one device with different start times; the
+        # earlier one is what the outage began at
+        r_text = """dev-1 ping4 PING.icmpState = 1,down,1484685257,1657029502,10.0.0.1
+dev-1 sys SNMP.snmpState = 1,down,1484685257,1657029400,
+"""  # noqa
+        session_mock.return_value.text = r_text
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        devices = api.get_unreachable()
+        self.assertEqual(devices["dev-1"]["event_start"].timestamp(), 1657029400)
+
+        # and the same regardless of the order the lines arrive in
+        session_mock.return_value.text = "\n".join(reversed(r_text.strip().split("\n")))
+        devices = api.get_unreachable()
+        self.assertEqual(devices["dev-1"]["event_start"].timestamp(), 1657029400)

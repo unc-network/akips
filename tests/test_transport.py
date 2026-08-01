@@ -21,7 +21,7 @@ class TransportTest(unittest.TestCase):
         session_mock.return_value.text = r_text
         self.assertIsInstance(session_mock, MagicMock)
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
 
         self.assertFalse(session_mock.called)
         self.assertRaises(AkipsError, api.get_devices)
@@ -33,7 +33,7 @@ class TransportTest(unittest.TestCase):
             requests.exceptions.HTTPError("500 Server Error")
         )
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertRaises(requests.exceptions.HTTPError):
             api.get_devices()
 
@@ -41,7 +41,7 @@ class TransportTest(unittest.TestCase):
     def test_connection_error_propagates(self, session_mock: MagicMock):
         session_mock.side_effect = requests.exceptions.ConnectionError("refused")
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertRaises(requests.exceptions.ConnectionError):
             api.get_devices()
 
@@ -49,7 +49,7 @@ class TransportTest(unittest.TestCase):
     def test_timeout_propagates(self, session_mock: MagicMock):
         session_mock.side_effect = requests.exceptions.Timeout("timed out")
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertRaises(requests.exceptions.Timeout):
             api.get_devices()
 
@@ -57,7 +57,7 @@ class TransportTest(unittest.TestCase):
     def test_request_exception_propagates(self, session_mock: MagicMock):
         session_mock.side_effect = requests.exceptions.RequestException("broken")
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertRaises(requests.exceptions.RequestException):
             api.get_devices()
 
@@ -78,7 +78,7 @@ class TransportTest(unittest.TestCase):
     def test_verify_false_is_passed_through(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1", verify=False)
+        api = AKIPS("127.0.0.1", ro_password="ro-secret", verify=False)
         api.get_devices()
         self.assertFalse(session_mock.call_args.kwargs["verify"])
 
@@ -98,7 +98,7 @@ class TransportTest(unittest.TestCase):
         self.assertEqual(redacted["cmds"], "mget * * * *")
 
     def test_parse_enum(self):
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         entry = api._parse_enum("8,full,1581605551,1706545348,core-uplink")
         self.assertEqual(entry["number"], "8")
         self.assertEqual(entry["value"], "full")
@@ -107,20 +107,20 @@ class TransportTest(unittest.TestCase):
         self.assertEqual(entry["modified"].year, 2024)
 
     def test_parse_enum_with_empty_description(self):
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         entry = api._parse_enum("2,up,1581605551,1706545348,")
         self.assertEqual(entry["value"], "up")
         self.assertEqual(entry["description"], "")
 
     def test_parse_enum_rejects_other_values(self):
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertRaises(AkipsError):
             api._parse_enum("not an enum value")
 
     def test_parse_enum_with_spaces_in_description(self):
         # Child descriptions routinely contain spaces, e.g. "Ethernet 1", so
         # the trailing field takes the rest of the line
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         entry = api._parse_enum("8,full,1581605551,1706545348,uplink to core")
         self.assertEqual(entry["value"], "full")
         self.assertEqual(entry["description"], "uplink to core")
@@ -141,7 +141,7 @@ class TransportTest(unittest.TestCase):
     def test_get_accepts_no_params(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         # params is documented as optional, so omitting it must not raise
         self.assertEqual(api._get(section="api-db"), "")
         self.assertIn("username", session_mock.call_args.kwargs["params"])
@@ -150,7 +150,7 @@ class TransportTest(unittest.TestCase):
     def test_verify_true_leaves_the_warning_filter_alone(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         before = list(warnings.filters)
         api.get_devices()
         self.assertEqual(list(warnings.filters), before)
@@ -159,7 +159,7 @@ class TransportTest(unittest.TestCase):
     def test_verify_false_restores_the_warning_filter(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1", verify=False)
+        api = AKIPS("127.0.0.1", ro_password="ro-secret", verify=False)
         before = list(warnings.filters)
         api.get_devices()
         # Suppression is scoped to the request; constructing a client with
@@ -170,7 +170,7 @@ class TransportTest(unittest.TestCase):
     def test_default_timeout_is_thirty_seconds(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_devices()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 30)
 
@@ -178,7 +178,9 @@ class TransportTest(unittest.TestCase):
     def test_timeout_is_configurable_at_construction(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1", timeout=5)
+        api = AKIPS(
+            "127.0.0.1", ro_password="ro-secret", rw_password="rw-secret", timeout=5
+        )
         # applies to every section, not just api-db
         api.get_devices()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
@@ -195,7 +197,7 @@ class TransportTest(unittest.TestCase):
     ):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_devices()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 30)
         api.timeout = 120

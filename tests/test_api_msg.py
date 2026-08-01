@@ -39,8 +39,8 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
-        messages = api.get_msg(time="today", addr="10.10.10.146")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        messages = api.get_msg(period="today", addr="10.10.10.146")
         self.assertIsNotNone(messages)
         self.assertEqual(messages[2]["time"], "1436232275")
         self.assertEqual(messages[2]["type"], "trap")
@@ -50,11 +50,11 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
     def test_get_msg_builds_optional_filters(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_msg(
-            time="last4h",
+            period="last4h",
             addr="10.4.2.26",
-            type="syslog",
+            msg_type="syslog",
             device="cisco-sw1",
             regex="LINEPROTO",
             limit=25,
@@ -73,8 +73,8 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
     def test_get_msg_ignores_unknown_type(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
-        api.get_msg(type="netflow")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_msg(msg_type="netflow")
         self.assertNotIn("type", session_mock.call_args.kwargs["params"])
 
     @patch("requests.Session.get")
@@ -85,7 +85,7 @@ OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
 """  # noqa
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         messages = api.get_msg()
         self.assertEqual(len(messages), 1)
         self.assertEqual(
@@ -100,7 +100,7 @@ OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
     def test_get_msg_returns_none_for_empty_response(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         self.assertIsNone(api.get_msg())
 
     @patch("requests.Session.get")
@@ -115,7 +115,7 @@ notice local7 149: LINEPROTO-5-UPDOWN
 """  # noqa
         session_mock.return_value.text = r_text
 
-        api = AKIPS("127.0.0.1")
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
         messages = api.get_msg()
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0]["ip_addr"], "10.4.2.26")
