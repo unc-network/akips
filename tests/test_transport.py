@@ -7,6 +7,8 @@ import warnings
 from unittest.mock import MagicMock, patch
 
 import requests
+import traceback
+import urllib3
 
 from akips import AKIPS, AkipsError
 
@@ -254,3 +256,106 @@ class TransportTest(unittest.TestCase):
             with self.assertRaises(requests.exceptions.Timeout) as caught:
                 api.get_devices()
         self.assertEqual(str(caught.exception), "timed out")
+
+    @patch("requests.Session.get")
+    def test_the_whole_exception_chain_is_scrubbed(self, session_mock: MagicMock):
+        # requests raises its error from the urllib3 one that caused it, and
+        # that inner exception holds the same URL.  Anything rendering a full
+        # traceback renders the chain, which is where tracebacks get stored.
+        secret = "SuperSecret123"
+        inner = urllib3.exceptions.HTTPError(
+            f"Max retries exceeded with url: /api-db?password={secret}"
+        )
+        inner.url = f"/api-db?password={secret}"
+        outer = requests.exceptions.ConnectionError(
+            f"HTTPSConnectionPool: url: /api-db?password={secret}"
+        )
+        outer.__cause__ = inner
+        session_mock.side_effect = outer
+
+        api = AKIPS("akips.example.com", ro_password=secret)
+        with self.assertLogs("akips", level="ERROR"):
+            with self.assertRaises(requests.exceptions.ConnectionError) as caught:
+                api.get_devices()
+
+        err = caught.exception
+        rendered = "".join(
+            traceback.format_exception(type(err), err, err.__traceback__)
+        )
+        self.assertNotIn(secret, rendered)
+        # the inner exception is reached, message and url attribute both
+        self.assertNotIn(secret, str(err.__cause__))
+        self.assertNotIn(secret, err.__cause__.url)
+
+    @patch("requests.Session.get")
+    def test_the_response_url_on_an_http_error_is_scrubbed(
+        self, session_mock: MagicMock
+    ):
+        # Error reporters read response.url separately from the message
+        secret = "SuperSecret123"
+        response = requests.Response()
+        response.status_code = 500
+        response.url = f"https://akips.example.com/api-db?password={secret}"
+        response.reason = "Server Error"
+        session_mock.return_value = response
+
+        api = AKIPS("akips.example.com", ro_password=secret)
+        with self.assertLogs("akips", level="ERROR"):
+            with self.assertRaises(requests.exceptions.HTTPError) as caught:
+                api.get_devices()
+        self.assertNotIn(secret, str(caught.exception))
+        self.assertNotIn(secret, caught.exception.response.url)
+
+    @patch("requests.Session.get")
+    def test_an_error_reply_body_is_redacted_without_mangling_data(
+        self, session_mock: MagicMock
+    ):
+        # The query parameter form is removed from the body, but the password
+        # is never replaced as a literal there: a short one would rewrite
+        # matching characters anywhere in a device reply
+        session_mock.return_value.text = (
+            "ERROR: api-db rejected ?username=api-ro&password=up for up"
+        )
+
+        api = AKIPS("akips.example.com", ro_password="up")
+        with self.assertRaises(AkipsError) as caught:
+            api.get_devices()
+        self.assertIn("password=****", str(caught.exception))
+        # the trailing 'up' is data, not a credential, and survives
+        self.assertTrue(str(caught.exception).endswith("for up"))
+
+    @patch("requests.Session.get")
+    def test_verify_accepts_a_ca_bundle_path(self, session_mock: MagicMock):
+        # A server missing an intermediate can be trusted with its own bundle
+        # rather than by turning verification off
+        session_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", ro_password="secret", verify="/etc/ca.pem")
+        api.get_devices()
+        self.assertEqual(session_mock.call_args.kwargs["verify"], "/etc/ca.pem")
+
+    @patch("requests.Session.get")
+    def test_scrubbing_never_masks_the_original_failure(self, session_mock: MagicMock):
+        # Some exception could expose url as a read only property.  Scrubbing
+        # must not turn that into an AttributeError raised in place of the
+        # error the caller was about to receive.
+        class StubbornError(requests.exceptions.ConnectionError):
+            @property
+            def url(self):  # type: ignore[override]
+                return "/api-db?password=SuperSecret123"
+
+        class StubbornResponse:
+            @property
+            def url(self):
+                return "/api-db?password=SuperSecret123"
+
+        err = StubbornError("connection failed for /api-db?password=SuperSecret123")
+        err.response = StubbornResponse()  # type: ignore[assignment]
+        session_mock.side_effect = err
+
+        api = AKIPS("akips.example.com", ro_password="SuperSecret123")
+        with self.assertLogs("akips", level="ERROR"):
+            with self.assertRaises(requests.exceptions.ConnectionError) as caught:
+                api.get_devices()
+        # the message is still scrubbed even though the attributes could not be
+        self.assertNotIn("SuperSecret123", str(caught.exception))

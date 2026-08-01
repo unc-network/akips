@@ -49,6 +49,10 @@ here, a breaking change means a 2.0.
   which is how a custom AKiPS API account will work once AKiPS offers them.
   Constructing a client with no password at all is now refused. **Breaking**
   for that case, which could never have authenticated anyway.
+- `verify` accepts a path to a CA bundle as well as `True` or `False`, which
+  requests has always supported but the annotation and documentation did not
+  mention. This is how to trust a server whose certificate chain is missing an
+  intermediate without turning verification off entirely.
 - Type annotations on every public method, and an `akips/py.typed` marker so
   consumers type checking their own code see real types instead of `Any`.
   The annotations are checked with mypy in CI, so what the marker promises is
@@ -127,9 +131,24 @@ here, a breaking change means a 2.0.
   release should treat the AKiPS password in those logs as exposed and
   rotate it.
 
-  One residual: an `HTTPError` also carries the response object, and
-  `response.url` still holds the query string it was fetched with. Avoid
-  logging that attribute directly.
+  The whole exception chain is scrubbed, not only the exception raised.
+  requests raises its error *from* the urllib3 one that caused it, and that
+  inner exception holds the same URL — in its message and in a `url`
+  attribute of its own. Anything rendering a full traceback renders the
+  chain, so a failed call in an application that stores tracebacks would
+  otherwise have written the password to wherever those are kept. The
+  `response.url` on an `HTTPError` is scrubbed too, since error reporters
+  read it separately from the message.
+
+  Scrubbing can never mask the original failure: if an attribute turns out to
+  be read only, the message is still cleaned and the original exception is
+  still what reaches the caller.
+
+  An error reply from AKiPS is also filtered before it is logged or raised.
+  No AKiPS error seen so far echoes a credential back, so this is defence in
+  depth rather than an observed leak. Only the query parameter form is
+  removed there, never the password as a literal, because a short password
+  would otherwise rewrite matching characters anywhere in a reply.
 - `get_unreachable()` warns when it cannot parse a line instead of dropping it
   silently. That call is how a consumer learns what is broken, so a dropped
   line meant a device reported down was invisible, and under reporting an

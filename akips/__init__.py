@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev3"
+__version__ = "1.0.0.dev4"
 
 import csv
 import io
@@ -43,7 +43,10 @@ class AKIPS:
             any other name, that pair is used for every section, which is how
             to use a custom AKiPS API account
         password (str): the password paired with username
-        verify (bool): Whether to verify SSL certificates (default: True)
+        verify (bool | str): Whether to verify TLS certificates (default:
+            True).  A path to a CA bundle can be given instead, which is
+            how to trust a server whose chain is missing an intermediate
+            without turning verification off entirely
         server_timezone (str): Timezone of the AKiPS server (default: "America/New_York")
         timeout (int): HTTP timeout in seconds applied to every call
             (default: 30).  Assign to it to change the timeout of an
@@ -65,7 +68,7 @@ class AKIPS:
         server: str,
         username: str = "api-ro",
         password: str | None = None,
-        verify: bool = True,
+        verify: bool | str = True,
         timezone: str = "America/New_York",
         timeout: int = 30,
         ro_password: str | None = None,
@@ -1094,45 +1097,86 @@ class AKIPS:
 
         return {k: ("****" if is_sensitive(k) else v) for k, v in params.items()}
 
-    def _redact_text(self, text: str) -> str:
+    def _redact_text(self, text: str, literals: bool = True) -> str:
         """
         Remove credentials from arbitrary text before it is logged or raised.
 
         Matching on the query parameter covers the value whatever it looks
-        like once URL encoded, and replacing the passwords this client holds
-        covers them appearing anywhere else.
+        like once URL encoded.  Replacing the passwords this client holds
+        catches them appearing outside a query string, but is unsafe for text
+        that carries device data: a short password would rewrite every
+        innocent occurrence of the same characters.  Pass literals=False for
+        anything that is not a URL or an error message.
 
         Args:
             text (str): text that may contain credentials
+            literals (bool): also replace the configured passwords wherever
+                they appear (default: True)
         Returns:
             The text with any credential replaced by '****'
         """
         text = re.sub(r"((?:password|passwd|pass)=)[^&\s]*", r"\1****", text)
-        for secret in (self.password, self.ro_password, self.rw_password):
-            if secret:
-                text = text.replace(secret, "****")
+        if literals:
+            for secret in (self.password, self.ro_password, self.rw_password):
+                if secret:
+                    text = text.replace(secret, "****")
         return text
 
     def _scrub_exception(self, err: BaseException) -> None:
         """
-        Strip credentials from an exception raised by requests, in place.
+        Strip credentials from an exception and everything it chains to.
 
         AKiPS authenticates by query string and requests puts the failing URL
         in its exception messages, so an untouched exception carries the
-        password into any log line or traceback that renders it.  Rewriting
-        the arguments keeps the exception's type and traceback, which a
-        caller may be relying on, while making the text safe.
+        password into any log line or traceback that renders it.
 
-        Note that an HTTPError also holds the response object, whose url
-        attribute still contains the query string it was fetched with.
+        The whole chain has to be scrubbed, not just the exception raised.
+        requests raises its own error from the urllib3 one that caused it, and
+        that inner exception holds the same URL, in its message and in a url
+        attribute.  Anything rendering a full traceback renders the chain, so
+        leaving it means the password reaches wherever tracebacks are kept.
+
+        Rewriting in place keeps each exception's type and traceback, which a
+        caller may be relying on, while making the text safe.
 
         Args:
             err (BaseException): the exception to scrub, modified in place
+                along with its __cause__ and __context__ chain
         """
-        original = str(err)
-        redacted = self._redact_text(original)
-        if redacted != original:
-            err.args = (redacted,)
+        seen: set[int] = set()
+        pending: list[BaseException | None] = [err]
+        while pending:
+            node = pending.pop()
+            if node is None or id(node) in seen:
+                continue
+            seen.add(id(node))
+
+            original = str(node)
+            redacted = self._redact_text(original)
+            if redacted != original:
+                node.args = (redacted,)
+
+            # urllib3 keeps the URL as an attribute of its own, which no
+            # amount of message rewriting reaches
+            url = getattr(node, "url", None)
+            if isinstance(url, str):
+                try:
+                    node.url = self._redact_text(url)  # type: ignore[attr-defined]
+                except AttributeError:
+                    pass
+
+            # A requests HTTPError carries the response it came from, and its
+            # url is the one that was fetched, credentials and all.  Error
+            # reporters read that separately from the message.
+            response = getattr(node, "response", None)
+            if response is not None and isinstance(getattr(response, "url", None), str):
+                try:
+                    response.url = self._redact_text(response.url)
+                except AttributeError:
+                    pass
+
+            pending.append(node.__cause__)
+            pending.append(node.__context__)
 
     def _get(
         self,
@@ -1209,8 +1253,16 @@ class AKIPS:
 
         # AKiPS can return a raw error message if something fails
         if re.match(r"^ERROR:", r.text):
-            logger.error("Web API request failed: {}".format(r.text))
-            raise AkipsError(message=r.text)
+            # Defence in depth: no AKiPS error seen so far echoes a credential
+            # back, but this text goes into a log and an exception message.
+            # Only the query parameter form is removed, never the password as
+            # a literal, because a short one would rewrite matching characters
+            # anywhere in the reply.
+            message = self._redact_text(r.text, literals=False)
+            logger.error("Web API request failed: {}".format(message))
+            raise AkipsError(message=message)
         else:
-            logger.debug("akips output: {}".format(r.text))
+            logger.debug(
+                "akips output: {}".format(self._redact_text(r.text, literals=False))
+            )
             return r.text
