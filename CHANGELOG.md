@@ -53,8 +53,11 @@ and after for each one.
   Constructing a client with no password at all is now refused. **Breaking**
   for that case, which could never have authenticated anyway.
 - A warning when a call names an API section AKiPS does not publish, which is
-  usually a typo. `SECTION_USERS` now lists all ten documented sections, so it
-  serves as both the account mapping and the list of what exists. Unknown
+  usually a typo. `SECTION_USERS` now lists all ten documented sections with
+  the account each one accepts, taken from the server's own Web API settings
+  page, so it serves as both the account mapping and the list of what exists.
+  Every section takes `api-ro` except `api-script`, which requires `api-rw`,
+  and `api-db`, which takes either. Unknown
   sections are warned about rather than refused, because AKiPS may add
   sections and `call()` exists so that reaching one need not wait for a
   release here. Each section is warned about once per client, so a poll loop

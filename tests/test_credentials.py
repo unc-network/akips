@@ -132,3 +132,42 @@ class CredentialTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             api.call("mget * * * *", user="admin")
         self.assertFalse(session_mock.called)
+
+    def test_the_section_table_matches_the_akips_documentation(self):
+        # Taken from the server's own Web API settings page rather than
+        # inferred.  Every section takes api-ro except api-script, which
+        # requires api-rw, and api-db, which takes either.
+        self.assertEqual(
+            AKIPS.SECTION_USERS,
+            {
+                "api-availability": "api-ro",
+                "api-config-viewer": "api-ro",
+                "api-db": None,
+                "api-flow": "api-ro",
+                "api-flow-timeseries": "api-ro",
+                "api-http-log": "api-ro",
+                "api-msg": "api-ro",
+                "api-script": "api-rw",
+                "api-spm": "api-ro",
+                "api-unused-interfaces": "api-ro",
+            },
+        )
+
+    @patch("requests.Session.get")
+    def test_a_read_write_only_client_is_told_what_it_needs(
+        self, session_mock: MagicMock
+    ):
+        # Only api-db and api-script accept api-rw, so a client holding just
+        # that password cannot reach the rest.  Saying so beforehand beats
+        # letting AKiPS reject the request.
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", rw_password="rw-secret")
+        with self.assertRaises(AkipsCredentialError) as caught:
+            api.get_group_availability()
+        self.assertIn("api-availability", str(caught.exception))
+        self.assertIn("ro_password", str(caught.exception))
+        self.assertFalse(session_mock.called)
+        # api-db and api-script still work on the rw password alone
+        api.get_devices()
+        self.assertEqual(session_mock.call_args.kwargs["params"]["username"], "api-rw")

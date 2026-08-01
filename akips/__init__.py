@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev4"
+__version__ = "1.0.0.dev5"
 
 import csv
 import io
@@ -34,6 +34,11 @@ class AKIPS:
 
         api = AKIPS('akips.example.com', ro_password='...', rw_password='...')
 
+    Four of the ten sections have methods of their own here: api-db,
+    api-script, api-msg and api-availability.  The rest are reached through
+    call(), which sends a request to any section and parses the reply in the
+    same shapes those methods use.
+
     Attributes:
         server (str): The AKiPS server hostname or IP address
         ro_password (str): password for the api-ro account
@@ -53,9 +58,15 @@ class AKIPS:
             existing client, e.g. api.timeout = 60
     """
 
-    # Every API section AKiPS publishes, mapped to the account it requires.
-    # None means either account will do, or that the requirement has not been
-    # confirmed, in which case the read only one is preferred.
+    # Every API section AKiPS publishes, mapped to the account it accepts, as
+    # documented on the server's own Web API settings page.  Every section
+    # takes api-ro except api-script, which requires api-rw, and api-db, which
+    # takes either: api-ro for read-only commands and api-rw for all of them.
+    # None marks that pair, where the read only account is preferred and a
+    # command needing more rights is reached with user='rw'.
+    #
+    # Only api-db reads a username at all.  The others authenticate on the
+    # password alone, so the username sent alongside is ignored there.
     #
     # This doubles as the list of sections known to exist.  Calling one that
     # is not here is warned about rather than refused, because AKiPS may add
@@ -63,16 +74,16 @@ class AKIPS:
     # call().  Each section is also disabled by default on the server, so a
     # section listed here can still be rejected until it is enabled.
     SECTION_USERS: dict[str, str | None] = {
-        "api-availability": None,
-        "api-config-viewer": None,
+        "api-availability": "api-ro",
+        "api-config-viewer": "api-ro",
         "api-db": None,
-        "api-flow": None,
-        "api-flow-timeseries": None,
-        "api-http-log": None,
+        "api-flow": "api-ro",
+        "api-flow-timeseries": "api-ro",
+        "api-http-log": "api-ro",
         "api-msg": "api-ro",
         "api-script": "api-rw",
-        "api-spm": None,
-        "api-unused-interfaces": None,
+        "api-spm": "api-ro",
+        "api-unused-interfaces": "api-ro",
     }
 
     def __init__(
@@ -368,6 +379,8 @@ class AKIPS:
             logger.debug("Found {} devices in akips".format(len(data.keys())))
             return data
         return None
+
+    # UPS helpers
 
     # UPS output sources other than 'normal'.  A UPS reporting any of these is
     # not running on mains, which is what an operator wants to know about.
@@ -832,89 +845,7 @@ class AKIPS:
             return values
         return None
 
-    # Low-level operations
-
-    # The reply shapes call() can parse, mapped to the parser for each
-    OUTPUT_FORMATS = ("raw", "lines", "key_value", "attributes", "csv", "csv_dict")
-
-    def call(
-        self,
-        command: str | None = None,
-        section: str = "api-db",
-        params: dict[str, Any] | None = None,
-        output: str = "raw",
-        user: str | None = None,
-    ) -> Any:
-        """
-        Send an arbitrary request to any AKiPS web API section and parse the
-        reply in one of the shapes AKiPS replies in.
-
-        This is the general purpose call for anything the specific methods do
-        not cover.  It parses with the same routines they use, so an ad-hoc
-        query returns the same shape its dedicated method would.
-
-        Sections do not share a parameter vocabulary.  api-db takes a command
-        string, while api-script, api-msg and api-availability each take their
-        own named parameters, so pass 'command' for the first and 'params' for the
-        others.  Passing both adds the command to the given parameters.
-
-        Output formats, and where each one occurs:
-
-            raw        the reply unchanged, as a string
-            lines      a list of non-blank lines
-            key_value  '{key} = {value}' lines, as from mgroup
-            attributes '{parent} {child} {attribute} = {value}' lines, as from
-                       mget, nested by parent, child, then attribute
-            csv        CSV rows as lists, for replies with no header row
-            csv_dict   CSV rows as dictionaries keyed by the header row
-
-        Args:
-            command (str): command string for the api-db section, shorthand
-                for params={'cmds': command}
-            section (str): API section to call (default: 'api-db')
-            params (dict): parameters for sections that take no command string
-            output (str): one of the formats listed above (default: 'raw')
-            user (str): force the 'ro' or 'rw' account, for a section
-                whose requirement is not in SECTION_USERS, or a command
-                needing more rights than its section usually does
-        Returns:
-            The reply in the requested shape, or None if the server returned
-            nothing
-        Raises:
-            ValueError: if output is not a supported format, or if neither
-                command nor params was provided
-            AkipsError: if the AKiPS server returns an error
-        """
-        # Check before making the request, so a bad argument fails the same way
-        # whether or not the server returned anything
-        if output not in self.OUTPUT_FORMATS:
-            raise ValueError(
-                "Invalid output value provided to call, expected one of {}".format(
-                    ", ".join(self.OUTPUT_FORMATS)
-                )
-            )
-        if command is None and params is None:
-            raise ValueError("call requires either a command or a params dictionary")
-
-        request_params = dict(params or {})
-        if command is not None:
-            request_params["cmds"] = command
-
-        text = self._get(section=section, params=request_params, user=user)
-        if not text:
-            return None
-
-        if output == "raw":
-            return text
-        if output == "lines":
-            return self._parse_lines(text)
-        if output == "key_value":
-            return self._parse_key_value(text)
-        if output == "attributes":
-            return self._parse_attributes(text)
-        if output == "csv_dict":
-            return self._parse_csv(text, header=True)
-        return self._parse_csv(text)
+    # Low-level operations, kept for compatibility
 
     def cmd(self, cmd: str, output: str = "raw") -> str | None:
         """
@@ -1114,7 +1045,7 @@ class AKIPS:
         return None
 
     # ---------------------------------------------------------------------------
-    # api-availability methods for availability statistics
+    # api-availability methods, these require the 'api-ro' user
 
     def get_group_availability(
         self, period: str = "last1d", report: str = "ping4", group: str | None = None
@@ -1190,11 +1121,101 @@ class AKIPS:
     #     pass
 
     # ---------------------------------------------------------------------------
+    # Generic operations, these reach any API section
+    #
+    # call() is not fixed to one section the way the methods above are.  It
+    # takes the section as an argument and picks the account from
+    # SECTION_USERS, which is how the sections with no methods of their own
+    # here are reached.
+
+    # The reply shapes call() can parse, mapped to the parser for each
+    OUTPUT_FORMATS = ("raw", "lines", "key_value", "attributes", "csv", "csv_dict")
+
+    def call(
+        self,
+        command: str | None = None,
+        section: str = "api-db",
+        params: dict[str, Any] | None = None,
+        output: str = "raw",
+        user: str | None = None,
+    ) -> Any:
+        """
+        Send an arbitrary request to any AKiPS web API section and parse the
+        reply in one of the shapes AKiPS replies in.
+
+        This is the general purpose call for anything the specific methods do
+        not cover.  It parses with the same routines they use, so an ad-hoc
+        query returns the same shape its dedicated method would.
+
+        Sections do not share a parameter vocabulary.  api-db takes a command
+        string, while api-script, api-msg and api-availability each take their
+        own named parameters, so pass 'command' for the first and 'params' for the
+        others.  Passing both adds the command to the given parameters.
+
+        Output formats, and where each one occurs:
+
+            raw        the reply unchanged, as a string
+            lines      a list of non-blank lines
+            key_value  '{key} = {value}' lines, as from mgroup
+            attributes '{parent} {child} {attribute} = {value}' lines, as from
+                       mget, nested by parent, child, then attribute
+            csv        CSV rows as lists, for replies with no header row
+            csv_dict   CSV rows as dictionaries keyed by the header row
+
+        Args:
+            command (str): command string for the api-db section, shorthand
+                for params={'cmds': command}
+            section (str): API section to call (default: 'api-db')
+            params (dict): parameters for sections that take no command string
+            output (str): one of the formats listed above (default: 'raw')
+            user (str): force the 'ro' or 'rw' account, for a section
+                whose requirement is not in SECTION_USERS, or a command
+                needing more rights than its section usually does
+        Returns:
+            The reply in the requested shape, or None if the server returned
+            nothing
+        Raises:
+            ValueError: if output is not a supported format, or if neither
+                command nor params was provided
+            AkipsError: if the AKiPS server returns an error
+        """
+        # Check before making the request, so a bad argument fails the same way
+        # whether or not the server returned anything
+        if output not in self.OUTPUT_FORMATS:
+            raise ValueError(
+                "Invalid output value provided to call, expected one of {}".format(
+                    ", ".join(self.OUTPUT_FORMATS)
+                )
+            )
+        if command is None and params is None:
+            raise ValueError("call requires either a command or a params dictionary")
+
+        request_params = dict(params or {})
+        if command is not None:
+            request_params["cmds"] = command
+
+        text = self._get(section=section, params=request_params, user=user)
+        if not text:
+            return None
+
+        if output == "raw":
+            return text
+        if output == "lines":
+            return self._parse_lines(text)
+        if output == "key_value":
+            return self._parse_key_value(text)
+        if output == "attributes":
+            return self._parse_attributes(text)
+        if output == "csv_dict":
+            return self._parse_csv(text, header=True)
+        return self._parse_csv(text)
+
+    # ---------------------------------------------------------------------------
     # Response parsers
     #
     # AKiPS replies in a handful of shapes.  Each one is parsed in exactly one
-    # place here, so the specific methods above and the generic call() below
-    # cannot drift apart in how they read the same reply.
+    # place here, so the specific methods above and the generic call() cannot
+    # drift apart in how they read the same reply.
 
     @staticmethod
     def _parse_lines(text: str) -> list[str]:
