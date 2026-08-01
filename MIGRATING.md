@@ -121,7 +121,23 @@ appears with `None` values.
 
 ## `get_unreachable()`
 
-Two changes.
+Three changes.
+
+It now searches `ping4|ping6|sys` rather than every child of every device,
+because the wildcard made AKiPS walk the whole tree to return a handful of
+lines and this is usually the query a dashboard runs most often. On a 16,000
+device fleet that is 10.5s against 5.0s for the same rows.
+
+Nothing to do if your AKiPS uses the standard child names — check with
+`mget * * ping4 PING.icmpState`. If it returns rows, you are fine. If your
+site names them differently, restore the old search:
+
+```py
+down = api.get_unreachable(children='*')
+```
+
+Worth checking rather than assuming: a site that needs this and does not set
+it sees an empty result, which reads as good news.
 
 `child` is the matched string rather than a one element tuple:
 

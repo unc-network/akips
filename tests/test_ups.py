@@ -20,6 +20,16 @@ BATTERY_TEST = """172.28.12.121 battery LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestRe
 
 
 class UpsOutputSourceTest(unittest.TestCase):
+    def test_the_default_states_cover_every_value_but_normal(self):
+        # UPS-MIB numbers upsOutputSource other(1) none(2) normal(3) bypass(4)
+        # battery(5) booster(6) reducer(7).  Anything missing from this list is
+        # a state no caller ever hears about, so pin the whole thing rather
+        # than trust it to be maintained alongside the MIB.
+        self.assertEqual(
+            AKIPS.UPS_ABNORMAL_OUTPUT_SOURCES,
+            ("other", "none", "bypass", "battery", "booster", "reducer"),
+        )
+
     @patch("requests.Session.get")
     def test_defaults_to_the_states_worth_looking_at(self, session_mock: MagicMock):
         session_mock.return_value.text = OUTPUT_SOURCE
@@ -28,7 +38,8 @@ class UpsOutputSourceTest(unittest.TestCase):
         devices = api.get_ups_output_source()
         self.assertEqual(
             session_mock.call_args.kwargs["params"]["cmds"],
-            "mget * * * UPS-MIB.upsOutputSource value /bypass|battery|booster|reducer/",
+            "mget * * ups UPS-MIB.upsOutputSource "
+            "value /other|none|bypass|battery|booster|reducer/",
         )
         entry = devices["172.29.214.24"]
         self.assertEqual(entry["value"], "bypass")
@@ -47,7 +58,7 @@ class UpsOutputSourceTest(unittest.TestCase):
         api.get_ups_output_source(states=None)
         self.assertEqual(
             session_mock.call_args.kwargs["params"]["cmds"],
-            "mget * * * UPS-MIB.upsOutputSource",
+            "mget * * ups UPS-MIB.upsOutputSource",
         )
 
     @patch("requests.Session.get")

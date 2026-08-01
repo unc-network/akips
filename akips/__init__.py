@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev5"
+__version__ = "1.0.0.dev6"
 
 import csv
 import io
@@ -241,7 +241,18 @@ class AKIPS:
             return data
         return None
 
-    def get_unreachable(self) -> dict[str, dict[str, Any]] | None:
+    # The children ping and SNMP state are reported under.  Naming them saves
+    # AKiPS walking every child of every device, which is most of the cost of
+    # this query: on a 16,000 device fleet the wildcard took 10.5s against
+    # 5.0s here, for the same rows.  ping6 is listed though most sites monitor
+    # over IPv4 alone, because a device reachable only over IPv6 going down is
+    # exactly what this call must not miss, and an alternative that matches
+    # nothing costs nothing.
+    UNREACHABLE_CHILDREN = "ping4|ping6|sys"
+
+    def get_unreachable(
+        self, children: str = UNREACHABLE_CHILDREN
+    ) -> dict[str, dict[str, Any]] | None:
         """
         Pull a list of unreachable devices by Ping and SNMP state.
 
@@ -251,14 +262,26 @@ class AKIPS:
                 [descr {/regex/}] [value {text|integer|/regex/}]
                 [profile {profile name}] [any|all|not group {group name} ...]
 
+        Note the {type} field is left off here.  These are enum attributes, so
+        narrowing with 'mget text' returns no rows at all rather than an
+        error, even though it is the obvious thing to reach for.
+
+        Args:
+            children (str): regex of children to search, defaulting to the
+                ones AKiPS reports these attributes under.  Pass '*' for
+                every child of every device, which is correct for a site
+                naming them differently and considerably slower
         Returns:
             A dictionary of device names to their unreachable attributes, or
             None if nothing was reported as down
         Raises:
             AkipsError: if the AKiPS server returns an error
         """
+        # '*' is the wildcard rather than a pattern, so it is the one value
+        # that must not be wrapped in slashes
+        child = children if children == "*" else f"/{children}/"
         params = {
-            "cmds": "mget * * * /PING.icmpState|SNMP.snmpState/ value /down/",
+            "cmds": f"mget * * {child} /PING.icmpState|SNMP.snmpState/ value /down/",
         }
         text = self._get(params=params)
         if text:
@@ -384,7 +407,26 @@ class AKIPS:
 
     # UPS output sources other than 'normal'.  A UPS reporting any of these is
     # not running on mains, which is what an operator wants to know about.
-    UPS_ABNORMAL_OUTPUT_SOURCES = ("bypass", "battery", "booster", "reducer")
+    #
+    # In MIB order, since UPS-MIB numbers them other(1) none(2) normal(3)
+    # bypass(4) battery(5) booster(6) reducer(7).  'none' is a UPS delivering
+    # no output at all and 'other' one that cannot classify its own source;
+    # both are here for the same reason 'unknown' is in the battery states
+    # below, because a UPS that cannot answer the question is worth looking
+    # at too.
+    UPS_ABNORMAL_OUTPUT_SOURCES = (
+        "other",
+        "none",
+        "bypass",
+        "battery",
+        "booster",
+        "reducer",
+    )
+
+    # The child the UPS itself is reported under, as against 'battery' for the
+    # battery attributes below.  Naming it keeps AKiPS from walking every
+    # child of every device, which is most of the cost of the query.
+    UPS_CHILD = "ups"
 
     # Battery states other than batteryNormal.  'unknown' is included because
     # a UPS that cannot report its own battery is worth looking at too.
@@ -446,8 +488,10 @@ class AKIPS:
         Pull the UPS devices that are not running on mains power.
 
         UPS-MIB reports where a UPS is drawing its output from, which is
-        'normal' when all is well.  By default this returns only the other
-        values, so the result is the list of UPSes worth looking at.
+        'normal' when all is well.  By default this returns every other value,
+        so the result is the list of UPSes worth looking at.  That includes
+        'none', a UPS delivering no output at all, and 'other', one that
+        cannot classify its own source.
 
         Note this is the output source, not the battery's own health, which
         UPS-MIB reports separately as upsBatteryStatus.
@@ -467,6 +511,7 @@ class AKIPS:
         """
         return self._get_enum_attribute(
             "UPS-MIB.upsOutputSource",
+            child=self.UPS_CHILD,
             values=states,
             group_filter=group_filter,
             groups=groups,

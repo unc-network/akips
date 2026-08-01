@@ -57,6 +57,50 @@ CrN-082-AP ping4 PING.icmpState = 1,down,1641624705,1646101757,192.168.94.112
         self.assertEqual(devices["192.168.248.54"]["index"], "1")
 
     @patch("requests.Session.get")
+    def test_get_unreachable_names_the_children_it_searches(
+        self, session_mock: MagicMock
+    ):
+        # A wildcard here makes AKiPS walk every child of every device, which
+        # is most of the cost of the query.  ping6 is in the list even where
+        # nothing is monitored over IPv6, since missing a device that is down
+        # is far worse than an alternative that matches nothing.
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_unreachable()
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"],
+            "mget * * /ping4|ping6|sys/ /PING.icmpState|SNMP.snmpState/ value /down/",
+        )
+
+    @patch("requests.Session.get")
+    def test_get_unreachable_can_search_every_child(self, session_mock: MagicMock):
+        # For a site whose children are named differently.  '*' is the
+        # wildcard rather than a pattern, so it must reach AKiPS bare: wrapped
+        # in slashes it would be a regex with nothing to repeat.
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_unreachable(children="*")
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"],
+            "mget * * * /PING.icmpState|SNMP.snmpState/ value /down/",
+        )
+
+    @patch("requests.Session.get")
+    def test_get_unreachable_takes_a_custom_child_pattern(
+        self, session_mock: MagicMock
+    ):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_unreachable(children="icmp|sys")
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"],
+            "mget * * /icmp|sys/ /PING.icmpState|SNMP.snmpState/ value /down/",
+        )
+
+    @patch("requests.Session.get")
     def test_get_attributes(self, session_mock: MagicMock):
         r_text = """TH840-F cpu A10-AX-MIB.axSysAverageControlCpuUsage = 1
 TH840-F cpu A10-AX-MIB.axSysAverageCpuUsage = 1

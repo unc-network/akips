@@ -100,11 +100,13 @@ and after for each one.
   series database, and reading them with `mget` returns the gauge's scaling
   factor, which is the same for every device.
 - `get_ups_output_source()` — which UPS devices are not running on mains
-  power. Returns the abnormal sources by default (`bypass`, `battery`,
-  `booster`, `reducer`), since that is the list worth acting on; pass
-  `states=None` for every UPS whatever its state. Note this is the output
-  source rather than the battery's own health, which UPS-MIB reports
-  separately as `upsBatteryStatus`.
+  power. Returns every source but `normal` by default, since that is the list
+  worth acting on; pass `states=None` for every UPS whatever its state. That
+  includes `none`, a UPS delivering no output at all, and `other`, one that
+  cannot classify its own source — a UPS that cannot answer the question is
+  worth looking at for the same reason `unknown` is in the battery states.
+  Note this is the output source rather than the battery's own health, which
+  UPS-MIB reports separately as `upsBatteryStatus`.
 - `get_liebert_battery_test()` — the result of the last UPS battery self test,
   defaulting to failures only. The vendor is in the name deliberately:
   battery test results are not in the standard UPS-MIB, so this reads an
@@ -130,6 +132,14 @@ and after for each one.
 
 ### Changed
 
+- `get_unreachable()` searches the children AKiPS reports ping and SNMP state
+  under, `ping4|ping6|sys`, rather than every child of every device. The
+  wildcard it used made AKiPS walk the whole tree to return a handful of
+  lines: measured on a 16,000 device fleet it took 10.5s against 5.0s for the
+  named children, for the same rows, and it is usually the query a dashboard
+  runs most often. Pass `children='*'` for the old behavior, which is what a
+  site naming its children differently needs. **Breaking** for such a site,
+  which would otherwise see nothing reported down.
 - `get_unreachable()` reports `child` as the matched string. It was a one
   element tuple, the only field in that structure with a surprising type.
   **Breaking.**
