@@ -25,6 +25,30 @@ here, a breaking change means a 2.0.
 
 ### Added
 
+- `ro_password` and `rw_password` on the client, and each call now
+  authenticates as the account its API section requires. AKiPS ships two API
+  accounts and its sections do not all accept the same one: `api-script`
+  needs `api-rw`, `api-msg` needs `api-ro`, and `api-db` takes either. A
+  single client could therefore never reach the whole API, and callers had to
+  construct two of them and remember which was which.
+
+  ```py
+  api = AKIPS('akips.example.com', ro_password='...', rw_password='...')
+  ```
+
+  Where either account will do, the read only one is preferred. A section
+  needing an account whose password was not supplied raises
+  `AkipsCredentialError` before the request is made, naming the section, the
+  account and the argument to pass, rather than letting AKiPS reject it.
+  `call()` takes `user='ro'` or
+  `user='rw'` for the sections this module does not model and for a command
+  needing more rights than its section usually does.
+
+  `username` and `password` still work: with `api-ro` or `api-rw` they fill
+  that account, and with any other name that pair is used for every section,
+  which is how a custom AKiPS API account will work once AKiPS offers them.
+  Constructing a client with no password at all is now refused. **Breaking**
+  for that case, which could never have authenticated anyway.
 - Type annotations on every public method, and an `akips/py.typed` marker so
   consumers type checking their own code see real types instead of `Any`.
   The annotations are checked with mypy in CI, so what the marker promises is
@@ -52,6 +76,13 @@ here, a breaking change means a 2.0.
 - `get_unreachable()` reports `child` as the matched string. It was a one
   element tuple, the only field in that structure with a surprising type.
   **Breaking.**
+- `get_device()` is keyed by device name, keeping the parent, child and
+  attribute levels AKiPS stores its data in. It previously dropped the parent
+  level and put the device name back as a `"name"` key sitting beside the
+  child dictionaries, so the obvious loop over the result raised
+  `AttributeError` on that one entry, and a child named `name` would have
+  collided with it. Asking for one device now gives a dictionary with one key,
+  the same shape `get_devices()` and `get_attributes()` return. **Breaking.**
 - `get_device()` returns `None` when a response parses to nothing, instead of a
   dictionary holding only the name that was asked for, which a caller could not
   tell apart from a device that has no attributes. **Breaking.**
@@ -62,6 +93,12 @@ here, a breaking change means a 2.0.
 - `get_unreachable()` returns `None` when nothing is reported down. It was the
   only one of eleven methods returning an empty container rather than `None`.
   **Breaking.**
+- `get_msg()` renames two parameters: `time` becomes `period` and `type`
+  becomes `msg_type`. `type` shadowed a builtin and `time` a standard library
+  module, and `period` is what every other method here already calls a time
+  filter. The request AKiPS receives is unchanged; only the Python argument
+  names differ. **Breaking** for callers passing them by keyword, which is the
+  usual way. `get_msg()` shipped in 0.5.1, so the exposure is small.
 - Suppressing TLS warnings for `verify=False` is scoped to this client's own
   requests. It previously disabled urllib3 warnings for the whole process,
   silencing them for every other library in the calling application.
@@ -81,6 +118,11 @@ here, a breaking change means a 2.0.
 
 ### Fixed
 
+- `get_unreachable()` reports the earliest event start for a device that is
+  down on both ping and SNMP. Both branches overwrote the value before the
+  comparison meant to keep the earlier one ran, so it compared a value against
+  itself and whichever line arrived last won. The start time of an outage was
+  therefore arbitrary for any device failing both checks.
 - `get_msg()` no longer raises `IndexError` when a message line arrives before
   any header. It popped an empty list, failing the entire call.
 - `cmd()` validates its output format before making the request, so an

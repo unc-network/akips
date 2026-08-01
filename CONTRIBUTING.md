@@ -86,11 +86,16 @@ This will also create a virtual environment located in .venv.
 # Should report all files as 'unchanged'
 % black --check .
 All done! ✨ 🍰 ✨
-5 files would be left unchanged.
+11 files would be left unchanged.
 
 # Linter should report nothing (at this point)
-$ ruff check .
+% ruff check .
 All checks passed!
+
+# Type checker should report nothing.  The package ships a py.typed marker,
+# so its annotations are a promise to anyone type checking against it.
+% mypy
+Success: no issues found in 2 source files
 ```
 
 Unit tests should pass (once again we are testing on unchanged 'develop' branch at this point so everything should pass)
@@ -101,13 +106,22 @@ Unit tests should pass (once again we are testing on unchanged 'develop' branch 
 platform darwin -- Python 3.10.2, pytest-9.1.1, pluggy-1.6.0
 rootdir: /Users/wew/project/akips
 configfile: pyproject.toml
-collected 11 items
+collected 88 items
 
-tests/test_connection.py ..........                                      [ 90%]
-tests/test_import_akips.py .                                             [100%]
+tests/test_api_availability.py .....                                     [  5%]
+tests/test_api_db.py .......................                             [ 31%]
+tests/test_api_msg.py ......                                             [ 38%]
+tests/test_api_script.py .......                                         [ 46%]
+tests/test_call.py ...............                                       [ 63%]
+tests/test_credentials.py ............                                   [ 77%]
+tests/test_import_akips.py .                                             [ 78%]
+tests/test_transport.py ...................                              [100%]
 
-============================== 11 passed in 0.11s ==============================
+============================== 88 passed in 0.19s ==============================
 ```
+
+The test files mirror the API sections in `akips/__init__.py`, so a test for a
+new method belongs in the file for the section it calls.
 
 ## Create a branch for your work
 
@@ -119,7 +133,8 @@ Switched to a new branch 'my_cool_work'
 
 ## Make your changes pass the linters and tests
 
-At the end of your changes the linters and unit tests MUST all pass.
+At the end of your changes all four checks MUST pass.  These are the same four
+the pipeline runs, so anything failing here will fail there.
 
 ```console
 % cd {{ repo_base }}
@@ -129,9 +144,15 @@ At the end of your changes the linters and unit tests MUST all pass.
 # Fix any linting errors
 % ruff check .
 
+# Fix any typing errors
+% mypy
+
 # Unit tests
 % py.test tests
 ```
+
+If mypy complains about missing stubs for a dependency you added, the fix is
+usually to add the matching `types-*` package to the dev dependencies.
 
 ## Submit your PR to the akips repository
 
