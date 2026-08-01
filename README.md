@@ -74,7 +74,12 @@ api = AKIPS(
 If you use a custom AKiPS API account, pass `username` and `password` instead
 and that pair is used for every section.
 
-### List all devices (with an optional group filter)
+### List all devices, the inventory view (with an optional group filter)
+
+The same handful of fields for every device, present even when a device did not
+report one, so the result is a rectangle you can list or tabulate without
+checking each key. For everything a single device holds, see `get_device`
+below.
 
 ```py
 devices = api.get_devices(groups=['a10'])
@@ -94,10 +99,11 @@ The above code will output the text below.
                    'ip4addr': '192.168.30.25'}}
 ```
 
-### List all data for a specific device
+### List all data for a specific device, the deep dive
 
-Where `get_devices` gives the same fields for every device, `get_device` gives
-everything one device holds, which varies by device type.
+Every child and attribute one device holds, which varies by device type. Where
+`get_devices` above answers "what do I have", this answers "what is on this
+one".
 
 ```py
 device = api.get_device('TH840-A')
