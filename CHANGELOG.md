@@ -52,6 +52,13 @@ and after for each one.
   which is how a custom AKiPS API account will work once AKiPS offers them.
   Constructing a client with no password at all is now refused. **Breaking**
   for that case, which could never have authenticated anyway.
+- A warning when a call names an API section AKiPS does not publish, which is
+  usually a typo. `SECTION_USERS` now lists all ten documented sections, so it
+  serves as both the account mapping and the list of what exists. Unknown
+  sections are warned about rather than refused, because AKiPS may add
+  sections and `call()` exists so that reaching one need not wait for a
+  release here. Each section is warned about once per client, so a poll loop
+  does not fill a log.
 - `verify` accepts a path to a CA bundle as well as `True` or `False`, which
   requests has always supported but the annotation and documentation did not
   mention. This is how to trust a server whose certificate chain is missing an

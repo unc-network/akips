@@ -3,6 +3,7 @@ Tests for call(), the general purpose request, and for the response parsers
 it shares with the specific methods.
 """
 
+import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -127,6 +128,48 @@ class CallTest(unittest.TestCase):
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         for output in AKIPS.OUTPUT_FORMATS:
             self.assertIsNone(api.call("mget * * * *", output=output))
+
+    @patch("requests.Session.get")
+    def test_an_unknown_section_warns_but_still_runs(self, session_mock: MagicMock):
+        # A typo lands here, and so does a section AKiPS added after this
+        # release.  Refusing would mean the second case has to wait for a
+        # release, which is what call() exists to avoid.
+        session_mock.return_value.text = "some output"
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        with self.assertLogs("akips", level="WARNING") as logged:
+            result = api.call(section="api-mgs", params={"time": "last1h"})
+        self.assertEqual(result, "some output")
+        self.assertIn("api-mgs", logged.output[0])
+        # the message lists what is known, so a typo is obvious
+        self.assertIn("api-msg", logged.output[0])
+
+    @patch("requests.Session.get")
+    def test_an_unknown_section_is_only_warned_about_once(
+        self, session_mock: MagicMock
+    ):
+        # A caller legitimately using a newer section should not have its log
+        # filled by a poll loop
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        with self.assertLogs("akips", level="WARNING") as logged:
+            for _ in range(5):
+                api.call(section="api-brand-new", params={"a": "b"})
+        self.assertEqual(len(logged.output), 1)
+
+    @patch("requests.Session.get")
+    def test_known_sections_do_not_warn(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret", rw_password="rw-secret")
+        logger = logging.getLogger("akips")
+        with patch.object(logger, "warning") as warn:
+            for section in AKIPS.SECTION_USERS:
+                api.call(section=section, params={"a": "b"})
+            api.get_devices()
+            api.get_msg()
+        warn.assert_not_called()
 
 
 class ParserAgreementTest(unittest.TestCase):

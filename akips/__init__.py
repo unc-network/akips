@@ -53,14 +53,26 @@ class AKIPS:
             existing client, e.g. api.timeout = 60
     """
 
-    # The account each section requires.  None means either will do, in which
-    # case the read only account is preferred.  Sections absent from this
-    # table are treated as None; pass user= to call() to override.
+    # Every API section AKiPS publishes, mapped to the account it requires.
+    # None means either account will do, or that the requirement has not been
+    # confirmed, in which case the read only one is preferred.
+    #
+    # This doubles as the list of sections known to exist.  Calling one that
+    # is not here is warned about rather than refused, because AKiPS may add
+    # sections and waiting for a release here would defeat the point of
+    # call().  Each section is also disabled by default on the server, so a
+    # section listed here can still be rejected until it is enabled.
     SECTION_USERS: dict[str, str | None] = {
-        "api-db": None,
-        "api-script": "api-rw",
-        "api-msg": "api-ro",
         "api-availability": None,
+        "api-config-viewer": None,
+        "api-db": None,
+        "api-flow": None,
+        "api-flow-timeseries": None,
+        "api-http-log": None,
+        "api-msg": "api-ro",
+        "api-script": "api-rw",
+        "api-spm": None,
+        "api-unused-interfaces": None,
     }
 
     def __init__(
@@ -83,6 +95,10 @@ class AKIPS:
         self.server_timezone = timezone
         self.timeout = timeout
         self.session = requests.Session()
+        # Sections warned about already, so a caller legitimately using a
+        # section this release does not know about is told once rather
+        # than on every call
+        self._unknown_sections: set[str] = set()
 
         # A username other than the two built in accounts is used for every
         # section.  AKiPS does not offer custom API accounts yet, but this is
@@ -1215,6 +1231,19 @@ class AKIPS:
             requests.exceptions.RequestException: for HTTP request errors
         """
         server_url = f"https://{self.server}/{section}"
+
+        if section not in self.SECTION_USERS and section not in self._unknown_sections:
+            # Warned rather than refused: AKiPS may add sections, and call()
+            # exists so that reaching one does not have to wait for a release
+            # here.  A typo lands here too, which is the point.
+            self._unknown_sections.add(section)
+            logger.warning(
+                "Unknown AKiPS API section {!r}, continuing anyway in case "
+                "this server offers one this release does not know about.  "
+                "Known sections: {}".format(
+                    section, ", ".join(sorted(self.SECTION_USERS))
+                )
+            )
 
         # Work on a copy so credentials are never written into the dictionary
         # the caller passed in, and so params is optional as documented
