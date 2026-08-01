@@ -222,7 +222,11 @@ class AKIPS:
                 # A reply that parses to nothing is not found, rather than a
                 # device that happens to have no attributes
                 return None
-            logger.debug("Found device {} in akips".format(data))
+            logger.debug(
+                "Found device {} with {} children in akips".format(
+                    name, len(data.get(name, {}))
+                )
+            )
             return data
         return None
 
@@ -310,7 +314,6 @@ class AKIPS:
                     )
                 )
             logger.debug("Found {} devices in akips".format(len(data)))
-            logger.debug("data: {}".format(data))
             return data
         return None
 
@@ -370,10 +373,55 @@ class AKIPS:
     # not running on mains, which is what an operator wants to know about.
     UPS_ABNORMAL_OUTPUT_SOURCES = ("bypass", "battery", "booster", "reducer")
 
+    # Battery states other than batteryNormal.  'unknown' is included because
+    # a UPS that cannot report its own battery is worth looking at too.
+    UPS_ABNORMAL_BATTERY_STATES = ("unknown", "batteryLow", "batteryDepleted")
+
     # The attribute Liebert and Vertiv equipment reports battery test results
     # in.  Battery test results are not in the standard UPS-MIB, so every
     # vendor uses its own; this one is named in the method that reads it.
     LIEBERT_BATTERY_TEST_ATTRIBUTE = "LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult"
+
+    def get_ups_battery_status(
+        self,
+        states: tuple[str, ...] | list[str] | None = UPS_ABNORMAL_BATTERY_STATES,
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, Any]] | None:
+        """
+        Pull the UPS devices whose battery is not reporting as normal.
+
+        UPS-MIB reports the battery's own condition, separately from where the
+        UPS is drawing its output, which get_ups_output_source() reads.  By
+        default this returns only the states other than batteryNormal.
+
+        This is the battery's condition, not how long it would last.  AKiPS
+        keeps the numeric readings such as upsEstimatedMinutesRemaining in its
+        time series database rather than alongside these, so they come from
+        get_series() rather than from here.  Reading them with mget returns
+        the gauge's scaling factor, which is identical for every device.
+
+        Args:
+            states (list): battery states to report, defaulting to everything
+                except batteryNormal.  Pass None for every UPS whatever its
+                battery state
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to the parsed state, or None if no
+            device matched.  Each entry carries the enum fields described on
+            _parse_enum, where 'value' is the battery state and 'modified' is
+            when it last changed, plus the device 'name' and 'child'
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        return self._get_enum_attribute(
+            "UPS-MIB.upsBatteryStatus",
+            child="battery",
+            values=states,
+            group_filter=group_filter,
+            groups=groups,
+        )
 
     def get_ups_output_source(
         self,
@@ -1275,14 +1323,21 @@ class AKIPS:
             )
         return (required, password)
 
+    # Substrings that mark a name as holding a credential, whether it is a
+    # query parameter or an AKiPS attribute.  Matching loosely is deliberate:
+    # over redacting costs a value in a debug log, under redacting leaks one.
+    SENSITIVE_KEYS = ("password", "pass", "token", "secret", "key", "community")
+
+    @classmethod
+    def _is_sensitive_key(cls, name: str) -> bool:
+        """Whether a parameter or attribute name looks like it holds a credential."""
+        return any(s in name.lower() for s in cls.SENSITIVE_KEYS)
+
     def _redact_sensitive_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Return a copy of params with sensitive keys redacted from logging output."""
-        SENSITIVE_KEYS = ("password", "pass", "token", "secret", "key", "community")
-
-        def is_sensitive(k: str) -> bool:
-            return any(s in k.lower() for s in SENSITIVE_KEYS)
-
-        return {k: ("****" if is_sensitive(k) else v) for k, v in params.items()}
+        return {
+            k: ("****" if self._is_sensitive_key(k) else v) for k, v in params.items()
+        }
 
     def _redact_text(self, text: str, literals: bool = True) -> str:
         """
@@ -1303,6 +1358,17 @@ class AKIPS:
             The text with any credential replaced by '****'
         """
         text = re.sub(r"((?:password|passwd|pass)=)[^&\s]*", r"\1****", text)
+
+        # AKiPS keeps SNMP credentials as ordinary device attributes, so a
+        # reply to something as innocent as get_device carries the community
+        # string and the v3 auth and priv passwords.
+        def redact_attribute(match: "re.Match[str]") -> str:
+            if self._is_sensitive_key(match.group(2)):
+                return f"{match.group(1)}****"
+            return match.group(0)
+
+        text = re.sub(r"^(\S+\s\S+\s(\S+)\s=\s).*$", redact_attribute, text, flags=re.M)
+
         if literals:
             for secret in (self.password, self.ro_password, self.rw_password):
                 if secret:

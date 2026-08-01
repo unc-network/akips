@@ -177,3 +177,55 @@ class EnumAttributeParsingTest(unittest.TestCase):
             devices = api.get_ups_output_source()
         self.assertEqual(list(devices), ["ups-1"])
         warn.assert_not_called()
+
+
+class UpsBatteryStatusTest(unittest.TestCase):
+    @patch("requests.Session.get")
+    def test_defaults_to_the_states_worth_looking_at(self, session_mock: MagicMock):
+        session_mock.return_value.text = (
+            "172.29.214.24 battery UPS-MIB.upsBatteryStatus "
+            "= 3,batteryLow,1469649711,1785575463,\n"
+        )
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        devices = api.get_ups_battery_status()
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"],
+            "mget * * battery UPS-MIB.upsBatteryStatus "
+            "value /unknown|batteryLow|batteryDepleted/",
+        )
+        entry = devices["172.29.214.24"]
+        self.assertEqual(entry["value"], "batteryLow")
+        self.assertEqual(entry["child"], "battery")
+
+    @patch("requests.Session.get")
+    def test_no_states_means_every_ups(self, session_mock: MagicMock):
+        # Taken from an AKiPS command console
+        session_mock.return_value.text = (
+            "172.29.214.24 battery UPS-MIB.upsBatteryStatus "
+            "= 2,batteryNormal,1469649711,1469649711,\n"
+        )
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        devices = api.get_ups_battery_status(states=None)
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"],
+            "mget * * battery UPS-MIB.upsBatteryStatus",
+        )
+        self.assertEqual(devices["172.29.214.24"]["value"], "batteryNormal")
+
+    @patch("requests.Session.get")
+    def test_it_is_separate_from_the_output_source(self, session_mock: MagicMock):
+        # A UPS can be on battery while its battery reports normal, and can
+        # have a failing battery while running on mains, so these are two
+        # questions rather than one
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_ups_battery_status()
+        battery = session_mock.call_args.kwargs["params"]["cmds"]
+        api.get_ups_output_source()
+        source = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertIn("UPS-MIB.upsBatteryStatus", battery)
+        self.assertIn("UPS-MIB.upsOutputSource", source)
+        self.assertNotEqual(battery, source)

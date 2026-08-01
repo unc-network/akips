@@ -359,3 +359,45 @@ class TransportTest(unittest.TestCase):
                 api.get_devices()
         # the message is still scrubbed even though the attributes could not be
         self.assertNotIn("SuperSecret123", str(caught.exception))
+
+    @patch("requests.Session.get")
+    def test_snmp_credentials_are_not_logged(self, session_mock: MagicMock):
+        # AKiPS keeps SNMP credentials as ordinary device attributes, so a
+        # reply to something as innocent as get_device carries the community
+        # string and the v3 auth and priv passwords
+        session_mock.return_value.text = (
+            "dev1 sys ip4addr = 10.0.0.1\n"
+            "dev1 sys SNMP.community = not-a-real-community\n"
+            "dev1 sys SNMP.auth_password = not-a-real-auth-password\n"
+            "dev1 sys SNMP.priv_password = not-a-real-priv-password\n"
+            "dev1 sys SNMPv2-MIB.sysName = ups-1\n"
+        )
+
+        api = AKIPS("akips.example.com", ro_password="secret")
+        with self.assertLogs("akips", level="DEBUG") as logged:
+            device = api.get_device("dev1")
+        written = "\n".join(logged.output)
+
+        for secret in (
+            "not-a-real-community",
+            "not-a-real-auth-password",
+            "not-a-real-priv-password",
+        ):
+            self.assertNotIn(secret, written)
+        # anything not a credential is still there to debug with
+        self.assertIn("ups-1", written)
+        # and the caller still gets what it asked for
+        self.assertEqual(
+            device["dev1"]["sys"]["SNMP.community"], "not-a-real-community"
+        )
+
+    @patch("requests.Session.get")
+    def test_a_parsed_device_is_not_dumped_into_the_log(self, session_mock: MagicMock):
+        # get_device used to log the whole parsed structure, which is how the
+        # credentials reached the log even once the reply itself was filtered
+        session_mock.return_value.text = "dev1 sys SNMP.community = secret-string\n"
+
+        api = AKIPS("akips.example.com", ro_password="secret")
+        with self.assertLogs("akips", level="DEBUG") as logged:
+            api.get_device("dev1")
+        self.assertNotIn("secret-string", "\n".join(logged.output))

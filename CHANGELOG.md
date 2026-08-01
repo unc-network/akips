@@ -73,6 +73,13 @@ and after for each one.
   reach it.
 - `get_group_availability()` — availability statistics for a group over a time
   period, from the `api-availability` section.
+- `get_ups_battery_status()` — which UPS batteries are not reporting as
+  normal, defaulting to `unknown`, `batteryLow` and `batteryDepleted`. This is
+  the battery's own condition, which UPS-MIB reports separately from where the
+  UPS draws its output. Note that the numeric readings such as estimated
+  minutes remaining are not available this way: AKiPS keeps those in its time
+  series database, and reading them with `mget` returns the gauge's scaling
+  factor, which is the same for every device.
 - `get_ups_output_source()` — which UPS devices are not running on mains
   power. Returns the abnormal sources by default (`bypass`, `battery`,
   `booster`, `reducer`), since that is the list worth acting on; pass
@@ -170,6 +177,15 @@ and after for each one.
   Scrubbing can never mask the original failure: if an attribute turns out to
   be read only, the message is still cleaned and the original exception is
   still what reaches the caller.
+
+  SNMP credentials no longer reach the debug log either. AKiPS keeps them as
+  ordinary device attributes, so a reply to something as innocent as
+  `get_device()` carries the community string and the v3 auth and priv
+  passwords. Attribute values are now redacted wherever a reply is rendered
+  for logging, and `get_device()` and `get_unreachable()` no longer dump their
+  whole parsed result at debug level, which is how those values reached the
+  log even once the reply itself was filtered. The caller still receives the
+  real values; only what is logged changes.
 
   An error reply from AKiPS is also filtered before it is logged or raised.
   No AKiPS error seen so far echoes a credential back, so this is defence in
