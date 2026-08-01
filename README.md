@@ -284,6 +284,11 @@ but no rw_password was given to AKIPS()
 `AkipsCredentialError` subclasses both `AkipsError` and `ValueError`, so
 catching either of those still catches it.
 
+## Upgrading
+
+[MIGRATING.md](https://github.com/unc-network/akips/blob/develop/MIGRATING.md)
+covers what changes when moving to 1.0, with before and after for each one.
+
 ## API Documentation
 
 [API Documentation](https://unc-network.github.io/akips/docs/akips.html)

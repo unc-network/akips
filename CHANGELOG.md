@@ -23,6 +23,9 @@ Those corrections are breaking, and they are gathered here deliberately: better
 to face them once than to meet them one at a time across several releases. From
 here, a breaking change means a 2.0.
 
+**Upgrading:** see [MIGRATING.md](MIGRATING.md) for what to change, with before
+and after for each one.
+
 ### Added
 
 - `ro_password` and `rw_password` on the client, and each call now
