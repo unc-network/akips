@@ -73,6 +73,22 @@ and after for each one.
   reach it.
 - `get_group_availability()` — availability statistics for a group over a time
   period, from the `api-availability` section.
+- `get_latest_values()` — the most recent reading of a numeric attribute for
+  each device. Counters and gauges keep no reading in the config database that
+  `get_attributes()` reads; that holds their type definition, which is the same
+  for every device. The readings are in the time series database, so this asks
+  for a short series and keeps the last value in it.
+
+  ```py
+  api.get_latest_values('UPS-MIB.upsBatteryVoltage', child='battery')
+  ```
+
+  The final interval of a series is usually still being filled and comes back
+  empty, so the last column is not the answer; this returns the last column
+  that has a value, with when it was measured. Results are keyed by device and
+  child, because an attribute like interface utilisation has one reading per
+  interface. Values arrive already scaled by AKiPS, in the attribute's real
+  units.
 - `get_ups_battery_status()` — which UPS batteries are not reporting as
   normal, defaulting to `unknown`, `batteryLow` and `batteryDepleted`. This is
   the battery's own condition, which UPS-MIB reports separately from where the

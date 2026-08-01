@@ -669,6 +669,119 @@ class AKIPS:
             return csv_to_list
         return None
 
+    # The columns every cseries reply starts with, before the timestamps
+    SERIES_FIXED_COLUMNS = ("parent", "child", "child description", "attribute")
+
+    def get_latest_values(
+        self,
+        attribute: str,
+        device: str = "*",
+        child: str = "*",
+        period: str = "last1h",
+        time_interval: int = 300,
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, dict[str, Any]]] | None:
+        """
+        Pull the most recent reading of a numeric attribute for each device.
+
+        Numeric attributes do not hold a reading in the config database that
+        get_attributes() reads; that holds the counter or gauge definition,
+        which is the same for every device.  The readings live in the time
+        series database, so this asks for a short series and keeps the last
+        value in it.
+
+        The final interval of a series is usually still being filled and comes
+        back empty, so the last column is not the answer; this returns the
+        last column that has a value, along with when it was measured.  Values
+        are already scaled by AKiPS, so what comes back is in the attribute's
+        real units.
+
+        Supporting AKiPS command syntax:
+
+            cseries [interval total|avg {secs}] time {time filter}
+                {type} {parent regex} {child regex} {attribute regex}
+                [profile {profile name}] [any|all|not group {group name} ...]
+
+        Args:
+            attribute (str): the attribute to read
+            device (str): device name or pattern to match (default: '*')
+            child (str): child name or pattern to match (default: '*')
+            period (str): how far back to look (default: 'last1h').  It only
+                has to be long enough to contain one completed interval
+            time_interval (int): seconds per interval (default: 300)
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to child names to the reading, each
+            with 'value', 'time' and 'attribute'.  A device with no reading in
+            the period is present with a value of None rather than dropped.
+            None if nothing matched at all
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        params = {
+            "cmds": f"cseries interval avg {time_interval} time {period} "
+            f"* {device} {child} {attribute}"
+        }
+        if groups:
+            # [any|all|not group {group name} ...]
+            group_list = " ".join(groups)
+            params["cmds"] += f" {group_filter} group {group_list}"
+        text = self._get(params=params)
+        if not text:
+            return None
+
+        data: dict[str, dict[str, dict[str, Any]]] = {}
+        unreadable = []
+        rows = cast(list[dict[str, str]], self._parse_csv(text, header=True))
+        for row in rows:
+            parent = row.get("parent")
+            child_name = row.get("child")
+            if not parent or not child_name:
+                continue
+            # Everything after the fixed columns is a timestamped reading, in
+            # order, because the reader keeps the header's column order
+            readings = [
+                (column, value)
+                for column, value in row.items()
+                if column not in self.SERIES_FIXED_COLUMNS and value
+            ]
+            entry: dict[str, Any] = {
+                "attribute": row.get("attribute", attribute),
+                "value": None,
+                "time": None,
+            }
+            if readings:
+                column, value = readings[-1]
+                try:
+                    entry["value"] = float(value)
+                except ValueError:
+                    unreadable.append(f"{parent} {child_name} = {value}")
+                    continue
+                try:
+                    entry["time"] = pytz.timezone(self.server_timezone).localize(
+                        datetime.strptime(column, "%Y-%m-%d %H:%M")
+                    )
+                except ValueError:
+                    # A column heading in a shape this does not recognize is
+                    # not worth losing the reading over
+                    entry["time"] = None
+            data.setdefault(parent, {})[child_name] = entry
+
+        if unreadable:
+            logger.warning(
+                "Could not read {} of {} {} values from akips, those are "
+                "missing from the result.  First: {}".format(
+                    len(unreadable),
+                    len(unreadable) + len(rows),
+                    attribute,
+                    unreadable[0],
+                )
+            )
+        logger.debug("Found readings for {} devices".format(len(data)))
+        return data
+
     def get_aggregate(
         self,
         period: str = "last1h",
