@@ -391,12 +391,6 @@ class AKIPS:
         Note this is the output source, not the battery's own health, which
         UPS-MIB reports separately as upsBatteryStatus.
 
-        Supporting AKiPS command syntax:
-
-            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [descr {/regex/}] [value {text|integer|/regex/}]
-                [profile {profile name}] [any|all|not group {group name} ...]
-
         Args:
             states (list): output sources to report, defaulting to everything
                 except 'normal'.  Pass None for every UPS whatever its state
@@ -438,12 +432,6 @@ class AKIPS:
         returns nothing, which would otherwise read as good news.  Another
         vendor's equivalent attribute can be passed to reuse the same parsing
         and shape.
-
-        Supporting AKiPS command syntax:
-
-            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
-                [descr {/regex/}] [value {text|integer|/regex/}]
-                [profile {profile name}] [any|all|not group {group name} ...]
 
         Args:
             results (list): test results to report, defaulting to failures
@@ -1175,6 +1163,12 @@ class AKIPS:
         which the interesting answer is the enum's text value and when it last
         changed.  Filtering by value is done by AKiPS rather than here, so a
         fleet wide query does not fetch every device to discard most of them.
+
+        Supporting AKiPS command syntax:
+
+            mget {type} [{parent regex} [{child regex} [{attribute regex}]]]
+                [descr {/regex/}] [value {text|integer|/regex/}]
+                [profile {profile name}] [any|all|not group {group name} ...]
 
         Args:
             attribute (str): the attribute to read
