@@ -174,3 +174,8 @@ docs/upstream-akips-requests.md
 
 # generated documentation build directory, published by the docs workflow
 site/
+
+# scratch space for captured AKiPS output.  Device dumps include SNMP
+# community strings and v3 auth and priv passwords, so nothing here is
+# safe to commit to a public repository.
+tmp/
