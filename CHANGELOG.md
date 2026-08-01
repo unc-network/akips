@@ -118,6 +118,18 @@ here, a breaking change means a 2.0.
 
 ### Fixed
 
+- **Credentials no longer reach the log or a traceback when a request fails.**
+  AKiPS authenticates by query string, and requests reports the URL it was
+  fetching in its exception messages, so the password appeared in full. The
+  handler logged that message directly, and re-raised an exception still
+  carrying it, so it also landed in any traceback the caller rendered. Both
+  are scrubbed now. Anyone who has run a failing request against a previous
+  release should treat the AKiPS password in those logs as exposed and
+  rotate it.
+
+  One residual: an `HTTPError` also carries the response object, and
+  `response.url` still holds the query string it was fetched with. Avoid
+  logging that attribute directly.
 - `get_unreachable()` warns when it cannot parse a line instead of dropping it
   silently. That call is how a consumer learns what is broken, so a dropped
   line meant a device reported down was invisible, and under reporting an

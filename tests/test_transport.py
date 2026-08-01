@@ -203,3 +203,54 @@ class TransportTest(unittest.TestCase):
         api.timeout = 120
         api.get_devices()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 120)
+
+    @patch("requests.Session.get")
+    def test_request_failures_do_not_leak_the_password(self, session_mock: MagicMock):
+        # AKiPS authenticates by query string and requests reports the URL it
+        # was fetching, so an unscrubbed exception carries the password into
+        # the log and into any traceback the caller renders
+        secret = "SuperSecret123"
+        message = (
+            "HTTPSConnectionPool(host='akips.example.com', port=443): "
+            "Max retries exceeded with url: "
+            f"/api-db?cmds=mget&username=api-ro&password={secret}"
+        )
+        session_mock.side_effect = requests.exceptions.ConnectionError(message)
+
+        api = AKIPS("akips.example.com", ro_password=secret)
+        with self.assertLogs("akips", level="ERROR") as logged:
+            with self.assertRaises(requests.exceptions.ConnectionError) as caught:
+                api.get_devices()
+
+        self.assertNotIn(secret, "\n".join(logged.output))
+        self.assertNotIn(secret, str(caught.exception))
+        self.assertIn("password=****", str(caught.exception))
+        # the exception type survives scrubbing, so existing handlers still work
+        self.assertIsInstance(caught.exception, requests.exceptions.ConnectionError)
+
+    @patch("requests.Session.get")
+    def test_a_url_encoded_password_is_scrubbed_too(self, session_mock: MagicMock):
+        # requests percent encodes the query, so the literal password does not
+        # appear; matching on the parameter catches it whatever it looks like
+        secret = "p@ss word/99"
+        session_mock.side_effect = requests.exceptions.ConnectionError(
+            "Max retries exceeded with url: /api-db?password=p%40ss+word%2F99&cmds=x"
+        )
+
+        api = AKIPS("akips.example.com", ro_password=secret)
+        with self.assertLogs("akips", level="ERROR") as logged:
+            with self.assertRaises(requests.exceptions.ConnectionError):
+                api.get_devices()
+        self.assertNotIn("p%40ss", "\n".join(logged.output))
+        self.assertIn("password=****", "\n".join(logged.output))
+
+    @patch("requests.Session.get")
+    def test_an_error_with_no_credentials_is_left_intact(self, session_mock: MagicMock):
+        # Nothing to scrub means the exception keeps its original structure
+        session_mock.side_effect = requests.exceptions.Timeout("timed out")
+
+        api = AKIPS("akips.example.com", ro_password="secret")
+        with self.assertLogs("akips", level="ERROR"):
+            with self.assertRaises(requests.exceptions.Timeout) as caught:
+                api.get_devices()
+        self.assertEqual(str(caught.exception), "timed out")

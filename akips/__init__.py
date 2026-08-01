@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev2"
+__version__ = "1.0.0.dev3"
 
 import csv
 import io
@@ -1094,6 +1094,46 @@ class AKIPS:
 
         return {k: ("****" if is_sensitive(k) else v) for k, v in params.items()}
 
+    def _redact_text(self, text: str) -> str:
+        """
+        Remove credentials from arbitrary text before it is logged or raised.
+
+        Matching on the query parameter covers the value whatever it looks
+        like once URL encoded, and replacing the passwords this client holds
+        covers them appearing anywhere else.
+
+        Args:
+            text (str): text that may contain credentials
+        Returns:
+            The text with any credential replaced by '****'
+        """
+        text = re.sub(r"((?:password|passwd|pass)=)[^&\s]*", r"\1****", text)
+        for secret in (self.password, self.ro_password, self.rw_password):
+            if secret:
+                text = text.replace(secret, "****")
+        return text
+
+    def _scrub_exception(self, err: BaseException) -> None:
+        """
+        Strip credentials from an exception raised by requests, in place.
+
+        AKiPS authenticates by query string and requests puts the failing URL
+        in its exception messages, so an untouched exception carries the
+        password into any log line or traceback that renders it.  Rewriting
+        the arguments keeps the exception's type and traceback, which a
+        caller may be relying on, while making the text safe.
+
+        Note that an HTTPError also holds the response object, whose url
+        attribute still contains the query string it was fetched with.
+
+        Args:
+            err (BaseException): the exception to scrub, modified in place
+        """
+        original = str(err)
+        redacted = self._redact_text(original)
+        if redacted != original:
+            err.args = (redacted,)
+
     def _get(
         self,
         section: str = "api-db",
@@ -1157,17 +1197,14 @@ class AKIPS:
                     server_url, params=params, verify=self.verify, timeout=self.timeout
                 )
             r.raise_for_status()
-        except requests.exceptions.HTTPError as errh:
-            logger.error(errh)
-            raise
-        except requests.exceptions.ConnectionError as errc:
-            logger.error(errc)
-            raise
-        except requests.exceptions.Timeout as errt:
-            logger.error(errt)
-            raise
         except requests.exceptions.RequestException as err:
-            logger.error(err)
+            # One handler for every requests failure: HTTPError,
+            # ConnectionError and Timeout are all RequestException, and each
+            # was doing the same thing here.  The exception is scrubbed before
+            # it is logged or re-raised, because requests reports the URL it
+            # was fetching and AKiPS puts the password in that URL.
+            self._scrub_exception(err)
+            logger.error("AKiPS request failed: {}".format(err))
             raise
 
         # AKiPS can return a raw error message if something fails
