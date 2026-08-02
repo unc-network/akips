@@ -70,11 +70,24 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
         self.assertEqual(params["limit"], "25")
 
     @patch("requests.Session.get")
-    def test_get_msg_ignores_unknown_type(self, session_mock: MagicMock):
+    def test_get_msg_refuses_an_unknown_type(self, session_mock: MagicMock):
+        # This used to be dropped, so the request went out with no type at all
+        # and came back with both syslog and traps while the caller believed it
+        # had filtered to one.  Too much data reads as correct, so nothing ever
+        # revealed the typo.
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        for wrong in ("netflow", "traps", "Syslog", ""):
+            with self.assertRaises(ValueError) as caught:
+                api.get_msg(msg_type=wrong)
+            self.assertIn("syslog, trap", str(caught.exception))
+        self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.get")
+    def test_get_msg_without_a_type_asks_for_both(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
-        api.get_msg(msg_type="netflow")
+        api.get_msg()
         self.assertNotIn("type", session_mock.call_args.kwargs["params"])
 
     @patch("requests.Session.get")
@@ -182,3 +195,69 @@ second message
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0]["message"], "first message")
         self.assertEqual(messages[1]["ip_addr"], "10.4.2.27")
+
+
+class NamedMessageTypeTest(unittest.TestCase):
+    """
+    get_syslog and get_traps exist so the type does not have to be spelled
+    correctly to take effect.  A caller cannot mistype an enum it never types.
+    """
+
+    @patch("requests.Session.get")
+    def test_get_syslog_asks_for_syslog(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_syslog()
+        params = session_mock.call_args.kwargs["params"]
+        self.assertEqual(params["type"], "syslog")
+        self.assertEqual(params["time"], "last1h")
+
+    @patch("requests.Session.get")
+    def test_get_traps_asks_for_traps(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_traps()
+        self.assertEqual(session_mock.call_args.kwargs["params"]["type"], "trap")
+
+    @patch("requests.Session.get")
+    def test_every_filter_reaches_the_wrapped_call(self, session_mock: MagicMock):
+        # A wrapper that dropped filters would be a downgrade from get_msg,
+        # so both forward all of them.
+        session_mock.return_value.text = ""
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+
+        for method, expected in ((api.get_syslog, "syslog"), (api.get_traps, "trap")):
+            method(
+                period="last1d",
+                addr="192.0.2.1",
+                device="switch-1",
+                regex="link down",
+                limit=25,
+            )
+            params = session_mock.call_args.kwargs["params"]
+            self.assertEqual(params["type"], expected)
+            self.assertEqual(params["time"], "last1d")
+            self.assertEqual(params["addr"], "192.0.2.1")
+            self.assertEqual(params["device"], "switch-1")
+            self.assertEqual(params["regex"], "link down")
+            self.assertEqual(params["limit"], "25")
+
+    @patch("requests.Session.get")
+    def test_the_wrappers_parse_the_same_way(self, session_mock: MagicMock):
+        session_mock.return_value.text = "1436232275 syslog 4 192.0.2.26\nlink down\n"
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        rows = api.get_syslog()
+        self.assertEqual(rows[0]["type"], "syslog")
+        self.assertEqual(rows[0]["ip_addr"], "192.0.2.26")
+        self.assertEqual(rows[0]["message"], "link down")
+
+    @patch("requests.Session.get")
+    def test_the_wrappers_return_none_for_an_empty_reply(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        self.assertIsNone(api.get_syslog())
+        self.assertIsNone(api.get_traps())

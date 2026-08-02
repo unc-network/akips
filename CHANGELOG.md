@@ -118,6 +118,11 @@ and after for each one.
   changed rather than a raw string. These are the first callers of the enum
   parser, which had been kept unused pending evidence that the format
   generalized beyond ping and SNMP state; it does.
+- `get_syslog()` and `get_traps()` — the two message types by name, with every
+  filter `get_msg()` takes forwarded. `get_msg()` still reaches both at once,
+  but a caller wanting one type no longer has to spell it: an enum you never
+  type is an enum you cannot mistype, which is the failure `msg_type`
+  validation now catches from the other direction.
 - `get_device_availability()` and `get_event_availability()` — availability
   per device and child, and the up and down event pairs behind those totals.
   Both existed as commented-out `pass` stubs; they are implemented now that
@@ -204,6 +209,13 @@ and after for each one.
   filter. The request AKiPS receives is unchanged; only the Python argument
   names differ. **Breaking** for callers passing them by keyword, which is the
   usual way. `get_msg()` shipped in 0.5.1, so the exposure is small.
+- `get_msg()` raises `ValueError` for an `msg_type` other than `syslog`,
+  `trap` or `None`. It previously dropped an unrecognized value, so the
+  request went out with no type at all and came back with both syslog and
+  traps while the caller believed it had filtered to one. `msg_type='traps'`
+  or `'Syslog'` returned more data than asked for, which reads as correct and
+  so never revealed the typo. **Breaking** only for a caller already passing a
+  value that was silently doing nothing.
 - Suppressing TLS warnings for `verify=False` is scoped to this client's own
   requests. It previously disabled urllib3 warnings for the whole process,
   silencing them for every other library in the calling application.

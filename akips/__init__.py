@@ -1002,6 +1002,11 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # api-msg methods, these require the 'api-ro' user
 
+    # The message types AKiPS keeps, and what get_msg accepts.  None asks for
+    # both, which is what the api-msg section returns when the parameter is
+    # left off.
+    MSG_TYPES = ("syslog", "trap")
+
     # 'period' and 'msg_type' map to the AKiPS query parameters 'time' and
     # 'type'.  They are deliberately named apart from those, because 'type' is
     # a builtin and 'time' a standard library module, and because 'period' is
@@ -1025,21 +1030,49 @@ class AKIPS:
                 [addr={ip filter}];[type=syslog|trap];[device={name}|{regex}];
                 [regex={regex filter}];[limit={qty messages}]
 
+        This is the highest volume call here, and worth filtering.  Measured on
+        a 17,000 device fleet, an unfiltered 'last1h' returned 472,014 messages
+        in 5.5 seconds; the same hour asking only for traps returned 5,160 in
+        0.8 seconds.  Syslog is the bulk of it, and a single appliance can be a
+        large share of that on its own.  See get_traps() and get_syslog().
+
         Args:
-            period (str): Required, time period to retrieve messages from (default: 'last1h')
+            period (str): Required, time period to retrieve messages from
+                (default: 'last1h').  'lastNm' and 'lastNh' are rolling
+                windows of the length they name, measured back from the moment
+                of the call.  'lastNd' is calendar relative, meaning N-1 whole
+                days plus today so far, so 'last1d' is today rather than 24
+                hours; use 'last24h' for a rolling day
             addr (str): IP address to filter messages by (default: None)
-            msg_type (str): message type, 'syslog' or 'trap' (default: syslog and traps)
+            msg_type (str): message type, 'syslog' or 'trap', or None for both
+                (default: None).  See get_syslog() and get_traps(), which name
+                the type rather than asking a caller to spell it
             device (str): device name to filter messages by (default: None)
             regex (str): regex pattern to filter message content by (default: None)
-            limit (int): maximum number of messages to return (default: None)
+            limit (int): maximum number of messages to return (default: None).
+                AKiPS fills this from the start of the window, so it returns
+                the oldest matching messages rather than the newest, and there
+                is no ordering parameter to ask for the other end.  For recent
+                activity narrow 'period' instead: 'last15m' with no limit costs
+                far less than an hour of messages thrown away after the fact
         Returns:
-            A list of message values, or None if no data found
+            A list of dictionaries, each with 'time', 'type', 'ip_ver',
+            'ip_addr' and 'message', or None if no data found
         Raises:
+            ValueError: if msg_type is not 'syslog', 'trap' or None
             AkipsError: if the AKiPS server returns an error
         """
 
+        # Checked rather than quietly ignored.  An unrecognized type used to be
+        # dropped, so a caller asking for 'traps' or 'Syslog' was sent no type
+        # at all and got both back believing it had filtered to one.
+        if msg_type is not None and msg_type not in self.MSG_TYPES:
+            raise ValueError(
+                "Invalid msg_type provided to get_msg, expected one of {}, "
+                "or None for both".format(", ".join(self.MSG_TYPES))
+            )
         params = {"time": period}
-        if msg_type in ("syslog", "trap"):
+        if msg_type is not None:
             params["type"] = msg_type
         if addr:
             params["addr"] = addr
@@ -1094,6 +1127,103 @@ class AKIPS:
             logger.debug("Found {} messages in akips".format(len(data)))
             return data
         return None
+
+    def get_syslog(
+        self,
+        period: str = "last1h",
+        addr: str | None = None,
+        device: str | None = None,
+        regex: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, str]] | None:
+        """
+        Retrieve syslog messages, leaving traps out.
+
+        The same as get_msg(msg_type='syslog') with every other filter
+        forwarded, named so the type does not have to be spelled correctly to
+        take effect.
+
+        Syslog is the high volume half of api-msg: an unfiltered hour was
+        465,936 messages on a 17,000 device fleet, one appliance accounting
+        for a large share of it.  Pass a shorter period, a device or a regex
+        unless the whole of it is wanted.
+
+        Args:
+            period (str): time period to retrieve messages from
+                (default: 'last1h').  'lastNm' and 'lastNh' are rolling
+                windows of the length they name; 'lastNd' is calendar
+                relative, so 'last1d' is today rather than 24 hours
+            addr (str): IP address to filter messages by (default: None)
+            device (str): device name to filter messages by (default: None)
+            regex (str): regex pattern to filter message content by
+                (default: None)
+            limit (int): maximum number of messages to return (default: None).
+                This returns the oldest matching messages, not the newest;
+                narrow 'period' for recent activity
+        Returns:
+            A list of dictionaries, each with 'time', 'type', 'ip_ver',
+            'ip_addr' and 'message', or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        return self.get_msg(
+            period=period,
+            msg_type="syslog",
+            addr=addr,
+            device=device,
+            regex=regex,
+            limit=limit,
+        )
+
+    def get_traps(
+        self,
+        period: str = "last1h",
+        addr: str | None = None,
+        device: str | None = None,
+        regex: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, str]] | None:
+        """
+        Retrieve SNMP traps, leaving syslog out.
+
+        The same as get_msg(msg_type='trap') with every other filter
+        forwarded, named so the type does not have to be spelled correctly to
+        take effect.
+
+        Asking for traps is what makes this call cheap enough to poll: on a
+        17,000 device fleet an hour of traps was 5,160 messages against
+        472,014 for an unfiltered hour.
+
+        The body of a trap is a varbind list, one per line, as
+        '{module} {attribute} {instance} {type} {value}'.  It is returned as
+        the raw 'message' text; this does not split it up.
+
+        Args:
+            period (str): time period to retrieve messages from
+                (default: 'last1h').  'lastNm' and 'lastNh' are rolling
+                windows of the length they name; 'lastNd' is calendar
+                relative, so 'last1d' is today rather than 24 hours
+            addr (str): IP address to filter messages by (default: None)
+            device (str): device name to filter messages by (default: None)
+            regex (str): regex pattern to filter message content by
+                (default: None)
+            limit (int): maximum number of messages to return (default: None).
+                This returns the oldest matching messages, not the newest;
+                narrow 'period' for recent activity
+        Returns:
+            A list of dictionaries, each with 'time', 'type', 'ip_ver',
+            'ip_addr' and 'message', or None if no data found
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        return self.get_msg(
+            period=period,
+            msg_type="trap",
+            addr=addr,
+            device=device,
+            regex=regex,
+            limit=limit,
+        )
 
     # ---------------------------------------------------------------------------
     # api-availability methods, these require the 'api-ro' user
