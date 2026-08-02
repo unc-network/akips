@@ -247,3 +247,59 @@ class ParserAgreementTest(unittest.TestCase):
             api.get_device("TH840-A"),
             api.call("mget * TH840-A * *", output="attributes"),
         )
+
+
+class AttributeParserReportsWhatItCannotReadTest(unittest.TestCase):
+    """
+    The attribute parser backs get_devices, get_device, get_attributes, the UPS
+    helpers and call(output='attributes').  It used to drop a line it could not
+    match without a word, so every one of those would report less than AKiPS
+    sent with nothing to say so.
+    """
+
+    @patch("requests.Session.get")
+    def test_a_line_it_cannot_read_is_reported(self, session_mock: MagicMock):
+        session_mock.return_value.text = (
+            "dev1 sys SNMPv2-MIB.sysName = dev1\n"
+            "this line is not in the expected shape\n"
+            "dev1 sys ip4addr = 192.0.2.1\n"
+        )
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        with self.assertLogs("akips", level="WARNING") as logged:
+            data = api.get_attributes()
+        # what could be read is still returned
+        self.assertEqual(data["dev1"]["sys"]["ip4addr"], "192.0.2.1")
+        self.assertIn("Could not parse 1 of 3", logged.output[0])
+        self.assertIn("not in the expected shape", logged.output[0])
+
+    @patch("requests.Session.get")
+    def test_blank_lines_are_not_reported(self, session_mock: MagicMock):
+        # A reply ends with a newline, and blank padding is not the server
+        # saying something unreadable.  Warning on those would fire on every
+        # call ever made and teach callers to silence the logger.
+        session_mock.return_value.text = (
+            "\ndev1 sys SNMPv2-MIB.sysName = dev1\n\n\ndev1 sys ip4addr = 192.0.2.1\n\n"
+        )
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        logger = logging.getLogger("akips")
+        with patch.object(logger, "warning") as warn:
+            data = api.get_attributes()
+        warn.assert_not_called()
+        self.assertEqual(len(data["dev1"]["sys"]), 2)
+
+    @patch("requests.Session.get")
+    def test_an_attribute_with_no_value_is_not_unreadable(
+        self, session_mock: MagicMock
+    ):
+        # 'attr =' with nothing after it is a real attribute reporting nothing,
+        # which is None, not a line the parser failed on
+        session_mock.return_value.text = "dev1 Ethernet1 IF-MIB.ifAlias =\n"
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        logger = logging.getLogger("akips")
+        with patch.object(logger, "warning") as warn:
+            data = api.get_attributes()
+        warn.assert_not_called()
+        self.assertIsNone(data["dev1"]["Ethernet1"]["IF-MIB.ifAlias"])

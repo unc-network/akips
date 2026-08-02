@@ -2,6 +2,7 @@
 Tests for the api-db section: entities, groups, events and time series.
 """
 
+import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -544,6 +545,30 @@ class LabeledAggregateTest(unittest.TestCase):
             with self.assertRaises(ValueError) as caught:
                 api.get_aggregate(labeled=True)
         self.assertIn("epoch seconds", str(caught.exception))
+
+    def test_empty_intervals_are_padding_not_anomalies(self):
+        # A calendar relative period covers the whole day, so every interval
+        # after the current moment comes back empty.  That is the period doing
+        # what it says, and warning about it would fire on every such call all
+        # day until a consumer silenced the logger.
+        api, reply = self._api_returning("4,5,,,\n", self.WINDOW)
+        logger = logging.getLogger("akips")
+        with patch.object(api.session, "get", side_effect=reply):
+            with patch.object(logger, "warning") as warn:
+                points = api.get_aggregate(labeled=True)
+        warn.assert_not_called()
+        self.assertEqual([p["value"] for p in points], [4.0, 5.0, None, None, None])
+        # the empty ones keep their place on the axis
+        self.assertEqual(int(points[4]["time"].timestamp()), 1785682928 + 4 * 300)
+
+    def test_an_unreadable_value_is_quoted_in_the_warning(self):
+        # The value that provoked the warning has to appear in it.  An empty
+        # string used to be reported as 'First:' followed by nothing at all.
+        api, reply = self._api_returning("4,not-a-number,6\n", self.WINDOW)
+        with patch.object(api.session, "get", side_effect=reply):
+            with self.assertLogs("akips", level="WARNING") as logged:
+                api.get_aggregate(labeled=True)
+        self.assertIn("'not-a-number'", logged.output[0])
 
     def test_a_value_that_is_not_a_number_keeps_its_place(self):
         # Dropping it would shift every later point along the axis

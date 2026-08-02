@@ -24,7 +24,18 @@ to face them once than to meet them one at a time across several releases. From
 here, a breaking change means a 2.0.
 
 **Upgrading:** see [MIGRATING.md](MIGRATING.md) for what to change, with before
-and after for each one.
+and after for each one. Two are worth knowing before you read any further,
+because between them they account for most of the work:
+
+```py
+# get_device() is keyed by the device name, one more level than before
+device['sys']['ip4addr']                 # was
+device['TH840-A']['sys']['ip4addr']      # is
+
+# the client takes a password per account rather than one for all of them
+AKIPS('akips.example.com', password=pw)              # was
+AKIPS('akips.example.com', ro_password=pw)           # is
+```
 
 ### Added
 
@@ -129,9 +140,13 @@ and after for each one.
 
   A period covering several disjoint ranges, such as
   `'lastweek; mon to fri 8:00 to 17:00'`, raises `ValueError` rather than
-  drawing five weekday windows as one continuous axis. A value that is not a
-  number is kept with `None` rather than dropped, since dropping a point would
-  shift every later one along the axis.
+  drawing five weekday windows as one continuous axis. An interval with no
+  reading is kept with `None` rather than dropped, since dropping a point
+  would shift every later one along the axis — and a calendar relative period
+  produces a great many of those, `last1d` being the whole of today, so only
+  the elapsed intervals hold anything. Those are logged at debug rather than
+  warned about; the warning is reserved for a value that is present but not a
+  number, and names it.
 - `get_syslog()` and `get_traps()` — the two message types by name, with every
   filter `get_msg()` takes forwarded. `get_msg()` still reaches both at once,
   but a caller wanting one type no longer has to spell it: an enum you never
@@ -214,6 +229,14 @@ and after for each one.
   was `""` from `get_device()`, `None` from `get_attributes()`, and
   `get_devices()` dropped the line entirely, which could leave a device out of
   its own listing. **Breaking.**
+- The attribute parser reports lines it cannot read instead of dropping them
+  silently. It backs `get_devices()`, `get_device()`, `get_attributes()`, the
+  three UPS helpers and `call(output='attributes')`, so a reply carrying
+  something in an unexpected shape used to make all of them return less than
+  AKiPS sent with nothing to say so. Blank lines are still ignored, since that
+  is how a reply ends rather than the server saying something unreadable. This
+  brings it in line with `get_unreachable()`, `get_msg()` and
+  `get_latest_values()`, which already reported what they could not read.
 - Every method returns `None` for nothing found, on both paths that reach it.
   AKiPS usually sends an empty body when nothing matches, and that already
   gave `None` everywhere. A reply carrying content that parses to no rows did

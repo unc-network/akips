@@ -65,23 +65,6 @@ class AKIPS:
         api.call('tf span last24h')
         api.call('tf dump last1d')
 
-    Attributes:
-        server (str): The AKiPS server hostname or IP address
-        ro_password (str): password for the api-ro account
-        rw_password (str): password for the api-rw account
-        username (str): kept for callers who set it directly.  With 'api-ro'
-            or 'api-rw' the password given alongside fills that account; with
-            any other name, that pair is used for every section, which is how
-            to use a custom AKiPS API account
-        password (str): the password paired with username
-        verify (bool | str): Whether to verify TLS certificates (default:
-            True).  A path to a CA bundle can be given instead, which is
-            how to trust a server whose chain is missing an intermediate
-            without turning verification off entirely
-        server_timezone (str): Timezone of the AKiPS server (default: "America/New_York")
-        timeout (int): HTTP timeout in seconds applied to every call
-            (default: 30).  Assign to it to change the timeout of an
-            existing client, e.g. api.timeout = 60
     """
 
     # Every API section AKiPS publishes, mapped to the account it accepts, as
@@ -111,6 +94,9 @@ class AKIPS:
         "api-spm": "api-ro",
         "api-unused-interfaces": "api-ro",
     }
+    """Every API section AKiPS publishes, mapped to the account it accepts.
+    None marks a section taking either, where the read only account is
+    preferred.  Also the list of sections known to exist."""
 
     def __init__(
         self,
@@ -124,14 +110,29 @@ class AKIPS:
         rw_password: str | None = None,
     ) -> None:
         self.server = server
+        """The AKiPS server hostname or IP address."""
         self.username = username
+        """Kept for callers who set it directly.  With 'api-ro' or 'api-rw'
+        the password given alongside fills that account; with any other name
+        that pair is used for every section, which is how to use a custom
+        AKiPS API account."""
         self.password = password
+        """The password paired with username."""
         self.ro_password = ro_password
+        """Password for the api-ro account."""
         self.rw_password = rw_password
+        """Password for the api-rw account."""
         self.verify = verify
+        """Whether to verify TLS certificates.  A path to a CA bundle can be
+        given instead, which is how to trust a server whose chain is missing
+        an intermediate without turning verification off entirely."""
         self.server_timezone = timezone
+        """Timezone of the AKiPS server, used to read the epochs it sends."""
         self.timeout = timeout
+        """HTTP timeout in seconds applied to every call.  Assign to it to
+        change the timeout of an existing client, e.g. api.timeout = 60."""
         self.session = requests.Session()
+        """The requests session every call is made through."""
         # Sections warned about already, so a caller legitimately using a
         # section this release does not know about is told once rather
         # than on every call
@@ -275,6 +276,7 @@ class AKIPS:
     # exactly what this call must not miss, and an alternative that matches
     # nothing costs nothing.
     UNREACHABLE_CHILDREN = "ping4|ping6|sys"
+    """The children get_unreachable() searches, as a regex."""
 
     def get_unreachable(
         self, children: str = UNREACHABLE_CHILDREN
@@ -456,20 +458,21 @@ class AKIPS:
         "booster",
         "reducer",
     )
-
-    # The child the UPS itself is reported under, as against 'battery' for the
-    # battery attributes below.  Naming it keeps AKiPS from walking every
-    # child of every device, which is most of the cost of the query.
-    UPS_CHILD = "ups"
+    """Output sources get_ups_output_source() reports by default, being every
+    UPS-MIB source but normal, so every state that is not running on mains."""
 
     # Battery states other than batteryNormal.  'unknown' is included because
     # a UPS that cannot report its own battery is worth looking at too.
     UPS_ABNORMAL_BATTERY_STATES = ("unknown", "batteryLow", "batteryDepleted")
+    """Battery states get_ups_battery_status() reports by default, being
+    every UPS-MIB state but batteryNormal."""
 
     # The attribute Liebert and Vertiv equipment reports battery test results
     # in.  Battery test results are not in the standard UPS-MIB, so every
     # vendor uses its own; this one is named in the method that reads it.
     LIEBERT_BATTERY_TEST_ATTRIBUTE = "LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult"
+    """The attribute get_liebert_battery_test() reads.  Battery test results
+    are not in the standard UPS-MIB, so this one is vendor specific."""
 
     def get_ups_battery_status(
         self,
@@ -545,7 +548,11 @@ class AKIPS:
         """
         return self._get_enum_attribute(
             "UPS-MIB.upsOutputSource",
-            child=self.UPS_CHILD,
+            # The child the UPS itself is reported under, as against
+            # 'battery' for the battery attributes.  Naming it keeps AKiPS
+            # from walking every child of every device, which is most of the
+            # cost of the query.
+            child="ups",
             values=states,
             group_filter=group_filter,
             groups=groups,
@@ -783,9 +790,6 @@ class AKIPS:
             return csv_to_list
         return None
 
-    # The columns every cseries reply starts with, before the timestamps
-    SERIES_FIXED_COLUMNS = ("parent", "child", "child description", "attribute")
-
     def get_latest_values(
         self,
         attribute: str,
@@ -846,6 +850,8 @@ class AKIPS:
         if not text:
             return None
 
+        # The columns every cseries reply starts with, before the timestamps
+        fixed_columns = ("parent", "child", "child description", "attribute")
         data: dict[str, dict[str, dict[str, Any]]] = {}
         unreadable = []
         rows = cast(list[dict[str, str]], self._parse_csv(text, header=True))
@@ -859,7 +865,7 @@ class AKIPS:
             readings = [
                 (column, value)
                 for column, value in row.items()
-                if column not in self.SERIES_FIXED_COLUMNS and value
+                if column not in fixed_columns and value
             ]
             entry: dict[str, Any] = {
                 "attribute": row.get("attribute", attribute),
@@ -927,6 +933,13 @@ class AKIPS:
         which costs one extra request and is the only honest way to do it,
         since computing the axis here would be this module's clock rather than
         the server's.
+
+        An interval the server has no reading for comes back empty and is kept
+        with a value of None, so the points stay in step with the axis.  A
+        calendar relative period returns a great many of those: 'last1d' is the
+        whole of today, so at 300 seconds it is 288 intervals of which only the
+        elapsed ones hold anything, and the rest are timestamped into the
+        evening to come.  Use 'last24h' for a rolling day with data throughout.
 
         Supporting AKiPS command syntax:
 
@@ -1009,14 +1022,22 @@ class AKIPS:
         timezone = pytz.timezone(self.server_timezone)
         labeled = []
         unreadable = []
+        empty = 0
         for index, value in enumerate(values):
-            try:
-                reading: float | None = float(value)
-            except ValueError:
-                # Kept rather than dropped: leaving a point out would shift
-                # every one after it along the axis
-                reading = None
-                unreadable.append(value)
+            # Kept rather than dropped either way: leaving a point out would
+            # shift every one after it along the axis
+            reading: float | None = None
+            if not value.strip():
+                # An interval the server has no data for.  A calendar relative
+                # period such as 'last1d' covers the whole day, so every bucket
+                # after the current moment comes back empty; that is the period
+                # doing what it says rather than anything wrong with the reply
+                empty += 1
+            else:
+                try:
+                    reading = float(value)
+                except ValueError:
+                    unreadable.append(value)
             labeled.append(
                 {
                     "time": datetime.fromtimestamp(
@@ -1025,10 +1046,15 @@ class AKIPS:
                     "value": reading,
                 }
             )
+        if empty:
+            logger.debug(
+                "{} of {} aggregate intervals had no data, kept with a value "
+                "of None".format(empty, len(values))
+            )
         if unreadable:
             logger.warning(
                 "Could not read {} of {} aggregate values as numbers, those "
-                "points are kept with a value of None.  First: {}".format(
+                "points are kept with a value of None.  First: {!r}".format(
                     len(unreadable), len(values), unreadable[0][:100]
                 )
             )
@@ -1152,6 +1178,7 @@ class AKIPS:
     # both, which is what the api-msg section returns when the parameter is
     # left off.
     MSG_TYPES = ("syslog", "trap")
+    """The message types get_msg() accepts.  None asks for both."""
 
     # 'period' and 'msg_type' map to the AKiPS query parameters 'time' and
     # 'type'.  They are deliberately named apart from those, because 'type' is
@@ -1388,6 +1415,8 @@ class AKIPS:
     # 'the last day' and rendering the answer should not silently get a
     # five minute sample that reads as a reliable 100% every night.
     AVAILABILITY_PERIOD = "last24h"
+    """The period the availability methods use by default, a rolling 24
+    hours rather than 'last1d', which AKiPS reads as today so far."""
 
     def get_group_availability(
         self,
@@ -1651,6 +1680,7 @@ class AKIPS:
 
     # The reply shapes call() can parse, mapped to the parser for each
     OUTPUT_FORMATS = ("raw", "lines", "key_value", "attributes", "csv", "csv_dict")
+    """The reply shapes call() can parse."""
 
     def call(
         self,
@@ -1780,17 +1810,40 @@ class AKIPS:
             A nested dictionary of parent, child, attribute to value
         """
         data: dict[str, dict[str, dict[str, str | None]]] = {}
+        unparsed = []
         for line in text.split("\n"):
             match = re.match(r"^(\S+)\s(\S+)\s(\S+)\s=(\s(.*))?$", line)
-            if match:
-                parent, child, attribute = (
-                    match.group(1),
-                    match.group(2),
-                    match.group(3),
+            if not match:
+                # Blank lines are how the reply ends and are not a problem.
+                # Anything else is the server saying something this cannot
+                # read, and it must not vanish: every method built on this one
+                # would otherwise report less than AKiPS sent, with nothing to
+                # say so.
+                if line.strip():
+                    unparsed.append(line)
+                continue
+            parent, child, attribute = (
+                match.group(1),
+                match.group(2),
+                match.group(3),
+            )
+            data.setdefault(parent, {}).setdefault(child, {})[attribute] = match.group(
+                5
+            )
+        if unparsed:
+            logger.warning(
+                "Could not parse {} of {} attribute lines from akips, those "
+                "values are missing from the result.  First: {}".format(
+                    len(unparsed),
+                    len(unparsed)
+                    + sum(
+                        len(attributes)
+                        for children in data.values()
+                        for attributes in children.values()
+                    ),
+                    unparsed[0][:200],
                 )
-                data.setdefault(parent, {}).setdefault(child, {})[attribute] = (
-                    match.group(5)
-                )
+            )
         return data
 
     @staticmethod
@@ -1984,6 +2037,8 @@ class AKIPS:
     # query parameter or an AKiPS attribute.  Matching loosely is deliberate:
     # over redacting costs a value in a debug log, under redacting leaks one.
     SENSITIVE_KEYS = ("password", "pass", "token", "secret", "key", "community")
+    """Substrings marking a request parameter or AKiPS attribute whose value
+    is redacted from log output.  Extend it to redact more."""
 
     @classmethod
     def _is_sensitive_key(cls, name: str) -> bool:
