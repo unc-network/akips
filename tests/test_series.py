@@ -73,7 +73,7 @@ class LatestValuesTest(unittest.TestCase):
     @patch("requests.Session.get")
     def test_several_children_on_one_device_are_all_kept(self, session_mock: MagicMock):
         # Keyed by device and child, because an attribute like interface
-        # utilisation has one reading per interface and a flat key would keep
+        # utilization has one reading per interface and a flat key would keep
         # only the last
         session_mock.return_value.text = (
             "parent,child,child description,attribute,2026-08-01 12:54,2026-08-01 12:59\n"

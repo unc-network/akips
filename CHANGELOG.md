@@ -89,7 +89,7 @@ and after for each one.
   The final interval of a series is usually still being filled and comes back
   empty, so the last column is not the answer; this returns the last column
   that has a value, with when it was measured. Results are keyed by device and
-  child, because an attribute like interface utilisation has one reading per
+  child, because an attribute like interface utilization has one reading per
   interface. Values arrive already scaled by AKiPS, in the attribute's real
   units.
 - `get_ups_battery_status()` — which UPS batteries are not reporting as
@@ -118,6 +118,20 @@ and after for each one.
   changed rather than a raw string. These are the first callers of the enum
   parser, which had been kept unused pending evidence that the format
   generalized beyond ping and SNMP state; it does.
+- `get_aggregate(labeled=True)` — a time against each aggregate value, as a
+  list of `{'time', 'value'}` dictionaries with `time` timezone aware and
+  `value` a float. An aggregate arrives from AKiPS as bare numbers with no
+  timestamps, unlike the series commands, so this asks the server for the
+  window with `tf pairs` and spaces the values across it: one extra request,
+  and the only honest way to do it, since working the axis out here would use
+  this module's clock rather than the server's. The default is `False` and the
+  unlabeled call is unchanged, making one request as before.
+
+  A period covering several disjoint ranges, such as
+  `'lastweek; mon to fri 8:00 to 17:00'`, raises `ValueError` rather than
+  drawing five weekday windows as one continuous axis. A value that is not a
+  number is kept with `None` rather than dropped, since dropping a point would
+  shift every later one along the axis.
 - `get_syslog()` and `get_traps()` — the two message types by name, with every
   filter `get_msg()` takes forwarded. `get_msg()` still reaches both at once,
   but a caller wanting one type no longer has to spell it: an enum you never
@@ -200,9 +214,31 @@ and after for each one.
   was `""` from `get_device()`, `None` from `get_attributes()`, and
   `get_devices()` dropped the line entirely, which could leave a device out of
   its own listing. **Breaking.**
-- `get_unreachable()` returns `None` when nothing is reported down. It was the
-  only one of eleven methods returning an empty container rather than `None`.
-  **Breaking.**
+- Every method returns `None` for nothing found, on both paths that reach it.
+  AKiPS usually sends an empty body when nothing matches, and that already
+  gave `None` everywhere. A reply carrying content that parses to no rows did
+  not: thirteen methods returned an empty dict or list there, and only
+  `get_device()` returned `None`, so the promise each docstring makes held on
+  one path and not the other. **Breaking**, though only for callers relying on
+  the inconsistent path — any caller working today already handles the `None`
+  the common path has always returned.
+- `get_device()` takes `device` rather than `name`, and is now a call to
+  `get_attributes()` rather than a second copy of the same command. The two
+  built byte-identical requests and returned identical results, and this was
+  the only method in the API naming a device `name`. **Breaking** for callers
+  passing it by keyword.
+- `get_series()` documents that the list form is the CSV as sent, header row
+  included, so it has one row more than the dictionary form. The header is the
+  time axis — one column heading per interval — which is why the list form
+  keeps it and the dictionary form does not need it separately, those headings
+  being its keys. Not a behavior change; it was previously undocumented and
+  read as an off-by-one.
+- `get_aggregate()` takes `time_interval` as an `int` rather than `interval`
+  as a `str`, matching `get_series()` and `get_latest_values()`, which take
+  the same thing. It already accepted an `int` at runtime, so the annotation
+  now describes what it does; with `py.typed` shipped, the old one made
+  correct-looking code fail a type check beside its sibling calls.
+  **Breaking** for callers passing it by keyword.
 - `get_msg()` renames two parameters: `time` becomes `period` and `type`
   becomes `msg_type`. `type` shadowed a builtin and `time` a standard library
   module, and `period` is what every other method here already calls a time
@@ -219,7 +255,7 @@ and after for each one.
 - Suppressing TLS warnings for `verify=False` is scoped to this client's own
   requests. It previously disabled urllib3 warnings for the whole process,
   silencing them for every other library in the calling application.
-- `cmd()` is deprecated in favour of `call()`. It still works and still returns
+- `cmd()` is deprecated in favor of `call()`. It still works and still returns
   the reply unparsed, but now raises a `DeprecationWarning`. It will be removed
   in a future major release.
 - Each reply shape is now parsed in exactly one place, shared between the
@@ -267,7 +303,7 @@ and after for each one.
   real values; only what is logged changes.
 
   An error reply from AKiPS is also filtered before it is logged or raised.
-  No AKiPS error seen so far echoes a credential back, so this is defence in
+  No AKiPS error seen so far echoes a credential back, so this is defense in
   depth rather than an observed leak. Only the query parameter form is
   removed there, never the password as a literal, because a short password
   would otherwise rewrite matching characters anywhere in a reply.
@@ -282,7 +318,7 @@ and after for each one.
   and `index` were the same last writer wins; the ping line now wins all
   three, since it is the only one carrying an address.
 - `get_msg()` splits records on the blank line that terminates each one,
-  rather than by recognising header lines. A message body line can look
+  rather than by recognizing header lines. A message body line can look
   exactly like a header — `OSPF-MIB ospfNbrState 4 full` does — and turned one
   message into two, both with empty bodies. Records it cannot read are counted
   and warned about rather than dropped silently.

@@ -172,7 +172,9 @@ OSPF-MIB ospfRouterId 10.4.2.20 IPAddress 10.4.40.1
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         with self.assertLogs("akips", level="WARNING"):
-            self.assertEqual(api.get_msg(), [])
+            # a reply that parses to nothing is None, the same answer an empty
+            # reply gives, rather than an empty list
+            self.assertIsNone(api.get_msg())
 
     @patch("requests.Session.get")
     def test_blank_padding_between_records_is_ignored(self, session_mock: MagicMock):

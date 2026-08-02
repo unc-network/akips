@@ -21,6 +21,8 @@ bottom first.
 | `attributes["x"] == ""` | `attributes["x"] is None` |
 | `if api.get_unreachable() == {}` | `if api.get_unreachable() is None` |
 | `api.get_msg(time=..., type=...)` | `api.get_msg(period=..., msg_type=...)` |
+| `api.get_device(name=...)` | `api.get_device(device=...)` |
+| `api.get_aggregate(interval="300")` | `api.get_aggregate(time_interval=300)` |
 | `api.cmd("mget ...")` | `api.call("mget ...")` |
 
 ## Credentials
@@ -51,7 +53,7 @@ read data, `ro_password` alone is enough.
 all. Given any other name, that pair is used for every section, which is how to
 use a custom AKiPS API account.
 
-Two behaviours are new here:
+Two behaviors are new here:
 
 - Constructing a client with no password at all raises `AkipsCredentialError`.
   Such a client could never have authenticated, so this turns a confusing
@@ -248,3 +250,21 @@ traceback rendered when a request failed. AKiPS authenticates by query string,
 and the underlying HTTP library reports the URL it was fetching in its error
 messages. If you have ever seen a failed request from this client, treat that
 password as exposed.
+
+## Nothing found is always `None`
+
+Every method returned `None` when AKiPS sent an empty body, which is what
+happens when nothing matches. A reply carrying content that parsed to no rows
+was different: thirteen methods gave back an empty dict or list instead.
+
+Nothing to do if you already test the result before using it, which you had to
+for the common path anyway:
+
+```py
+devices = api.get_devices()
+if devices:
+    ...
+```
+
+Only code branching on the *kind* of emptiness is affected — `== {}` or `== []`
+no longer matches where it once did.

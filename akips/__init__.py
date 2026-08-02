@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev9"
+__version__ = "1.0.0.dev10"
 
 import csv
 import io
@@ -38,6 +38,32 @@ class AKIPS:
     api-script, api-msg and api-availability.  The rest are reached through
     call(), which sends a request to any section and parses the reply in the
     same shapes those methods use.
+
+    AKiPS stores data in three levels, a parent such as a device or user,
+    then a child such as an interface or 'sys', then an attribute.  What an
+    attribute's value means depends on its type, per the AKiPS API guide:
+
+        counter    always 1, so the value carries nothing
+        enum       '{integer},{text}', e.g. '2,down'
+        gauge      a scale factor, positive to multiply and negative to
+                   divide, not a reading
+        integer    a whole number, positive, negative or zero
+        RTT        microseconds, not milliseconds
+        text       up to 2000 characters
+        timestamp  seconds since the Unix epoch
+        uptime     seconds since the status last changed
+
+    Counters and gauges therefore come back from get_attributes() as their
+    definition rather than a reading; the readings are in the time series
+    database, which get_latest_values() and get_series() read.
+
+    Time filters are not all the same shape either.  'lastNm' and 'lastNh'
+    are rolling windows, while 'lastNd' is calendar relative, so 'last1d' is
+    today rather than 24 hours.  AKiPS will say which it means, since 'tf' is
+    one of the commands the read only account can run:
+
+        api.call('tf span last24h')
+        api.call('tf dump last1d')
 
     Attributes:
         server (str): The AKiPS server hostname or IP address
@@ -190,12 +216,16 @@ class AKIPS:
                 for child_attributes in children.values():
                     entry.update(child_attributes)
                 data[parent] = entry
+            # A reply that parses to nothing is nothing found, the same
+            # answer an empty reply gives, rather than an empty container
+            if not data:
+                return None
             logger.debug("Found {} devices in akips".format(len(data.keys())))
             return data
         return None
 
     def get_device(
-        self, name: str
+        self, device: str
     ) -> dict[str, dict[str, dict[str, str | None]]] | None:
         """
         Pull all configuration attributes for a single device.  The name is the
@@ -224,28 +254,18 @@ class AKIPS:
                 [profile {profile name}] [any|all|not group {group name} ...]
 
         Args:
-            name (str): The device name to retrieve
+            device (str): the AKiPS name of one device, exactly.  Unlike
+                get_attributes(), which takes a pattern, this identifies a
+                single device
         Returns:
             A dictionary of the device name to its child names to attribute
             names and values, or None if the device was not found
         Raises:
             AkipsError: if the AKiPS server returns an error
         """
-        params = {"cmds": f"mget * {name} * *"}
-        text = self._get(params=params)
-        if text:
-            data = self._parse_attributes(text)
-            if not data:
-                # A reply that parses to nothing is not found, rather than a
-                # device that happens to have no attributes
-                return None
-            logger.debug(
-                "Found device {} with {} children in akips".format(
-                    name, len(data.get(name, {}))
-                )
-            )
-            return data
-        return None
+        # This is get_attributes() with the filters left at their defaults, so
+        # it calls it rather than building the same command a second time.
+        return self.get_attributes(device=device)
 
     # The children ping and SNMP state are reported under.  Naming them saves
     # AKiPS walking every child of every device, which is most of the cost of
@@ -353,6 +373,10 @@ class AKIPS:
                         len(unparsed), len(unparsed) + len(data), unparsed[0][:200]
                     )
                 )
+            # A reply that parses to nothing is nothing found, the same
+            # answer an empty reply gives, rather than an empty container
+            if not data:
+                return None
             logger.debug("Found {} devices in akips".format(len(data)))
             return data
         return None
@@ -405,6 +429,10 @@ class AKIPS:
         text = self._get(params=params)
         if text:
             data = self._parse_attributes(text)
+            # A reply that parses to nothing is nothing found, the same
+            # answer an empty reply gives, rather than an empty container
+            if not data:
+                return None
             logger.debug("Found {} devices in akips".format(len(data.keys())))
             return data
         return None
@@ -605,6 +633,10 @@ class AKIPS:
                 device_name: groups_value.split(",")
                 for device_name, groups_value in self._parse_key_value(text).items()
             }
+            # A reply that parses to nothing is nothing found, the same
+            # answer an empty reply gives, rather than an empty container
+            if not data:
+                return None
             logger.debug(
                 "Found {} device and group mappings in akips".format(len(data.keys()))
             )
@@ -675,6 +707,10 @@ class AKIPS:
                         "details": match.group(7),
                     }
                     data.append(entry)
+            # A reply that parses to nothing is nothing found, the same
+            # answer an empty reply gives, rather than an empty container
+            if not data:
+                return None
             logger.debug(
                 "Found {} events of type {} in akips".format(len(data), event_type)
             )
@@ -710,7 +746,12 @@ class AKIPS:
             time_interval (int): interval in seconds for series data points (default: 60)
             device (str): device name or pattern to match (default: '*')
             attribute (str): attribute name or pattern to match (default: '*')
-            get_dict (bool): return each row as a dictionary (default: True)
+            get_dict (bool): return each row as a dictionary keyed by the
+                header row, rather than the CSV as sent (default: True).
+                The header carries one column heading per interval, which is
+                the time axis for the values under it.  As dictionaries those
+                headings are the keys; as lists the header is the first entry,
+                so the list form has one row more than the dictionary form
             group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
             groups (list): list of group names to filter by (if any)
         Returns:
@@ -726,9 +767,18 @@ class AKIPS:
             params["cmds"] += f" {group_filter} group {group_list}"
         text = self._get(params=params)
         if text:
-            # Rows as dictionaries keyed by the header row, or as plain lists
-            # with that header row kept as the first entry
+            # Rows as dictionaries keyed by the header row, or as the CSV as
+            # sent with that header kept as the first entry.  The header is
+            # the time axis, one column heading per interval, so the list form
+            # keeps it: without it the values underneath are readings with no
+            # timestamps.  The dictionary form does not need it separately
+            # because those headings became its keys.
             csv_to_list = self._parse_csv(text, header=get_dict)
+            data_rows = csv_to_list if get_dict else csv_to_list[1:]
+            if not data_rows:
+                # A header with nothing under it is an axis with no series on
+                # it, which is nothing found rather than a result
+                return None
             logger.debug("Found {} series entries".format(len(csv_to_list)))
             return csv_to_list
         return None
@@ -843,6 +893,8 @@ class AKIPS:
                     unreadable[0],
                 )
             )
+        if not data:
+            return None
         logger.debug("Found readings for {} devices".format(len(data)))
         return data
 
@@ -852,15 +904,29 @@ class AKIPS:
         device: str = "*",
         attribute: str = "*",
         operator: str = "avg",
-        interval: str = "300",
+        time_interval: int = 300,
         group_filter: str = "any",
         groups: list[str] | None = None,
-    ) -> list[str] | None:
+        labeled: bool = False,
+    ) -> list[str] | list[dict[str, Any]] | None:
         """
         Pull aggregate counter values over a period of time with optional filtering
         by device, attribute, and/or group membership.  Defaults to all devices
         and attributes over the last hour with average aggregation every 300 seconds.  Review
         AKiPS documentation for details on time filter syntax.
+
+        The aggregate collapses every matching device into a single series, so
+        unlike get_series() the reply says nothing about what was measured.
+        AKiPS sends no timestamps with it either, only the numbers, and there
+        is one more of them than there are intervals: an hour at 300 seconds
+        returns 13 values, not 12, the last of them landing on the end of the
+        window.
+
+        Pass labeled=True to get a time against each value.  That asks the
+        server for the window with 'tf pairs' and spaces the values across it,
+        which costs one extra request and is the only honest way to do it,
+        since computing the axis here would be this module's clock rather than
+        the server's.
 
         Supporting AKiPS command syntax:
 
@@ -873,16 +939,28 @@ class AKIPS:
             device (str): device name or pattern to match (default: '*')
             attribute (str): attribute name or pattern to match (default: '*')
             operator (str): aggregation operator, 'avg' or 'total seconds' (default: 'avg')
-            interval (str): interval in seconds for aggregation points (default: '300')
+            time_interval (int): seconds per aggregation point (default: 300).
+                Named to match get_series() and get_latest_values(), which
+                take the same thing
             group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
             groups (list): list of group names to filter by (if any)
+            labeled (bool): put a time against each value (default: False).
+                Adds a request, and needs a period covering one continuous
+                range; a filter such as 'lastweek; mon to fri 8:00 to 17:00'
+                is several disjoint ranges and cannot be one axis
         Returns:
-            A list of aggregate values, or None if no data found
+            A list of aggregate values, one more than the number of intervals,
+            or None if no data found.  With labeled=True, a list of
+            dictionaries with 'time' and 'value', where 'time' is timezone
+            aware in the server's timezone and 'value' is a float, or None
+            where the value was not a number
         Raises:
+            ValueError: if labeled is asked for and the period does not
+                describe one continuous range
             AkipsError: if the AKiPS server returns an error
         """
         params = {
-            "cmds": f"aggregate interval {operator} {interval} time {period} * {device} * {attribute}"
+            "cmds": f"aggregate interval {operator} {time_interval} time {period} * {device} * {attribute}"
         }
         if groups:
             group_list = " ".join(groups)
@@ -892,9 +970,69 @@ class AKIPS:
             # One CSV row of values, followed by a blank line
             rows = cast(list[list[str]], self._parse_csv(text))
             values = rows[0] if rows else []
+            if not values:
+                return None
             logger.debug("Found {} aggregate values".format(len(values)))
-            return values
+            if not labeled:
+                return values
+            return self._label_aggregate(values, period, time_interval)
         return None
+
+    def _label_aggregate(
+        self, values: list[str], period: str, time_interval: int
+    ) -> list[dict[str, Any]]:
+        """
+        Put a time against each value of an aggregate.
+
+        The bounds come from the server rather than from arithmetic here, so
+        the axis is the window AKiPS actually measured.  'tf pairs' answers
+        with '{start},{end}' in epoch seconds, one line per continuous range
+        within the filter.
+        """
+        text = self._get(params={"cmds": f"tf pairs {period}"})
+        ranges = self._parse_lines(text or "")
+        if len(ranges) != 1:
+            raise ValueError(
+                "Cannot label aggregate values for period {!r}: it describes "
+                "{} separate ranges, and a single time axis needs one".format(
+                    period, len(ranges)
+                )
+            )
+        try:
+            start_epoch, _end_epoch = (int(field) for field in ranges[0].split(","))
+        except ValueError:
+            raise ValueError(
+                "Could not read the window for period {!r} from {!r}; expected "
+                "'{{start}},{{end}}' in epoch seconds".format(period, ranges[0])
+            ) from None
+
+        timezone = pytz.timezone(self.server_timezone)
+        labeled = []
+        unreadable = []
+        for index, value in enumerate(values):
+            try:
+                reading: float | None = float(value)
+            except ValueError:
+                # Kept rather than dropped: leaving a point out would shift
+                # every one after it along the axis
+                reading = None
+                unreadable.append(value)
+            labeled.append(
+                {
+                    "time": datetime.fromtimestamp(
+                        start_epoch + index * time_interval, tz=timezone
+                    ),
+                    "value": reading,
+                }
+            )
+        if unreadable:
+            logger.warning(
+                "Could not read {} of {} aggregate values as numbers, those "
+                "points are kept with a value of None.  First: {}".format(
+                    len(unreadable), len(values), unreadable[0][:100]
+                )
+            )
+        return labeled
 
     # Low-level operations, kept for compatibility
 
@@ -931,6 +1069,13 @@ class AKIPS:
         AKiPS records additional IP addresses when found on devices, so this function
         can be used to find the primary device name (primary key) from any known IP address.
 
+        This is the one read in this module that a read only deployment cannot
+        perform.  AKiPS exposes it as a site script rather than a database
+        query, so it lives in api-script and needs rw_password even though it
+        changes nothing.  A client holding only ro_password raises
+        AkipsCredentialError rather than returning None, so a caller building
+        on it should not plan for a read only deployment.
+
         Supporting AKiPS site script function (which requires the api-rw user):
 
             web_find_device_by_ip(ipaddr)
@@ -965,7 +1110,8 @@ class AKIPS:
             web_manual_grouping(type, group, mode, device)
 
         Args:
-            device (str): device name to update
+            device (str): the AKiPS name of one device, exactly; this
+                takes no pattern
             group (str): group name to update
             mode (str): 'assign' to add device to group, 'clear' to remove device from group
         Returns:
@@ -1089,7 +1235,7 @@ class AKIPS:
             #     message line(s): {message text}
             #     blank terminating line
             #
-            # Records are split on that blank line rather than by recognising
+            # Records are split on that blank line rather than by recognizing
             # each header, because a body line can look exactly like a header
             # and would otherwise start a new record in the middle of a
             # message, turning one message into two with empty bodies.
@@ -1124,6 +1270,10 @@ class AKIPS:
                         unparsed, unparsed + len(data)
                     )
                 )
+            # A reply that parses to nothing is nothing found, the same
+            # answer an empty reply gives, rather than an empty container
+            if not data:
+                return None
             logger.debug("Found {} messages in akips".format(len(data)))
             return data
         return None
@@ -1340,10 +1490,10 @@ class AKIPS:
             report (str): 'ping4', 'ping6', 'snmp' or 'ifstatus', in any
                 combination, comma separated (default: 'ping4')
             device (str): device to filter by, as '{device}' or
-                '{device} {child}'.  This is the device's AKiPS name, its one
-                primary key, which is either its sysName or its IP address
-                depending on how the server names devices; get_device_by_ip()
-                resolves an address to it
+                '{device} {child}'.  This is the device's AKiPS name
+                exactly, its one primary key, which is either its sysName or
+                its IP address depending on how the server names devices, and
+                takes no pattern; get_device_by_ip() resolves an address to it
             group (str): group name to filter by
         Returns:
             A list of dictionaries, one per device and child, or None if
@@ -1364,6 +1514,11 @@ class AKIPS:
             "mode": "device",  # 'group', 'device' or 'events'
             "time": period,  # time filter, refer to programming guide
             "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
+            # 'entity' is not in the nm-availability syntax the AKiPS API
+            # guide publishes, which lists only mode, time, report, group and
+            # profile.  It works, and is how device and event mode are scoped
+            # here, but being undocumented it is the parameter most likely to
+            # change under us in a future AKiPS release.
             "entity": device,  # {device} [{child}] to filter by device or child
             "group": group,  # {group name} to filter by group
         }
@@ -1436,10 +1591,10 @@ class AKIPS:
             report (str): 'ping4', 'ping6', 'snmp' or 'ifstatus', in any
                 combination, comma separated (default: 'ping4')
             device (str): device to filter by, as '{device}' or
-                '{device} {child}'.  This is the device's AKiPS name, its one
-                primary key, which is either its sysName or its IP address
-                depending on how the server names devices; get_device_by_ip()
-                resolves an address to it
+                '{device} {child}'.  This is the device's AKiPS name
+                exactly, its one primary key, which is either its sysName or
+                its IP address depending on how the server names devices, and
+                takes no pattern; get_device_by_ip() resolves an address to it
             group (str): group name to filter by
         Returns:
             A list of dictionaries, one per up and down pair, or None if
@@ -1461,6 +1616,11 @@ class AKIPS:
             "mode": "events",  # 'group', 'device' or 'events'
             "time": period,  # time filter, refer to programming guide
             "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
+            # 'entity' is not in the nm-availability syntax the AKiPS API
+            # guide publishes, which lists only mode, time, report, group and
+            # profile.  It works, and is how device and event mode are scoped
+            # here, but being undocumented it is the parameter most likely to
+            # change under us in a future AKiPS release.
             "entity": device,  # {device} [{child}] to filter by device or child
             "group": group,  # {group name} to filter by group
         }
@@ -1770,6 +1930,8 @@ class AKIPS:
                     len(unparsed), len(unparsed) + len(data), attribute, unparsed[0]
                 )
             )
+        if not data:
+            return None
         logger.debug("Found {} devices reporting {}".format(len(data), attribute))
         return data
 
@@ -2014,7 +2176,7 @@ class AKIPS:
 
         # AKiPS can return a raw error message if something fails
         if re.match(r"^ERROR:", r.text):
-            # Defence in depth: no AKiPS error seen so far echoes a credential
+            # Defense in depth: no AKiPS error seen so far echoes a credential
             # back, but this text goes into a log and an exception message.
             # Only the query parameter form is removed, never the password as
             # a literal, because a short one would rewrite matching characters

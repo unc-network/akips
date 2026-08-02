@@ -294,7 +294,11 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         rows = api.get_series(get_dict=False)
+        # The header is kept, because its column headings are the timestamps
+        # for the values beneath them.  Drop it and the readings have no time
+        # axis at all.
         self.assertEqual(rows[0][0], "parent")
+        self.assertEqual(rows[0][4], "2024-02-21 09:10")
         self.assertEqual(rows[1][4], "4")
 
     @patch("requests.Session.get")
@@ -302,7 +306,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         session_mock.return_value.text = ""
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
-        api.get_aggregate(operator="total", interval="600")
+        api.get_aggregate(operator="total", time_interval=600)
         cmds = session_mock.call_args.kwargs["params"]["cmds"]
         self.assertTrue(cmds.startswith("aggregate interval total 600 "))
 
@@ -464,3 +468,91 @@ dev1 sys SNMPv2-MIB.sysContact = Networking
         ):
             self.assertIn(requested, entry)
         self.assertEqual(entry["SNMPv2-MIB.sysContact"], "Networking")
+
+
+class LabeledAggregateTest(unittest.TestCase):
+    """
+    An aggregate arrives as bare numbers, so labeling one means asking the
+    server where the window was rather than working it out from the clock here.
+    """
+
+    # Captured bounds for last1h: 3600 seconds, so 13 fenceposts at 300
+    WINDOW = "1785682928,1785686528\n"
+    VALUES = "4,5,6,7,8,9,10,11,12,13,14,15,16\n"
+
+    def _api_returning(self, *replies: str):
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        remaining = iter(replies)
+
+        def reply(*args, **kwargs):
+            response = MagicMock()
+            response.text = next(remaining)
+            response.ok = True
+            response.status_code = 200
+            return response
+
+        return api, reply
+
+    def test_unlabeled_is_unchanged_and_asks_once(self):
+        api, reply = self._api_returning(self.VALUES)
+        with patch.object(api.session, "get", side_effect=reply) as session_mock:
+            values = api.get_aggregate()
+        self.assertEqual(values[0], "4")
+        self.assertEqual(len(values), 13)
+        # no second request for the window when it is not needed
+        self.assertEqual(session_mock.call_count, 1)
+
+    def test_labeled_puts_a_time_against_each_value(self):
+        api, reply = self._api_returning(self.VALUES, self.WINDOW)
+        with patch.object(api.session, "get", side_effect=reply) as session_mock:
+            points = api.get_aggregate(labeled=True)
+        self.assertEqual(session_mock.call_count, 2)
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"], "tf pairs last1h"
+        )
+        self.assertEqual(len(points), 13)
+        self.assertEqual(points[0]["value"], 4.0)
+        # fenceposts, so the last value lands on the end of the window itself
+        self.assertEqual(points[0]["time"].timestamp(), 1785682928)
+        self.assertEqual(points[-1]["time"].timestamp(), 1785686528)
+        self.assertIsNotNone(points[0]["time"].tzinfo)
+
+    def test_the_axis_is_evenly_spaced_by_the_interval(self):
+        api, reply = self._api_returning(self.VALUES, self.WINDOW)
+        with patch.object(api.session, "get", side_effect=reply):
+            points = api.get_aggregate(labeled=True)
+        gaps = {
+            int(b["time"].timestamp() - a["time"].timestamp())
+            for a, b in zip(points, points[1:])
+        }
+        self.assertEqual(gaps, {300})
+
+    def test_a_period_of_several_ranges_is_refused(self):
+        # A discontinuous filter is not one axis, and pretending otherwise
+        # would draw five weekday windows as though they ran together
+        api, reply = self._api_returning(
+            self.VALUES, "1785124800,1785168000\n1785211200,1785254400\n"
+        )
+        with patch.object(api.session, "get", side_effect=reply):
+            with self.assertRaises(ValueError) as caught:
+                api.get_aggregate(period="lastweek", labeled=True)
+        self.assertIn("2 separate ranges", str(caught.exception))
+
+    def test_an_unreadable_window_is_refused(self):
+        api, reply = self._api_returning(self.VALUES, "not,epochs\n")
+        with patch.object(api.session, "get", side_effect=reply):
+            with self.assertRaises(ValueError) as caught:
+                api.get_aggregate(labeled=True)
+        self.assertIn("epoch seconds", str(caught.exception))
+
+    def test_a_value_that_is_not_a_number_keeps_its_place(self):
+        # Dropping it would shift every later point along the axis
+        api, reply = self._api_returning("4,nan-ish,6\n", self.WINDOW)
+        with patch.object(api.session, "get", side_effect=reply):
+            with self.assertLogs("akips", level="WARNING") as logged:
+                points = api.get_aggregate(labeled=True)
+        self.assertEqual(len(points), 3)
+        self.assertIsNone(points[1]["value"])
+        self.assertEqual(points[2]["value"], 6.0)
+        self.assertEqual(int(points[2]["time"].timestamp()), 1785682928 + 600)
+        self.assertIn("nan-ish", logged.output[0])
