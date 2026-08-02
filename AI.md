@@ -43,6 +43,15 @@ bugs, settles inconsistent return shapes, adds type annotations throughout, and
 ships a `py.typed` marker. Those are real changes to behavior that callers can
 observe, and they were drafted with AI assistance.
 
+It also grew the API. The client went from 12 public methods at 0.6.0 to 22,
+adding a generic `call()` reaching any API section, UPS battery and power
+helpers, a reader for the latest value of a numeric attribute, named forms of
+the syslog and trap queries, and the device and event availability calls that
+had sat as commented-out stubs since 2025. Those were drafted with AI
+assistance too. Each one was asked for by the maintainer, against a stated
+need from a consuming application, rather than proposed by the AI as an
+improvement in its own right.
+
 Two things make that a different activity from the AI writing the library:
 
 - The maintainer reviews every change before it is committed. Work is left in
@@ -51,24 +60,43 @@ Two things make that a different activity from the AI writing the library:
   point, including an earlier version of the configurable timeout that added a
   parameter to thirteen methods where one setting on the client was what was
   actually wanted.
-- The changes land against a test suite that grew from 11 tests to 59 while
-  covering them, alongside ruff, black, and mypy. Where a fix altered an
-  existing contract, the test asserting the old behavior was written first, so
-  the change had to break a test on purpose rather than pass unnoticed.
+- The changes land against a test suite that grew from 11 tests in 3 files to
+  167 in 12 while covering them, alongside ruff, black, and mypy. Where a fix
+  altered an existing contract, the test asserting the old behavior was written
+  first, so the change had to break a test on purpose rather than pass
+  unnoticed.
+- Behavior was verified against a live AKiPS server, not only against tests. A
+  consuming application exercised each pre-release build against a fleet of
+  roughly 17,000 devices and reported back over ten rounds, which is how the
+  cost of a query, the meaning of a time filter, and the shape of a reply were
+  established. Several conclusions the AI had reached by reasoning were wrong
+  and were corrected by that measurement.
 
 ## How the collaboration works
 
 The maintainer poses a problem or asks for a review. The AI investigates,
 reports what it finds, and proposes options with trade-offs. The maintainer
-decides. Decisions made by the maintainer during this work have included
-staying on 0.6.0 rather than declaring 1.0.0, dropping Python 3.9 support,
-replacing the linter, and adding the pre-release publishing guard.
+decides. Decisions taken by the maintainer during this work have included
+declaring 1.0.0 rather than continuing on 0.6.x, dropping Python 3.9 support,
+replacing the linter, adding the pre-release publishing guard, keeping an
+unused helper that looked like dead code, declining to split the module into
+several files, and deferring trap parsing to a later release rather than
+freezing a shape on one fleet's evidence.
 
 Where a proposal was wrong or incomplete, it was corrected before landing.
+Some of those corrections came from the maintainer catching a regression in
+review: an AI change removed the header row from one of `get_series()`'s two
+return shapes, on the grounds that the two disagreed by a row, and the
+maintainer pointed out that the header carries the timestamps and that
+dropping it would leave the readings with no time axis. That change was
+reverted and the behavior documented instead.
+
 Claims of fact are checked against primary sources rather than asserted from
 memory: advisories are confirmed with `pip-audit` against the actual lock file,
-action runtimes are read from the actions' own manifests, and shell logic
-embedded in workflows is extracted and executed locally before being committed.
+action runtimes are read from the actions' own manifests, shell logic embedded
+in workflows is extracted and executed locally before being committed, and
+statements about AKiPS behavior are checked against the vendor's own API guide
+or measured against a running server.
 
 Every AI-assisted change passes the same gates as any other change: ruff, black,
 mypy, and the full pytest matrix.
@@ -104,7 +132,16 @@ $ git log --grep="Co-Authored-By: Claude"
   cannot pass silently.
 - AI does not publish releases. Publishing is gated behind CI checks and a
   human merge to `main`.
-- Credentials and secrets are never shared with AI tooling.
+- No credential reaches the repository, in source, tests, documentation or
+  commit messages. Server passwords live in the environment and are given to
+  the client at construction.
+- Test data is invented rather than captured. AKiPS stores SNMP community
+  strings and v3 authentication and privacy passwords as ordinary device
+  attributes, so a reply from a monitored network can carry credentials in
+  fields that look like any other. Real output is examined outside the
+  repository, for its shape, and fixtures are then written from scratch with
+  obviously fake values. Realism in a fixture is never worth a real value,
+  since a parser cannot tell the difference.
 - Anything an AI asserts about an external system, a version number, or a
   security advisory is verified against that system before it is acted on.
 

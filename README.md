@@ -50,9 +50,12 @@ api = AKIPS('akips.example.com', ro_password='something', rw_password='other')
 | API section | Account required | Methods |
 | --- | --- | --- |
 | `api-db` | either, prefers `api-ro` | most of the client |
-| `api-msg` | `api-ro` | `get_msg` |
+| `api-msg` | `api-ro` | `get_msg`, `get_syslog`, `get_traps` |
 | `api-script` | `api-rw` | `get_device_by_ip`, `set_group_membership` |
-| `api-availability` | either, prefers `api-ro` | `get_group_availability` |
+| `api-availability` | `api-ro` | `get_group_availability`, `get_device_availability`, `get_event_availability` |
+
+AKiPS publishes six further sections that this module does not wrap. `call()`
+reaches those too, choosing the account the same way.
 
 Asking for a call whose account has no password raises `AkipsCredentialError`
 before any request is made, naming what to pass.
@@ -64,12 +67,17 @@ api = AKIPS(
     'akips.example.com',
     ro_password='something',
     timeout=10,          # seconds, applied to every call, default 30
-    verify=False,        # skip TLS verification, for a self signed certificate
+    verify='/etc/ssl/certs/akips-ca.pem',   # or True, or False to skip checks
     timezone='America/New_York',   # how the server reports its timestamps
 )
 ```
 
 `timeout` can also be changed later with `api.timeout = 60`.
+
+`verify` takes a path to a CA bundle as well as `True` or `False`. A path is
+how to trust a server whose certificate chain is missing an intermediate,
+which is common on an internal deployment, without turning verification off
+everywhere.
 
 If you use a custom AKiPS API account, pass `username` and `password` instead
 and that pair is used for every section.
@@ -85,8 +93,6 @@ everything a single device holds, see `get_device` below.
 devices = api.get_devices(groups=['a10'])
 pprint.pp(devices, sort_dicts=True, width=120, indent=4)
 ```
-
-The above code will output the text below.
 
 ```text
 {   'TH840-A': {   'SNMPv2-MIB.sysDescr': 'Thunder Series Unified Application Service Gateway TH840 ACOS',
@@ -122,18 +128,47 @@ keyed by device name just as `get_devices` is.
 
 An attribute the device reported no value for is `None`.
 
+### What the values mean
+
+AKiPS gives every attribute a type, and the type decides how to read its
+value. A `1` usually means "this is a counter" rather than "the value is one",
+which is why several attributes in these examples read that way.
+
+| Type | Value | Example |
+| --- | --- | --- |
+| counter | always `1` | `1` |
+| gauge | a scaling factor, positive to multiply and negative to divide | `-2` |
+| enum | `{number},{text}` | `2,up` |
+| integer | a whole number | `100287` |
+| RTT | microseconds, not milliseconds | `430` |
+| text | up to 2000 characters | `Datacenter A` |
+| timestamp | seconds since the Unix epoch | `1406787487` |
+| uptime | seconds since the state last changed | `13095` |
+
+**Counters and gauges hold no reading here.** The configuration database these
+methods read holds their definition, which is identical on every device; a
+gauge's value is its scale, not a measurement. The readings are in the time
+series database, which `get_latest_values()` and `get_series()` read.
+
+An enum arrives from `mget` with two more fields, when it was created and when
+it last changed, which is where `'SNMP.snmpState': '2,up,1581605551,1706545348,'`
+in the output above comes from. The UPS helpers parse that form for you.
+
 ### Lookup the AKiPS device key for a specific IP address
 
 ```py
 device_key = api.get_device_by_ip(ipaddr='192.168.20.15')
-pprint.pp(device_key, sort_dicts=True, width=120, indent=4)
+print(device_key)
 ```
-
-The above code will return the key used by AKiPS for the device with this IP.
 
 ```text
-'TH840-A'
+TH840-A
 ```
+
+This is the key AKiPS stores the device under, which is what every other method
+means by a device. Note it needs `rw_password`: AKiPS exposes the lookup as a
+site script rather than a database query, so it is the one read here that a
+read only client cannot make.
 
 ### Get attributes for a specific device and child
 
@@ -141,8 +176,6 @@ The above code will return the key used by AKiPS for the device with this IP.
 attributes = api.get_attributes(device="TH840-A", child="sys")
 pprint.pp(attributes, sort_dicts=True, width=120, indent=4)
 ```
-
-The above code will return the key used by AKiPS for the device with this IP.
 
 ```text
 {   'TH840-A': {   'sys': {   'SNMP.community': 'private',
@@ -172,14 +205,19 @@ The above code will return the key used by AKiPS for the device with this IP.
                               'mac_md5': 'a34558cd34432f618f5b29fb4376b5a2'}}}
 ```
 
+Note the `SNMP.community` in there. AKiPS stores SNMP community strings and v3
+authentication and privacy passwords as ordinary device attributes, so a reply
+like this one carries credentials in fields that look like any other. This
+module redacts them from its own debug logging, but anything you print, persist
+or forward is yours to handle. It is also why a captured reply should never
+become a test fixture without every value in it being replaced first.
+
 ### Get a specific attribute over all devices (with optional group filter)
 
 ```py
 attributes = api.get_attributes(attribute='SNMPv2-MIB.sysUpTime',groups=['a10'])
 pprint.pp(attributes, sort_dicts=True, width=120, indent=4)
 ```
-
-The above code will return the following data.
 
 ```text
 {   'TH840-A': {'sys': {'SNMPv2-MIB.sysUpTime': '1749494858,1759502176'}},
@@ -193,8 +231,6 @@ group_list = api.get_group_membership(groups=["a10"])
 pprint.pp(group_list, sort_dicts=True, width=120, indent=4)
 ```
 
-The above code will return the following data.
-
 ```text
 {   'TH840-A': ['A10', 'admin', 'Core-Routers', 'Not-Core', 'OpsCenter', 'Ungrouped', 'user '],
     'TH840-B': ['A10', 'admin', 'Core-Routers', 'Not-Core', 'OpsCenter', 'Ungrouped', 'user ']}
@@ -207,11 +243,106 @@ group_list = api.get_group_membership(device="TH840-A")
 pprint.pp(group_list, sort_dicts=True, width=120, indent=4)
 ```
 
-The above code will return the following data.
-
 ```text
 {'TH840-A': ['A10', 'admin', 'Core-Routers', 'Not-Core', 'OpsCenter', 'Ungrouped', 'user ']}
 ```
+
+### UPS power and battery
+
+Three helpers return only the UPS devices in a state worth acting on, rather
+than every UPS that reports the attribute.
+
+```py
+on_battery = api.get_ups_output_source()      # any source but 'normal'
+weak = api.get_ups_battery_status()           # any state but 'batteryNormal'
+failed = api.get_liebert_battery_test()       # failed self tests only
+pprint.pp(on_battery, sort_dicts=False, width=100)
+```
+
+```text
+{'ups-1': {'number': '5',
+           'value': 'battery',
+           'description': '',
+           'created': datetime.datetime(2016, 7, 27, 16, 1, 51, tzinfo=<DstTzInfo 'America/New_York' ...>),
+           'modified': datetime.datetime(2026, 7, 1, 4, 57, 1, tzinfo=<DstTzInfo 'America/New_York' ...>),
+           'name': 'ups-1',
+           'child': 'ups'}}
+```
+
+`modified` is when the UPS last changed state, which is worth reading: minutes
+old is an event, months old is usually an inventory problem rather than an
+outage.
+
+Numbers such as estimated runtime are not in the configuration database, for
+the reason under *What the values mean* above: a gauge there is a scale, not a
+measurement. Ask the time series database instead:
+
+```py
+runtime = api.get_latest_values('UPS-MIB.upsEstimatedMinutesRemaining',
+                                child='battery')
+```
+
+```text
+{'ups-1': {'battery': {'attribute': 'UPS-MIB.upsEstimatedMinutesRemaining',
+                       'value': 42.0,
+                       'time': datetime.datetime(2026, 8, 2, 12, 44, tzinfo=<DstTzInfo 'America/New_York' ...>)}}}
+```
+
+### Syslog and traps
+
+`get_msg()` returns both message types. `get_syslog()` and `get_traps()` are
+the same call with the type filled in, so it cannot be misspelled.
+
+```py
+traps = api.get_traps(period='last15m')
+syslog = api.get_syslog(period='last15m', device='TH840-A')
+pprint.pp(traps, sort_dicts=False, width=100)
+```
+
+```text
+[{'time': '1436232275',
+  'type': 'trap',
+  'ip_ver': '4',
+  'ip_addr': '192.0.2.26',
+  'message': 'IF-MIB linkDown 0 ENUM 2,down'}]
+```
+
+Ask for one type. On a large fleet an unfiltered hour can be hundreds of
+thousands of messages, almost all of it syslog, where the traps alone are a few
+thousand. Note also that `limit` fills from the *start* of the window, so it
+returns the oldest matches rather than the newest; for recent activity, narrow
+`period` instead.
+
+### Availability
+
+Three modes: a summary per group, a row per device and child, and the up and
+down events behind those totals.
+
+```py
+groups = api.get_group_availability()
+devices = api.get_device_availability(group='Datacenter-A')
+outages = api.get_event_availability(device='TH840-A', period='last7d')
+pprint.pp(groups, sort_dicts=False, width=100)
+```
+
+```text
+[{'child': 'ping4',
+  'attr': 'PING.icmpState',
+  'group name': 'Datacenter-A',
+  'total time': '86400',
+  'match time': '86372',
+  'group target': '9990',
+  'tf': 'last24h'}]
+```
+
+`match time` over `total time` is the availability, and `group target` is the
+figure AKiPS is configured to expect, in basis points, so `9990` is 99.90%.
+Reporting against that beats inventing a threshold of your own.
+
+Device and event mode return nothing at all unless scoped, so both require a
+`device` or a `group` and raise `ValueError` without one. All three default to
+`period='last24h'`, a rolling day; `last1d` would be *today so far*, which
+shrinks to minutes just after midnight.
 
 ### Anything else, with call()
 
