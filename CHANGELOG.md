@@ -127,12 +127,18 @@ and after for each one.
   in particular returns `down` and `up` where group mode returns `attr` and
   a group name.
 
-  `get_device_availability()` requires a `device` or a `group`. AKiPS answers
-  an unscoped device mode call with an empty body rather than an error, which
-  would arrive as `None` and read as "nothing to report", so it is refused
-  before the request is made. Whether events mode behaves the same way is not
-  confirmed, so an unscoped call there that comes back empty is logged rather
-  than refused.
+  Both require a `device` or a `group`. AKiPS answers an unscoped call in
+  either mode with an empty body rather than an error, which would arrive as
+  `None` and read as "nothing to report", so it is refused before the request
+  is made. Group mode is unaffected and still runs unscoped.
+
+  In events mode, `down` and `up` are epoch seconds bounding one outage, so a
+  device that flapped twice comes back as two rows, and the length of an
+  outage is `up` minus `down`. `total time` and `match time` describe the
+  measurement rather than the row they sit beside: every row in a reply shares
+  one `total time`, the length of the window, and a device's `match time` is
+  that less the time it spent down. Reading `total time` as the length of the
+  outage on its row would report the whole window for a one minute flap.
 
   Both return `group target`, the availability AKiPS is configured to expect,
   in basis points — `9890` is 98.90%. It is set per group, so a caller can

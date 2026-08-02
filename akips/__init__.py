@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev7"
+__version__ = "1.0.0.dev8"
 
 import csv
 import io
@@ -1234,11 +1234,26 @@ class AKIPS:
         cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         cisco-131-16-1,ping4,1603060380,1603060498,2389764,2388341
 
-        'down' and 'up' are epochs in the server's timezone, and both come
-        back empty for a device with no event pair in the window, which is
-        what a device that stayed up looks like.  These columns are not the
-        ones group or device mode returns, so the three modes are parsed
-        separately rather than sharing a field list.
+        'down' and 'up' are epoch seconds bounding a single outage, so a
+        device that went down twice comes back as two rows.  Both are empty
+        for a device that stayed up, which still reports the window it was
+        measured over.
+
+        Take the length of an outage as 'up' minus 'down'.  'total time' and
+        'match time' describe the measurement rather than the row they sit
+        beside: every row in a reply carries the same 'total time', the
+        length of the window, and a device's 'match time' is that less the
+        time it spent down.  Measured against a live server, a device with
+        outages of 44 and 46 seconds came back with a 'match time' 90 below
+        'total time' on both of its rows, while devices in the same reply
+        that stayed up had the two equal.
+
+        So 'total time' is not the length of the outage on its row.  Reading
+        it that way gives the whole measurement window as the duration of a
+        one minute flap.
+
+        These columns are not the ones group or device mode returns, so the
+        three modes are parsed separately rather than sharing a field list.
 
         Args:
             period (str): time filter, refer to the AKiPS programming guide
@@ -1253,8 +1268,17 @@ class AKIPS:
             A list of dictionaries, one per up and down pair, or None if
             nothing matched
         Raises:
+            ValueError: if neither device nor group is given
             AkipsError: if the AKiPS server returns an error
         """
+        # Same as device mode, confirmed against a server: without a scope the
+        # reply is empty rather than an error, which would arrive as None and
+        # read as 'no outages'
+        if device is None and group is None:
+            raise ValueError(
+                "get_event_availability needs a device or a group to scope it, "
+                "an unscoped call returns nothing at all"
+            )
         params = {
             "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
             "mode": "events",  # 'group', 'device' or 'events'
@@ -1278,15 +1302,6 @@ class AKIPS:
             csv_to_list = self._parse_csv(text, fieldnames=column_headers)
             logger.debug("Found {} entries".format(len(csv_to_list)))
             return cast("list[dict[str, str]]", csv_to_list)
-        if device is None and group is None:
-            # Device mode returns nothing at all unless it is scoped.  Whether
-            # this mode behaves the same way has not been confirmed against a
-            # server, so an empty unscoped reply is worth a word rather than
-            # being passed off as 'no outages'.
-            logger.warning(
-                "get_event_availability returned nothing for a call with no "
-                "device or group; pass one if that was not expected"
-            )
         return None
 
     # ---------------------------------------------------------------------------

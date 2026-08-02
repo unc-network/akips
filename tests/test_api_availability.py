@@ -2,7 +2,6 @@
 Tests for the api-availability section: availability statistics.
 """
 
-import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -207,28 +206,60 @@ cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         self.assertEqual(params["entity"], "cisco-131-16-1")
 
     @patch("requests.Session.get")
-    def test_get_event_availability_warns_when_unscoped_and_empty(
-        self, session_mock: MagicMock
-    ):
-        # Whether events mode needs a scope the way device mode does has not
-        # been confirmed against a server, so this says something rather than
-        # returning None as though there were no outages.
-        session_mock.return_value.text = ""
-
+    def test_get_event_availability_needs_a_scope(self, session_mock: MagicMock):
+        # Confirmed against a server to behave the same way device mode does:
+        # an unscoped call comes back empty rather than erroring, which would
+        # reach the caller as None and read as 'no outages'.
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
-        with self.assertLogs("akips", level="WARNING") as logged:
-            self.assertIsNone(api.get_event_availability())
-        self.assertIn("device or group", logged.output[0])
+        with self.assertRaises(ValueError) as caught:
+            api.get_event_availability()
+        self.assertIn("device or a group", str(caught.exception))
+        self.assertFalse(session_mock.called)
 
     @patch("requests.Session.get")
-    def test_get_event_availability_stays_quiet_when_scoped(
+    def test_get_event_availability_returns_none_for_empty_response(
         self, session_mock: MagicMock
     ):
         # A scoped call returning nothing is a real answer: no outages.
         session_mock.return_value.text = ""
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
-        logger = logging.getLogger("akips")
-        with patch.object(logger, "warning") as warn:
-            self.assertIsNone(api.get_event_availability(device="cisco-131-16-1"))
-        warn.assert_not_called()
+        self.assertIsNone(api.get_event_availability(device="cisco-131-16-1"))
+
+    @patch("requests.Session.get")
+    def test_get_event_availability_reports_each_outage_separately(
+        self, session_mock: MagicMock
+    ):
+        # Shaped after a live reply.  Two flaps on one device are two rows,
+        # and both carry the same totals: 'total time' is the measurement
+        # window, and 'match time' is that less the time spent down.  A
+        # device that stayed up has no pair and the two are equal.
+        #
+        # Reading 'total time' as the length of the outage on its row would
+        # report the whole window, a day and a half here, for a 44 second flap.
+        session_mock.return_value.text = (
+            "ap-a,ping4,1785658160,1785658204,120324,120234\n"
+            "ap-a,ping4,1785589638,1785589684,120324,120234\n"
+            "ap-b,ping4,,,120324,120324\n"
+        )
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        rows = api.get_event_availability(group="4-Some-Building")
+        self.assertEqual(len(rows), 3)
+
+        flapped = [row for row in rows if row["parent"] == "ap-a"]
+        durations = [int(row["up"]) - int(row["down"]) for row in flapped]
+        self.assertEqual(durations, [44, 46])
+        # the totals repeat across the device's rows rather than tracking them
+        self.assertEqual(flapped[0]["total time"], flapped[1]["total time"])
+        # and the shortfall in match time is the downtime, not one row's worth
+        self.assertEqual(
+            int(flapped[0]["total time"]) - int(flapped[0]["match time"]),
+            sum(durations),
+        )
+
+        stayed_up = rows[2]
+        self.assertEqual(stayed_up["down"], "")
+        self.assertEqual(stayed_up["total time"], stayed_up["match time"])
+        # every device in one reply is measured over the same window
+        self.assertEqual(stayed_up["total time"], flapped[0]["total time"])
