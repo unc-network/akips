@@ -199,8 +199,14 @@ class AKIPS:
     ) -> dict[str, dict[str, dict[str, str | None]]] | None:
         """
         Pull all configuration attributes for a single device.  The name is the
-        primary device key in AKiPS which might be an IP address or hostname
-        depending on your AKiPS settings.
+        device's AKiPS name, its one primary key, which is either its sysName
+        or its IP address depending on how the server is set to name devices.
+        It is assigned at discovery, but a server can be told to reassign
+        devices already discovered from the other source, and an operator can
+        change one by hand, so a caller storing these as identifiers of its own
+        should not assume they never change.  A device keyed by name still
+        carries its address as an attribute, and get_device_by_ip() resolves
+        an address back to the key.
 
         This is the deep dive: every child and attribute this device holds,
         which varies by device type.  For the same fields across every device,
@@ -1092,8 +1098,22 @@ class AKIPS:
     # ---------------------------------------------------------------------------
     # api-availability methods, these require the 'api-ro' user
 
+    # AKiPS has two kinds of time filter and they are easy to confuse.
+    # 'lastNd' is calendar relative: it means N-1 whole days plus today so
+    # far, so 'last1d' is today and measures minutes just after midnight.
+    # 'lastNh' and 'lastNm' are rolling windows of the length they name.
+    #
+    # These methods default to the rolling form.  An availability figure is a
+    # percentage of the window it was measured over, and a caller asking for
+    # 'the last day' and rendering the answer should not silently get a
+    # five minute sample that reads as a reliable 100% every night.
+    AVAILABILITY_PERIOD = "last24h"
+
     def get_group_availability(
-        self, period: str = "last1d", report: str = "ping4", group: str | None = None
+        self,
+        period: str = AVAILABILITY_PERIOD,
+        report: str = "ping4",
+        group: str | None = None,
     ) -> list[dict[str, str]] | None:
         """
         Retrieve availability statistics for a group of devices over a time period.
@@ -1106,6 +1126,21 @@ class AKIPS:
         ping4,PING.icmpState,1-Building-16,44541195,44540002,9990,last1w
         ping4,PING.icmpState,Accedian,1766635,1766635,9890,last1w;mon to sat 6:00 to 20:00
         ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00; sat 8:00 to 18:00
+
+        Args:
+            period (str): time filter, refer to the AKiPS programming guide
+                (default: 'last24h').  'lastNd' is calendar relative, meaning
+                N-1 whole days plus today so far, so 'last1d' is today rather
+                than 24 hours and shrinks to minutes just after midnight.
+                'lastNh' and 'lastNm' are rolling windows of the length they
+                name.  'total time' in the reply is the window measured
+            report (str): 'ping4', 'ping6', 'snmp' or 'ifstatus', in any
+                combination, comma separated (default: 'ping4')
+            group (str): group name to filter by, or every group
+        Returns:
+            A list of dictionaries, one per group, or None if nothing matched
+        Raises:
+            AkipsError: if the AKiPS server returns an error
         """
         params = {
             "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
@@ -1136,7 +1171,7 @@ class AKIPS:
 
     def get_device_availability(
         self,
-        period: str = "last1d",
+        period: str = AVAILABILITY_PERIOD,
         report: str = "ping4",
         device: str | None = None,
         group: str | None = None,
@@ -1167,12 +1202,18 @@ class AKIPS:
 
         Args:
             period (str): time filter, refer to the AKiPS programming guide
-                (default: 'last1d')
+                (default: 'last24h').  'lastNd' is calendar relative, meaning
+                N-1 whole days plus today so far, so 'last1d' is today rather
+                than 24 hours and shrinks to minutes just after midnight.
+                'lastNh' and 'lastNm' are rolling windows of the length they
+                name.  'total time' in the reply is the window measured
             report (str): 'ping4', 'ping6', 'snmp' or 'ifstatus', in any
                 combination, comma separated (default: 'ping4')
             device (str): device to filter by, as '{device}' or
-                '{device} {child}'.  This is the key AKiPS stores the device
-                under, which is not necessarily its sysName
+                '{device} {child}'.  This is the device's AKiPS name, its one
+                primary key, which is either its sysName or its IP address
+                depending on how the server names devices; get_device_by_ip()
+                resolves an address to it
             group (str): group name to filter by
         Returns:
             A list of dictionaries, one per device and child, or None if
@@ -1216,7 +1257,7 @@ class AKIPS:
 
     def get_event_availability(
         self,
-        period: str = "last1d",
+        period: str = AVAILABILITY_PERIOD,
         report: str = "ping4",
         device: str | None = None,
         group: str | None = None,
@@ -1257,12 +1298,18 @@ class AKIPS:
 
         Args:
             period (str): time filter, refer to the AKiPS programming guide
-                (default: 'last1d')
+                (default: 'last24h').  'lastNd' is calendar relative, meaning
+                N-1 whole days plus today so far, so 'last1d' is today rather
+                than 24 hours and shrinks to minutes just after midnight.
+                'lastNh' and 'lastNm' are rolling windows of the length they
+                name.  'total time' in the reply is the window measured
             report (str): 'ping4', 'ping6', 'snmp' or 'ifstatus', in any
                 combination, comma separated (default: 'ping4')
             device (str): device to filter by, as '{device}' or
-                '{device} {child}'.  This is the key AKiPS stores the device
-                under, which is not necessarily its sysName
+                '{device} {child}'.  This is the device's AKiPS name, its one
+                primary key, which is either its sysName or its IP address
+                depending on how the server names devices; get_device_by_ip()
+                resolves an address to it
             group (str): group name to filter by
         Returns:
             A list of dictionaries, one per up and down pair, or None if

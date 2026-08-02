@@ -78,7 +78,10 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_group_availability()
         params = session_mock.call_args.kwargs["params"]
-        self.assertEqual(params["time"], "last1d")
+        # A rolling 24 hours, not 'last1d'.  AKiPS reads 'lastNd' as N-1 whole
+        # days plus today so far, so the default would measure five minutes at
+        # 00:05 and report it as a confident 100%.
+        self.assertEqual(params["time"], "last24h")
         self.assertEqual(params["report"], "ping4")
         # No group means no filter; requests drops a None valued parameter
         self.assertIsNone(params["group"])
@@ -263,3 +266,29 @@ cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         self.assertEqual(stayed_up["total time"], stayed_up["match time"])
         # every device in one reply is measured over the same window
         self.assertEqual(stayed_up["total time"], flapped[0]["total time"])
+
+
+class AvailabilityPeriodTest(unittest.TestCase):
+    def test_all_three_methods_default_to_a_rolling_window(self):
+        # AKiPS reads 'lastNd' as N-1 whole days plus today so far, measured
+        # against a live server: at 09:50 'last1d' was 35,458s rather than
+        # 86,400s, and 'last7d' was 553,860s, six whole days plus today.  An
+        # availability percentage over a window that shrinks to minutes after
+        # midnight reads as a reliable 100% every night, so the default is the
+        # rolling form that means what its name says.
+        self.assertEqual(AKIPS.AVAILABILITY_PERIOD, "last24h")
+
+    @patch("requests.Session.get")
+    def test_the_default_reaches_every_availability_method(
+        self, session_mock: MagicMock
+    ):
+        session_mock.return_value.text = ""
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+
+        for call in (
+            lambda: api.get_group_availability(),
+            lambda: api.get_device_availability(group="4-Some-Building"),
+            lambda: api.get_event_availability(group="4-Some-Building"),
+        ):
+            call()
+            self.assertEqual(session_mock.call_args.kwargs["params"]["time"], "last24h")

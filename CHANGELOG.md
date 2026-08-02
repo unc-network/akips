@@ -127,7 +127,19 @@ and after for each one.
   in particular returns `down` and `up` where group mode returns `attr` and
   a group name.
 
-  Both require a `device` or a `group`. AKiPS answers an unscoped call in
+  All three availability methods default to `period='last24h'`, a rolling 24
+  hours, rather than `last1d`. AKiPS reads `lastNd` as N-1 whole days plus
+  today so far, so `last1d` is today rather than a day: measured against a
+  live server at 09:50 it was 35,458 seconds, and `last7d` was 553,860, six
+  whole days plus today. An availability percentage is a proportion of the
+  window it was measured over, so the old default shrank to minutes just
+  after midnight and would have read as a confident 100% every night with
+  nothing in the reply announcing it. `lastNh` and `lastNm` are rolling
+  windows of the length they name, and `total time` in every reply is the
+  window actually measured.
+
+  Both `get_device_availability()` and `get_event_availability()` require a
+  `device` or a `group`. AKiPS answers an unscoped call in
   either mode with an empty body rather than an error, which would arrive as
   `None` and read as "nothing to report", so it is refused before the request
   is made. Group mode is unaffected and still runs unscoped.
