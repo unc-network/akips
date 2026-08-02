@@ -117,7 +117,27 @@ and after for each one.
   Both return the parsed enum, so a caller gets the state and when it last
   changed rather than a raw string. These are the first callers of the enum
   parser, which had been kept unused pending evidence that the format
-  generalised beyond ping and SNMP state; it does.
+  generalized beyond ping and SNMP state; it does.
+- `get_device_availability()` and `get_event_availability()` — availability
+  per device and child, and the up and down event pairs behind those totals.
+  Both existed as commented-out `pass` stubs; they are implemented now that
+  the parameters and column shapes have been confirmed against a live
+  server. Each mode of `nm-availability` returns its own columns, so the
+  three are parsed separately rather than sharing a field list — events mode
+  in particular returns `down` and `up` where group mode returns `attr` and
+  a group name.
+
+  `get_device_availability()` requires a `device` or a `group`. AKiPS answers
+  an unscoped device mode call with an empty body rather than an error, which
+  would arrive as `None` and read as "nothing to report", so it is refused
+  before the request is made. Whether events mode behaves the same way is not
+  confirmed, so an unscoped call there that comes back empty is logged rather
+  than refused.
+
+  Both return `group target`, the availability AKiPS is configured to expect,
+  in basis points — `9890` is 98.90%. It is set per group, so a caller can
+  report against the target already agreed on the server instead of choosing
+  a threshold of its own.
 - `call()` — send a request to any API section and parse the reply in one of
   the shapes AKiPS replies in: `raw`, `lines`, `key_value`, `attributes`,
   `csv` or `csv_dict`. It replaces `cmd()`, which could only reach `api-db`

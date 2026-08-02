@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0.dev6"
+__version__ = "1.0.0.dev7"
 
 import csv
 import io
@@ -1134,36 +1134,160 @@ class AKIPS:
             return cast("list[dict[str, str]]", csv_to_list)
         return None
 
-    # Commented out for now till it can be fully tested.
-    # def get_device_availability(self, time="last1d", report="ping4", device=None):
-    #     """
-    #     Retrieve availability statistics for a device over a time period.
+    def get_device_availability(
+        self,
+        period: str = "last1d",
+        report: str = "ping4",
+        device: str | None = None,
+        group: str | None = None,
+    ) -> list[dict[str, str]] | None:
+        """
+        Retrieve availability statistics per device over a time period.
 
-    #     # output format: {parent},{child},{attr},{total time},{match time},{group target}
-    #     # example: nm-availability mode device time last1w report snmp,ping4 group Accedian
+        Where group mode summarises a whole group, this reports each device
+        and child separately, so a device checked by both ping and SNMP
+        appears on two rows.
 
-    #     accedian-131-2-7,ping4,PING.icmpState,136020,136020,9890
-    #     accedian-131-2-7,sys,SNMP.snmpState,136020,136020,9890
-    #     accedian-131-2-8,ping4,PING.icmpState,136020,136020,9890
-    #     accedian-131-2-8,sys,SNMP.snmpState,136020,136020,9890
-    #     accedian-131-2-9,ping4,PING.icmpState,136020,136020,9890
-    #     accedian-131-2-9,sys,SNMP.snmpState,136020,136020,9890
-    #     """
-    #     pass
+        A device or a group is required.  Unlike group mode, device mode
+        answers an unscoped call with an empty body rather than an error,
+        which would reach the caller as None and read as 'nothing to report'.
 
-    # Commented out for now till it can be fully tested.
-    # def get_event_availability(self, time="last1d", report="ping4", device=None):
-    #     """
-    #     Retrieve availability statistics for pairs of up/down events.
+        # output format: {parent},{child},{attr},{total time},{match time},{group target}
+        # example: nm-availability mode device time last1w report snmp,ping4 group Accedian
 
-    #     # output format: {parent},{child},{down},{up},{total time},{match_time}
-    #     # example: nm-availability mode events time last1M report ping4 entity cisco-131-16-1
+        accedian-131-2-7,ping4,PING.icmpState,136020,136020,9890
+        accedian-131-2-7,sys,SNMP.snmpState,136020,136020,9890
+        accedian-131-2-8,ping4,PING.icmpState,136020,136020,9890
+        accedian-131-2-8,sys,SNMP.snmpState,136020,136020,9890
 
-    #     cisco-131-16-1,ping4,1603822871,1603822916,2389764,2388341
-    #     cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
-    #     cisco-131-16-1,ping4,1603060380,1603060498,2389764,2388341
-    #     """
-    #     pass
+        'group target' is the availability AKiPS is configured to expect, in
+        basis points, so 9890 is 98.90% and 10000 is 100.00%.  It is set per
+        group, so a caller can report against the target already agreed on
+        the server rather than inventing a threshold of its own.
+
+        Args:
+            period (str): time filter, refer to the AKiPS programming guide
+                (default: 'last1d')
+            report (str): 'ping4', 'ping6', 'snmp' or 'ifstatus', in any
+                combination, comma separated (default: 'ping4')
+            device (str): device to filter by, as '{device}' or
+                '{device} {child}'.  This is the key AKiPS stores the device
+                under, which is not necessarily its sysName
+            group (str): group name to filter by
+        Returns:
+            A list of dictionaries, one per device and child, or None if
+            nothing matched
+        Raises:
+            ValueError: if neither device nor group is given
+            AkipsError: if the AKiPS server returns an error
+        """
+        # Checked before the request, so a call that could only ever come back
+        # empty fails as the mistake it is rather than as good news
+        if device is None and group is None:
+            raise ValueError(
+                "get_device_availability needs a device or a group to scope it, "
+                "an unscoped call returns nothing at all"
+            )
+        params = {
+            "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
+            "mode": "device",  # 'group', 'device' or 'events'
+            "time": period,  # time filter, refer to programming guide
+            "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
+            "entity": device,  # {device} [{child}] to filter by device or child
+            "group": group,  # {group name} to filter by group
+        }
+        text = self._get(section="api-availability", params=params)
+        if text:
+            # This endpoint sends no header row, so the column names come from
+            # here rather than from the reply.  They are not group mode's
+            # columns; each mode of nm-availability returns its own.
+            column_headers = [
+                "parent",
+                "child",
+                "attr",
+                "total time",
+                "match time",
+                "group target",
+            ]
+            csv_to_list = self._parse_csv(text, fieldnames=column_headers)
+            logger.debug("Found {} entries".format(len(csv_to_list)))
+            return cast("list[dict[str, str]]", csv_to_list)
+        return None
+
+    def get_event_availability(
+        self,
+        period: str = "last1d",
+        report: str = "ping4",
+        device: str | None = None,
+        group: str | None = None,
+    ) -> list[dict[str, str]] | None:
+        """
+        Retrieve the up and down event pairs behind a device's availability.
+
+        Where device mode gives the totals, this gives the outages that
+        produced them, one row per pair.
+
+        # output format: {parent},{child},{down},{up},{total time},{match time}
+        # example: nm-availability mode events time last1M report ping4 entity cisco-131-16-1
+
+        cisco-131-16-1,ping4,1603822871,1603822916,2389764,2388341
+        cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
+        cisco-131-16-1,ping4,1603060380,1603060498,2389764,2388341
+
+        'down' and 'up' are epochs in the server's timezone, and both come
+        back empty for a device with no event pair in the window, which is
+        what a device that stayed up looks like.  These columns are not the
+        ones group or device mode returns, so the three modes are parsed
+        separately rather than sharing a field list.
+
+        Args:
+            period (str): time filter, refer to the AKiPS programming guide
+                (default: 'last1d')
+            report (str): 'ping4', 'ping6', 'snmp' or 'ifstatus', in any
+                combination, comma separated (default: 'ping4')
+            device (str): device to filter by, as '{device}' or
+                '{device} {child}'.  This is the key AKiPS stores the device
+                under, which is not necessarily its sysName
+            group (str): group name to filter by
+        Returns:
+            A list of dictionaries, one per up and down pair, or None if
+            nothing matched
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        params = {
+            "maintenance": "off",  # 'on' or 'off', show/hide maintenance mode devices
+            "mode": "events",  # 'group', 'device' or 'events'
+            "time": period,  # time filter, refer to programming guide
+            "report": report,  # 'ping4', 'ping6', 'snmp', 'ifstatus'. Any combination, comma separated,
+            "entity": device,  # {device} [{child}] to filter by device or child
+            "group": group,  # {group name} to filter by group
+        }
+        text = self._get(section="api-availability", params=params)
+        if text:
+            # This endpoint sends no header row, so the column names come from
+            # here rather than from the reply
+            column_headers = [
+                "parent",
+                "child",
+                "down",
+                "up",
+                "total time",
+                "match time",
+            ]
+            csv_to_list = self._parse_csv(text, fieldnames=column_headers)
+            logger.debug("Found {} entries".format(len(csv_to_list)))
+            return cast("list[dict[str, str]]", csv_to_list)
+        if device is None and group is None:
+            # Device mode returns nothing at all unless it is scoped.  Whether
+            # this mode behaves the same way has not been confirmed against a
+            # server, so an empty unscoped reply is worth a word rather than
+            # being passed off as 'no outages'.
+            logger.warning(
+                "get_event_availability returned nothing for a call with no "
+                "device or group; pass one if that was not expected"
+            )
+        return None
 
     # ---------------------------------------------------------------------------
     # Generic operations, these reach any API section
