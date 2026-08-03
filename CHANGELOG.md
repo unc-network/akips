@@ -12,7 +12,7 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 > tags after the fact, by comparing the public API at each tag. They record the
 > user-visible changes but are not as detailed as entries written at the time.
 
-## [1.0.0] - unreleased
+## [1.0.0] - 2026-08-03
 
 The first release to commit to a stable API. Return shapes that disagreed with
 each other are settled, the public methods are annotated, and the package ships
@@ -607,7 +607,7 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...develop
+[1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/unc-network/akips/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/unc-network/akips/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/unc-network/akips/compare/v0.4.5...v0.5.0
