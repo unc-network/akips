@@ -12,10 +12,10 @@ from akips import AKIPS
 class ApiDbTest(unittest.TestCase):
     @patch("requests.Session.get")
     def test_get_devices(self, session_mock: MagicMock):
-        r_text = """192.168.1.29 sys ip4addr = 192.168.1.29
-192.168.1.29 sys SNMPv2-MIB.sysDescr = VMware ESXi 6.5.0 build-8294253 VMware Inc. x86_64
-192.168.1.29 sys SNMPv2-MIB.sysName = server.example.com
-192.168.1.30 sys ip4addr = 192.168.1.30
+        r_text = """203.0.113.29 sys ip4addr = 203.0.113.29
+203.0.113.29 sys SNMPv2-MIB.sysDescr = VMware ESXi 6.5.0 build-8294253 VMware Inc. x86_64
+203.0.113.29 sys SNMPv2-MIB.sysName = server.example.com
+203.0.113.30 sys ip4addr = 203.0.113.30
 """  # noqa
 
         session_mock.return_value.ok = True
@@ -24,22 +24,22 @@ class ApiDbTest(unittest.TestCase):
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         devices = api.get_devices()
-        self.assertEqual(devices["192.168.1.29"]["ip4addr"], "192.168.1.29")
+        self.assertEqual(devices["203.0.113.29"]["ip4addr"], "203.0.113.29")
         self.assertEqual(
-            devices["192.168.1.29"]["SNMPv2-MIB.sysDescr"],
+            devices["203.0.113.29"]["SNMPv2-MIB.sysDescr"],
             "VMware ESXi 6.5.0 build-8294253 VMware Inc. x86_64",
         )
         self.assertEqual(
-            devices["192.168.1.29"]["SNMPv2-MIB.sysName"], "server.example.com"
+            devices["203.0.113.29"]["SNMPv2-MIB.sysName"], "server.example.com"
         )
-        self.assertEqual(devices["192.168.1.30"]["ip4addr"], "192.168.1.30")
+        self.assertEqual(devices["203.0.113.30"]["ip4addr"], "203.0.113.30")
 
     @patch("requests.Session.get")
     def test_get_unreachable(self, session_mock: MagicMock):
-        r_text = """192.168.248.54 ping4 PING.icmpState = 1,down,1484685257,1657029502,192.168.248.54
-192.168.248.54 sys SNMP.snmpState = 1,down,1484685257,1657029499,
-CrN-082-AP ping4 PING.icmpState = 1,down,1605595895,1656331597,192.168.94.63
-CrN-082-AP ping4 PING.icmpState = 1,down,1641624705,1646101757,192.168.94.112
+        r_text = """203.0.113.54 ping4 PING.icmpState = 1,down,1484685257,1657029502,203.0.113.54
+203.0.113.54 sys SNMP.snmpState = 1,down,1484685257,1657029499,
+CrN-082-AP ping4 PING.icmpState = 1,down,1605595895,1656331597,203.0.113.63
+CrN-082-AP ping4 PING.icmpState = 1,down,1641624705,1646101757,203.0.113.112
 """  # noqa
         session_mock.return_value.ok = True
         session_mock.return_value.status_code = 200
@@ -47,15 +47,15 @@ CrN-082-AP ping4 PING.icmpState = 1,down,1641624705,1646101757,192.168.94.112
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         devices = api.get_unreachable()
-        self.assertEqual(devices["192.168.248.54"]["snmp_state"], "down")
-        self.assertEqual(devices["192.168.248.54"]["ping_state"], "down")
+        self.assertEqual(devices["203.0.113.54"]["snmp_state"], "down")
+        self.assertEqual(devices["203.0.113.54"]["ping_state"], "down")
         # child is the matched string; it used to be a one element tuple,
         # the only field in the structure with a surprising type.  For a device
         # down on both checks the ping line wins, so it does not depend on
         # which line the server happened to send last.
-        self.assertEqual(devices["192.168.248.54"]["child"], "ping4")
+        self.assertEqual(devices["203.0.113.54"]["child"], "ping4")
         self.assertEqual(devices["CrN-082-AP"]["child"], "ping4")
-        self.assertEqual(devices["192.168.248.54"]["index"], "1")
+        self.assertEqual(devices["203.0.113.54"]["index"], "1")
 
     @patch("requests.Session.get")
     def test_get_unreachable_names_the_children_it_searches(
@@ -136,9 +136,9 @@ TH840-F Ethernet1 IF-MIB.ifPhysAddress = 001fa008d411
 
     @patch("requests.Session.get")
     def test_get_group_membership(self, session_mock: MagicMock):
-        r_text = """10.10.10.146 = admin,Cisco,maintenance_mode,Not-Core,OpsCenter,poll_oid_10,user
-10.10.20.31 = Security,admin,maintenance_mode,Not-Core,OpsCenter,PaloAlto,user
-10.10.30.26 = admin,Brocade,maintenance_mode,Not-Core,OpsCenter,Ungrouped,user
+        r_text = """203.0.113.146 = admin,Cisco,maintenance_mode,Not-Core,OpsCenter,poll_oid_10,user
+203.0.113.31 = Security,admin,maintenance_mode,Not-Core,OpsCenter,PaloAlto,user
+203.0.113.26 = admin,Brocade,maintenance_mode,Not-Core,OpsCenter,Ungrouped,user
 """  # noqa
         session_mock.return_value.ok = True
         session_mock.return_value.status_code = 200
@@ -146,7 +146,7 @@ TH840-F Ethernet1 IF-MIB.ifPhysAddress = 001fa008d411
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         list = api.get_group_membership(groups=["maintenance_mode"])
-        self.assertEqual(list["10.10.10.146"][0], "admin")
+        self.assertEqual(list["203.0.113.146"][0], "admin")
 
     @patch("requests.Session.get")
     def test_get_series(self, session_mock: MagicMock):
@@ -327,7 +327,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
 
     @patch("requests.Session.get")
     def test_cmd_still_works_but_warns(self, session_mock: MagicMock):
-        r_text = "TH840-A sys ip4addr = 192.168.20.15\n"
+        r_text = "TH840-A sys ip4addr = 203.0.113.15\n"
         session_mock.return_value.text = r_text
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
@@ -394,7 +394,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
     ):
         # Two states down for one device with different start times; the
         # earlier one is what the outage began at
-        r_text = """dev-1 ping4 PING.icmpState = 1,down,1484685257,1657029502,10.0.0.1
+        r_text = """dev-1 ping4 PING.icmpState = 1,down,1484685257,1657029502,192.0.2.101
 dev-1 sys SNMP.snmpState = 1,down,1484685257,1657029400,
 """  # noqa
         session_mock.return_value.text = r_text
@@ -415,8 +415,8 @@ dev-1 sys SNMP.snmpState = 1,down,1484685257,1657029400,
         # A device reported down that this cannot read must not vanish:
         # under reporting an outage is the worst thing this call can do
         r_text = """dev1 ping4 PING.icmpState = 1,down,1690000000,1753970052
-dev2 ping4 PING.icmpState = 1,down here,1690000000,1753970052,10.0.0.2
-dev3 ping4 PING.icmpState = 1,down,1690000000,1753970052,10.0.0.3
+dev2 ping4 PING.icmpState = 1,down here,1690000000,1753970052,192.0.2.102
+dev3 ping4 PING.icmpState = 1,down,1690000000,1753970052,192.0.2.103
 """  # noqa
         session_mock.return_value.text = r_text
 
@@ -432,7 +432,7 @@ dev3 ping4 PING.icmpState = 1,down,1690000000,1753970052,10.0.0.3
     def test_get_unreachable_fields_do_not_depend_on_line_order(
         self, session_mock: MagicMock
     ):
-        ping = "dev1 ping4 PING.icmpState = 1,down,1690000000,1753970052,10.0.0.1\n"
+        ping = "dev1 ping4 PING.icmpState = 1,down,1690000000,1753970052,192.0.2.101\n"
         snmp = "dev1 sys SNMP.snmpState = 2,down,1690000000,1753970052,\n"
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
@@ -446,7 +446,7 @@ dev3 ping4 PING.icmpState = 1,down,1690000000,1753970052,10.0.0.3
         # the ping line carries the address, so it wins the shared fields
         # whichever order the server sent them in
         self.assertEqual(seen[0], seen[1])
-        self.assertEqual(seen[0], ("10.0.0.1", "ping4", "1", "down"))
+        self.assertEqual(seen[0], ("192.0.2.101", "ping4", "1", "down"))
 
     @patch("requests.Session.get")
     def test_get_devices_keeps_attributes_beyond_the_requested_set(
@@ -454,7 +454,7 @@ dev3 ping4 PING.icmpState = 1,down,1690000000,1753970052,10.0.0.3
     ):
         # The four requested keys are always present; anything else the server
         # sends is kept rather than dropped
-        r_text = """dev1 sys ip4addr = 10.0.0.1
+        r_text = """dev1 sys ip4addr = 192.0.2.101
 dev1 sys SNMPv2-MIB.sysContact = Networking
 """  # noqa
         session_mock.return_value.text = r_text

@@ -32,7 +32,7 @@ class CredentialTest(unittest.TestCase):
             ("api-rw", "rw-secret"),
         )
         self.assertEqual(
-            self.sent(api, lambda a: a.get_device_by_ip(ipaddr="10.0.0.1")),
+            self.sent(api, lambda a: a.get_device_by_ip(ipaddr="192.0.2.101")),
             ("api-rw", "rw-secret"),
         )
 
@@ -92,7 +92,7 @@ class CredentialTest(unittest.TestCase):
         api = AKIPS("127.0.0.1", username="api-rw", password="secret")
         self.assertEqual(api.rw_password, "secret")
         self.assertEqual(
-            self.sent(api, lambda a: a.get_device_by_ip(ipaddr="10.0.0.1")),
+            self.sent(api, lambda a: a.get_device_by_ip(ipaddr="192.0.2.101")),
             ("api-rw", "secret"),
         )
 
@@ -103,7 +103,7 @@ class CredentialTest(unittest.TestCase):
         for call in (
             lambda a: a.get_devices(),
             lambda a: a.get_msg(),
-            lambda a: a.get_device_by_ip(ipaddr="10.0.0.1"),
+            lambda a: a.get_device_by_ip(ipaddr="192.0.2.101"),
             lambda a: a.get_group_availability(),
         ):
             self.assertEqual(self.sent(api, call), ("monitoring", "secret"))

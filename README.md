@@ -120,13 +120,13 @@ pprint.pp(devices, sort_dicts=True, width=120, indent=4)
                    'SNMPv2-MIB.sysLocation': 'Datacenter A',
                    'SNMPv2-MIB.sysName': 'TH840-A',
                    'SNMPv2-MIB.sysObjectID': 'A10-COMMON-MIB.a10AX.38',
-                   'ip4addr': '192.168.20.15'},
+                   'ip4addr': '203.0.113.15'},
     'TH840-B': {   'SNMPv2-MIB.sysContact': None,
                    'SNMPv2-MIB.sysDescr': 'Thunder Series Unified Application Service Gateway TH840 ACOS',
                    'SNMPv2-MIB.sysLocation': 'Datacenter B',
                    'SNMPv2-MIB.sysName': 'TH840-B',
                    'SNMPv2-MIB.sysObjectID': 'A10-COMMON-MIB.a10AX.38',
-                   'ip4addr': '192.168.30.25'}}
+                   'ip4addr': '203.0.113.25'}}
 ```
 
 ### List all data for a specific device, the deep dive
@@ -147,7 +147,7 @@ keyed by device name just as `get_devices` is.
 {   'TH840-A': {   'Ethernet1': {'IF-MIB.ifAlias': None, 'IF-MIB.ifDescr': 'Ethernet 1'},
                    'sys': {   'SNMPv2-MIB.sysLocation': 'Datacenter A',
                               'SNMPv2-MIB.sysName': 'TH840-A',
-                              'ip4addr': '192.168.20.15'}}}
+                              'ip4addr': '203.0.113.15'}}}
 ```
 
 An attribute the device reported no value for is `None`.
@@ -181,7 +181,7 @@ in the output above comes from. The UPS helpers parse that form for you.
 ### Lookup the AKiPS device key for a specific IP address
 
 ```py
-device_key = api.get_device_by_ip(ipaddr='192.168.20.15')
+device_key = api.get_device_by_ip(ipaddr='203.0.113.15')
 print(device_key)
 ```
 
@@ -210,7 +210,7 @@ pprint.pp(attributes, sort_dicts=True, width=120, indent=4)
                               'SNMP.discover_walks_fail': '0',
                               'SNMP.discover_walks_ok': '57',
                               'SNMP.discover_walks_unknown': '0',
-                              'SNMP.ipaddr': '192.168.20.15',
+                              'SNMP.ipaddr': '203.0.113.15',
                               'SNMP.lost': '1',
                               'SNMP.maxrep': '20',
                               'SNMP.rtt': '1',
@@ -225,7 +225,7 @@ pprint.pp(attributes, sort_dicts=True, width=120, indent=4)
                               'SNMPv2-MIB.sysObjectID': 'A10-COMMON-MIB.a10AX.38',
                               'SNMPv2-MIB.sysUpTime': '1749494858,1759502716',
                               'ifXTable': '1',
-                              'ip4addr': '192.168.20.15',
+                              'ip4addr': '203.0.113.15',
                               'mac_md5': 'a34558cd34432f618f5b29fb4376b5a2'}}}
 ```
 
@@ -336,6 +336,13 @@ thousands of messages, almost all of it syslog, where the traps alone are a few
 thousand. Note also that `limit` fills from the *start* of the window, so it
 returns the oldest matches rather than the newest; for recent activity, narrow
 `period` instead.
+
+`ip_addr` is where the message came from, which is not necessarily the address
+AKiPS holds for the device. A device with several interfaces can send from any
+of them, so a trap can arrive from an address that matches no device record at
+all. `get_device_by_ip` resolves one back to a device, using an address table
+AKiPS maintains internally — which is the reason that call exists, and why it
+goes through the site script.
 
 ### Availability
 

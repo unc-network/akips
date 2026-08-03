@@ -204,6 +204,13 @@ AKIPS('akips.example.com', ro_password=pw)           # is
 
 ### Changed
 
+- `get_device_by_ip()` warns when the site script replies with something it
+  does not recognize, rather than returning `None`. The script says in as many
+  words when an address matches nothing, so that case stays quiet, but an HTML
+  error page or a complaint about a missing argument used to read as "no
+  device has that address" and be believed. An unknown function was already
+  raised, being `ERROR` prefixed; this covers the rest.
+
 - `get_devices()` returns two more attributes, `SNMPv2-MIB.sysObjectID` and
   `SNMPv2-MIB.sysContact`, bringing it to the set AKiPS shows read only on its
   device edit page: what SNMP reported about a device rather than what an

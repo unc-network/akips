@@ -13,9 +13,11 @@ from unittest.mock import MagicMock, patch
 from akips import AKIPS
 
 # Taken from an AKiPS command console
-OUTPUT_SOURCE = "172.29.214.24 ups UPS-MIB.upsOutputSource = 4,bypass,1469649711,1782896221,\n"  # noqa
-BATTERY_TEST = """172.28.12.121 battery LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult = 2,passed,1420596219,1782274020,
-172.28.12.128 battery LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult = 2,passed,1420596219,1784088362,
+OUTPUT_SOURCE = (
+    "192.0.2.24 ups UPS-MIB.upsOutputSource = 4,bypass,1469649711,1782896221,\n"  # noqa
+)
+BATTERY_TEST = """192.0.2.121 battery LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult = 2,passed,1420596219,1782274020,
+192.0.2.128 battery LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult = 2,passed,1420596219,1784088362,
 """  # noqa
 
 
@@ -41,11 +43,11 @@ class UpsOutputSourceTest(unittest.TestCase):
             "mget * * ups UPS-MIB.upsOutputSource "
             "value /other|none|bypass|battery|booster|reducer/",
         )
-        entry = devices["172.29.214.24"]
+        entry = devices["192.0.2.24"]
         self.assertEqual(entry["value"], "bypass")
         self.assertEqual(entry["number"], "4")
         self.assertEqual(entry["child"], "ups")
-        self.assertEqual(entry["name"], "172.29.214.24")
+        self.assertEqual(entry["name"], "192.0.2.24")
         # modified is when the UPS moved to this source
         self.assertEqual(entry["modified"].year, 2026)
         self.assertEqual(entry["created"].year, 2016)
@@ -117,8 +119,8 @@ class LiebertBatteryTestTest(unittest.TestCase):
             "mget * * battery LIEBERT-GP-POWER-MIB.lgpPwrBatteryTestResult",
         )
         self.assertEqual(len(devices), 2)
-        self.assertEqual(devices["172.28.12.121"]["value"], "passed")
-        self.assertEqual(devices["172.28.12.128"]["child"], "battery")
+        self.assertEqual(devices["192.0.2.121"]["value"], "passed")
+        self.assertEqual(devices["192.0.2.128"]["child"], "battery")
 
     @patch("requests.Session.get")
     def test_another_vendor_attribute_can_be_given(self, session_mock: MagicMock):
@@ -194,7 +196,7 @@ class UpsBatteryStatusTest(unittest.TestCase):
     @patch("requests.Session.get")
     def test_defaults_to_the_states_worth_looking_at(self, session_mock: MagicMock):
         session_mock.return_value.text = (
-            "172.29.214.24 battery UPS-MIB.upsBatteryStatus "
+            "192.0.2.24 battery UPS-MIB.upsBatteryStatus "
             "= 3,batteryLow,1469649711,1785575463,\n"
         )
 
@@ -205,7 +207,7 @@ class UpsBatteryStatusTest(unittest.TestCase):
             "mget * * battery UPS-MIB.upsBatteryStatus "
             "value /unknown|batteryLow|batteryDepleted/",
         )
-        entry = devices["172.29.214.24"]
+        entry = devices["192.0.2.24"]
         self.assertEqual(entry["value"], "batteryLow")
         self.assertEqual(entry["child"], "battery")
 
@@ -213,7 +215,7 @@ class UpsBatteryStatusTest(unittest.TestCase):
     def test_no_states_means_every_ups(self, session_mock: MagicMock):
         # Taken from an AKiPS command console
         session_mock.return_value.text = (
-            "172.29.214.24 battery UPS-MIB.upsBatteryStatus "
+            "192.0.2.24 battery UPS-MIB.upsBatteryStatus "
             "= 2,batteryNormal,1469649711,1469649711,\n"
         )
 
@@ -223,7 +225,7 @@ class UpsBatteryStatusTest(unittest.TestCase):
             session_mock.call_args.kwargs["params"]["cmds"],
             "mget * * battery UPS-MIB.upsBatteryStatus",
         )
-        self.assertEqual(devices["172.29.214.24"]["value"], "batteryNormal")
+        self.assertEqual(devices["192.0.2.24"]["value"], "batteryNormal")
 
     @patch("requests.Session.get")
     def test_it_is_separate_from_the_output_source(self, session_mock: MagicMock):

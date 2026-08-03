@@ -16,7 +16,7 @@ from akips import AKIPS
 BATTERY_VOLTAGE = (
     "parent,child,child description,attribute,2026-08-01 12:44,"
     "2026-08-01 12:49,2026-08-01 12:54,2026-08-01 12:59\n"
-    "172.29.214.24,battery,,UPS-MIB.upsBatteryVoltage,53,53,53,\n"
+    "192.0.2.24,battery,,UPS-MIB.upsBatteryVoltage,53,53,53,\n"
 )
 
 
@@ -27,14 +27,14 @@ class LatestValuesTest(unittest.TestCase):
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         result = api.get_latest_values(
-            "UPS-MIB.upsBatteryVoltage", device="172.29.214.24", child="battery"
+            "UPS-MIB.upsBatteryVoltage", device="192.0.2.24", child="battery"
         )
         self.assertEqual(
             session_mock.call_args.kwargs["params"]["cmds"],
-            "cseries interval avg 300 time last1h * 172.29.214.24 battery "
+            "cseries interval avg 300 time last1h * 192.0.2.24 battery "
             "UPS-MIB.upsBatteryVoltage",
         )
-        entry = result["172.29.214.24"]["battery"]
+        entry = result["192.0.2.24"]["battery"]
         # the trailing empty column is the interval in progress, not the value
         self.assertEqual(entry["value"], 53.0)
         self.assertEqual(entry["time"].strftime("%Y-%m-%d %H:%M"), "2026-08-01 12:54")
@@ -45,7 +45,7 @@ class LatestValuesTest(unittest.TestCase):
         session_mock.return_value.text = BATTERY_VOLTAGE
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret", timezone="America/New_York")
-        entry = api.get_latest_values("UPS-MIB.upsBatteryVoltage")["172.29.214.24"][
+        entry = api.get_latest_values("UPS-MIB.upsBatteryVoltage")["192.0.2.24"][
             "battery"
         ]
         # the column heading carries no offset, so it is read in the server's

@@ -11,36 +11,36 @@ from akips import AKIPS
 class ApiMsgTest(unittest.TestCase):
     @patch("requests.Session.get")
     def test_get_msg(self, session_mock: MagicMock):
-        r_text = """1436232275 syslog 4 10.4.2.26
+        r_text = """1436232275 syslog 4 198.51.100.26
 notice local7 149:Jul 7 11:24:34.476: LINEPROTO-5-UPDOWN: Line protocol on Interface Serial1/6, changed...
 
-1436232275 syslog 4 10.4.2.26
-notice local7 150:Jul 7 11:24:34.572: OSPF-5-ADJCHG: Process 1, Nbr 10.4.45.1 onSerial1/6 from LOADING...
+1436232275 syslog 4 198.51.100.26
+notice local7 150:Jul 7 11:24:34.572: OSPF-5-ADJCHG: Process 1, Nbr 198.51.100.45 onSerial1/6 from LOADING...
 
-1436232275 trap 4 10.4.2.26
+1436232275 trap 4 198.51.100.26
 SNMPv2-MIB sysUpTime 0 TimeTicks 54003
 SNMPv2-MIB snmpTrapOID 0 ObjectIdentifier
 OSPF-TRAP-MIB.ospf Nbr StateChange
-OSPF-MIB ospfRouterId 10.4.2.20 IPAddress 10.4.40.1
-OSPF-MIB ospfNbrIpAddr 10.4.2.20 IPAddress 10.4.2.166
-OSPF-MIB ospfNbrAddressLessIndex 10.4.2.20 Integer 0
-OSPF-MIB ospfNbrRtrId 10.4.2.20 IPAddress 10.4.45.1
-OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
+OSPF-MIB ospfRouterId 198.51.100.20 IPAddress 198.51.100.40
+OSPF-MIB ospfNbrIpAddr 198.51.100.20 IPAddress 198.51.100.166
+OSPF-MIB ospfNbrAddressLessIndex 198.51.100.20 Integer 0
+OSPF-MIB ospfNbrRtrId 198.51.100.20 IPAddress 198.51.100.45
+OSPF-MIB ospfNbrState 198.51.100.20 ENUM 8,full
 
-1436232276 trap 4 10.4.2.26
+1436232276 trap 4 198.51.100.26
 SNMPv2-MIB sysUpTime 0 TimeTicks 54004
 SNMPv2-MIB snmpTrapOID 0 ObjectIdentifier
 OSPF-TRAP-MIB. ospf OriginateLsa
-OSPF-MIB ospfRouterId 10.4.2.20 IPAddress 10.4.40.1
-OSPF-MIB ospfLsdbAreaId 10.4.2.20 IPAddress 0.0.0.0
-OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
+OSPF-MIB ospfRouterId 198.51.100.20 IPAddress 198.51.100.40
+OSPF-MIB ospfLsdbAreaId 198.51.100.20 IPAddress 0.0.0.0
+OSPF-MIB ospfLsdbType 198.51.100.20 ENUM 1,routerLink
 """  # noqa
         session_mock.return_value.ok = True
         session_mock.return_value.status_code = 200
         session_mock.return_value.text = r_text
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
-        messages = api.get_msg(period="today", addr="10.10.10.146")
+        messages = api.get_msg(period="today", addr="203.0.113.146")
         self.assertIsNotNone(messages)
         self.assertEqual(messages[2]["time"], "1436232275")
         self.assertEqual(messages[2]["type"], "trap")
@@ -53,7 +53,7 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         api.get_msg(
             period="last4h",
-            addr="10.4.2.26",
+            addr="198.51.100.26",
             msg_type="syslog",
             device="cisco-sw1",
             regex="LINEPROTO",
@@ -63,7 +63,7 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
         self.assertTrue(args[0].endswith("/api-msg"))
         params = kwargs["params"]
         self.assertEqual(params["time"], "last4h")
-        self.assertEqual(params["addr"], "10.4.2.26")
+        self.assertEqual(params["addr"], "198.51.100.26")
         self.assertEqual(params["type"], "syslog")
         self.assertEqual(params["device"], "cisco-sw1")
         self.assertEqual(params["regex"], "LINEPROTO")
@@ -92,9 +92,9 @@ OSPF-MIB ospfLsdbType 10.4.2.20 ENUM 1,routerLink
 
     @patch("requests.Session.get")
     def test_get_msg_joins_multi_line_messages(self, session_mock: MagicMock):
-        r_text = """1436232275 trap 4 10.4.2.26
+        r_text = """1436232275 trap 4 198.51.100.26
 SNMPv2-MIB sysUpTime 0 TimeTicks 54003
-OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
+OSPF-MIB ospfNbrState 198.51.100.20 ENUM 8,full
 """  # noqa
         session_mock.return_value.text = r_text
 
@@ -104,10 +104,10 @@ OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
         self.assertEqual(
             messages[0]["message"],
             "SNMPv2-MIB sysUpTime 0 TimeTicks 54003\n"
-            "OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full",
+            "OSPF-MIB ospfNbrState 198.51.100.20 ENUM 8,full",
         )
         self.assertEqual(messages[0]["ip_ver"], "4")
-        self.assertEqual(messages[0]["ip_addr"], "10.4.2.26")
+        self.assertEqual(messages[0]["ip_addr"], "198.51.100.26")
 
     @patch("requests.Session.get")
     def test_get_msg_returns_none_for_empty_response(self, session_mock: MagicMock):
@@ -123,7 +123,7 @@ OSPF-MIB ospfNbrState 10.4.2.20 ENUM 8,full
         # next record.
         r_text = """continuation of something we never saw the header for
 
-1436232275 syslog 4 10.4.2.26
+1436232275 syslog 4 198.51.100.26
 notice local7 149: LINEPROTO-5-UPDOWN
 """  # noqa
         session_mock.return_value.text = r_text
@@ -132,7 +132,7 @@ notice local7 149: LINEPROTO-5-UPDOWN
         with self.assertLogs("akips", level="WARNING") as logged:
             messages = api.get_msg()
         self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0]["ip_addr"], "10.4.2.26")
+        self.assertEqual(messages[0]["ip_addr"], "198.51.100.26")
         self.assertEqual(
             messages[0]["message"], "notice local7 149: LINEPROTO-5-UPDOWN"
         )
@@ -146,9 +146,9 @@ notice local7 149: LINEPROTO-5-UPDOWN
         # This trap body contains a line matching the header pattern.  Records
         # are split on blank lines, so it stays part of the message instead of
         # starting a second record with an empty body.
-        r_text = """1436232275 trap 4 10.4.2.26
+        r_text = """1436232275 trap 4 198.51.100.26
 OSPF-MIB ospfNbrState 4 full
-OSPF-MIB ospfRouterId 10.4.2.20 IPAddress 10.4.40.1
+OSPF-MIB ospfRouterId 198.51.100.20 IPAddress 198.51.100.40
 """  # noqa
         session_mock.return_value.text = r_text
 
@@ -159,14 +159,14 @@ OSPF-MIB ospfRouterId 10.4.2.20 IPAddress 10.4.40.1
         self.assertEqual(
             messages[0]["message"],
             "OSPF-MIB ospfNbrState 4 full\n"
-            "OSPF-MIB ospfRouterId 10.4.2.20 IPAddress 10.4.40.1",
+            "OSPF-MIB ospfRouterId 198.51.100.20 IPAddress 198.51.100.40",
         )
 
     @patch("requests.Session.get")
     def test_ip_version_accepts_only_four_or_six(self, session_mock: MagicMock):
         # The character class used to be [4|6], which also matched a literal
         # pipe, so a body line with one in that position looked like a header
-        r_text = """1436232275 syslog | 10.4.2.26
+        r_text = """1436232275 syslog | 198.51.100.26
 """  # noqa
         session_mock.return_value.text = r_text
 
@@ -182,11 +182,11 @@ OSPF-MIB ospfRouterId 10.4.2.20 IPAddress 10.4.40.1
         # not malformed records and must not be counted as unparsed
         r_text = """
 
-1436232275 syslog 4 10.4.2.26
+1436232275 syslog 4 198.51.100.26
 first message
 
 
-1436232276 syslog 4 10.4.2.27
+1436232276 syslog 4 198.51.100.27
 second message
 
 """  # noqa
@@ -196,7 +196,7 @@ second message
         messages = api.get_msg()
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0]["message"], "first message")
-        self.assertEqual(messages[1]["ip_addr"], "10.4.2.27")
+        self.assertEqual(messages[1]["ip_addr"], "198.51.100.27")
 
 
 class NamedMessageTypeTest(unittest.TestCase):

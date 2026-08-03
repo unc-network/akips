@@ -13,7 +13,7 @@ from akips import AKIPS
 class CallTest(unittest.TestCase):
     @patch("requests.Session.get")
     def test_raw_is_the_default(self, session_mock: MagicMock):
-        r_text = "TH840-A sys ip4addr = 192.168.20.15\n"
+        r_text = "TH840-A sys ip4addr = 203.0.113.15\n"
         session_mock.return_value.text = r_text
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
@@ -34,14 +34,14 @@ class CallTest(unittest.TestCase):
     @patch("requests.Session.get")
     def test_key_value_output(self, session_mock: MagicMock):
         session_mock.return_value.text = (
-            "10.10.10.146 = admin,Cisco,maintenance_mode\n"
-            "10.10.20.31 = Security,admin,PaloAlto\n"
+            "203.0.113.146 = admin,Cisco,maintenance_mode\n"
+            "203.0.113.31 = Security,admin,PaloAlto\n"
         )
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         parsed = api.call("mgroup * *", output="key_value")
-        self.assertEqual(parsed["10.10.10.146"], "admin,Cisco,maintenance_mode")
-        self.assertEqual(parsed["10.10.20.31"], "Security,admin,PaloAlto")
+        self.assertEqual(parsed["203.0.113.146"], "admin,Cisco,maintenance_mode")
+        self.assertEqual(parsed["203.0.113.31"], "Security,admin,PaloAlto")
 
     @patch("requests.Session.get")
     def test_attributes_output(self, session_mock: MagicMock):
@@ -199,16 +199,16 @@ class ParserAgreementTest(unittest.TestCase):
     def test_get_group_membership_shares_the_key_value_parser(
         self, session_mock: MagicMock
     ):
-        session_mock.return_value.text = "10.10.10.146 = admin,Cisco\n"
+        session_mock.return_value.text = "203.0.113.146 = admin,Cisco\n"
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         # get_group_membership splits the value; the raw shape is the same
         self.assertEqual(
-            api.get_group_membership(), {"10.10.10.146": ["admin", "Cisco"]}
+            api.get_group_membership(), {"203.0.113.146": ["admin", "Cisco"]}
         )
         self.assertEqual(
             api.call("mgroup * *", output="key_value"),
-            {"10.10.10.146": "admin,Cisco"},
+            {"203.0.113.146": "admin,Cisco"},
         )
 
     @patch("requests.Session.get")
@@ -233,7 +233,7 @@ class ParserAgreementTest(unittest.TestCase):
         self, session_mock: MagicMock
     ):
         session_mock.return_value.text = (
-            "TH840-A sys ip4addr = 192.168.20.15\n"
+            "TH840-A sys ip4addr = 203.0.113.15\n"
             "TH840-A Ethernet1 IF-MIB.ifDescr = Ethernet 1\n"
         )
 

@@ -188,7 +188,7 @@ class TransportTest(unittest.TestCase):
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
         api.get_msg()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
-        api.get_device_by_ip(ipaddr="10.0.0.1")
+        api.get_device_by_ip(ipaddr="192.0.2.101")
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
         api.get_group_availability()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
@@ -366,7 +366,7 @@ class TransportTest(unittest.TestCase):
         # reply to something as innocent as get_device carries the community
         # string and the v3 auth and priv passwords
         session_mock.return_value.text = (
-            "dev1 sys ip4addr = 10.0.0.1\n"
+            "dev1 sys ip4addr = 192.0.2.101\n"
             "dev1 sys SNMP.community = not-a-real-community\n"
             "dev1 sys SNMP.auth_password = not-a-real-auth-password\n"
             "dev1 sys SNMP.priv_password = not-a-real-priv-password\n"

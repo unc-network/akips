@@ -1120,6 +1120,13 @@ class AKIPS:
         AKiPS records additional IP addresses when found on devices, so this function
         can be used to find the primary device name (primary key) from any known IP address.
 
+        A device is stored under one address, but it may answer on several.
+        The case this exists for is a syslog message or SNMP trap arriving
+        from an interface other than the one AKiPS knows the device by, where
+        the source address matches no device at all.  AKiPS keeps an internal
+        address to device table, which the site script reads, so this maps any
+        address the server has seen back to the device holding it.
+
         This is the one read in this module that a read only deployment cannot
         perform.  AKiPS exposes it as a site script rather than a database
         query, so it lives in api-script and needs rw_password even though it
@@ -1140,15 +1147,25 @@ class AKIPS:
         """
         params = {"function": "web_find_device_by_ip", "ipaddr": ipaddr}
         text = self._get(section="api-script", params=params)
-        if text:
-            lines = text.split("\n")
-            for line in lines:
-                match = re.match(r"IP Address (\S+) is configured on (\S+)", line)
-                if match:
-                    address = match.group(1)
-                    device_name = match.group(2)
-                    logger.debug(f"Found {address} on device {device_name}")
-                    return device_name
+        if not text:
+            return None
+        for line in text.split("\n"):
+            match = re.match(r"IP Address (\S+) is configured on (\S+)", line)
+            if match:
+                address = match.group(1)
+                device_name = match.group(2)
+                logger.debug(f"Found {address} on device {device_name}")
+                return device_name
+        # The site script says so in as many words when it finds nothing, so a
+        # reply that is neither that nor a match did not come from it.  The
+        # likeliest cause is the script not being installed, which would
+        # otherwise read as 'no device has that address' and be believed.
+        if "is not configured on any devices" not in text:
+            logger.warning(
+                "web_find_device_by_ip returned something unexpected; check "
+                "that the site script is installed on this AKiPS server.  "
+                "Reply: {}".format(self._redact_text(text.strip()[:200]))
+            )
         return None
 
     def set_group_membership(self, device: str, group: str, mode: str) -> None:
@@ -1255,7 +1272,10 @@ class AKIPS:
                 far less than an hour of messages thrown away after the fact
         Returns:
             A list of dictionaries, each with 'time', 'type', 'ip_ver',
-            'ip_addr' and 'message', or None if no data found
+            'ip_addr' and 'message', or None if no data found.  'ip_addr' is
+            where the message came from, which need not be the address AKiPS
+            holds for the device: a device with several interfaces can send
+            from any of them.  get_device_by_ip() resolves one to a device
         Raises:
             ValueError: if msg_type is not 'syslog', 'trap' or None
             AkipsError: if the AKiPS server returns an error
@@ -1364,7 +1384,10 @@ class AKIPS:
                 narrow 'period' for recent activity
         Returns:
             A list of dictionaries, each with 'time', 'type', 'ip_ver',
-            'ip_addr' and 'message', or None if no data found
+            'ip_addr' and 'message', or None if no data found.  'ip_addr' is
+            where the message came from, which need not be the address AKiPS
+            holds for the device: a device with several interfaces can send
+            from any of them.  get_device_by_ip() resolves one to a device
         Raises:
             AkipsError: if the AKiPS server returns an error
         """
@@ -1414,7 +1437,10 @@ class AKIPS:
                 narrow 'period' for recent activity
         Returns:
             A list of dictionaries, each with 'time', 'type', 'ip_ver',
-            'ip_addr' and 'message', or None if no data found
+            'ip_addr' and 'message', or None if no data found.  'ip_addr' is
+            where the message came from, which need not be the address AKiPS
+            holds for the device: a device with several interfaces can send
+            from any of them.  get_device_by_ip() resolves one to a device
         Raises:
             AkipsError: if the AKiPS server returns an error
         """

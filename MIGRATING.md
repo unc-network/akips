@@ -74,12 +74,12 @@ value was a dictionary.
 ```py
 # before
 device = api.get_device('TH840-A')
-device['sys']['ip4addr']        # '192.168.20.15'
+device['sys']['ip4addr']        # '203.0.113.15'
 device['name']                  # 'TH840-A'
 
 # after
 device = api.get_device('TH840-A')
-device['TH840-A']['sys']['ip4addr']     # '192.168.20.15'
+device['TH840-A']['sys']['ip4addr']     # '203.0.113.15'
 next(iter(device))                      # 'TH840-A'
 ```
 
