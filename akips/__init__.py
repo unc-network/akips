@@ -1147,6 +1147,13 @@ class AKIPS:
         address to device table, which the site script reads, so this maps any
         address the server has seen back to the device holding it.
 
+        That table is not the same as the device's attributes, and searching
+        the attributes is not a substitute.  Observed on a live server: an
+        address resolved here to a device whose whole attribute tree contained
+        no mention of it, the server having seen it on an interface at
+        discovery without storing it.  get_attributes() searches what AKiPS
+        recorded; this searches what AKiPS saw.
+
         This is the one read in this module that a read only deployment cannot
         perform.  AKiPS exposes it as a site script rather than a database
         query, so it lives in api-script and needs rw_password even though it
