@@ -84,7 +84,9 @@ next(iter(device))                      # 'TH840-A'
 ```
 
 The result now keeps the parent, child and attribute levels AKiPS stores, which
-is the same shape `get_devices()` and `get_attributes()` return. If you were
+is the same shape `get_attributes()` returns. Note `get_devices()` is one
+level shallower, being device and attribute with no child, because it asks for
+a single child and flattens. If you were
 looping over it, the special case for `"name"` can go:
 
 ```py

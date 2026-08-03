@@ -243,7 +243,7 @@ AKIPS('akips.example.com', ro_password=pw)           # is
   child dictionaries, so the obvious loop over the result raised
   `AttributeError` on that one entry, and a child named `name` would have
   collided with it. Asking for one device now gives a dictionary with one key,
-  the same shape `get_devices()` and `get_attributes()` return. **Breaking.**
+  the same shape `get_attributes()` returns. **Breaking.**
 - `get_device()` returns `None` when a response parses to nothing, instead of a
   dictionary holding only the name that was asked for, which a caller could not
   tell apart from a device that has no attributes. **Breaking.**

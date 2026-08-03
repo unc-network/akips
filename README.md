@@ -154,7 +154,8 @@ pprint.pp(device, sort_dicts=True, width=120, indent=4)
 ```
 
 The result keeps the parent, child and attribute levels AKiPS stores, so it is
-keyed by device name just as `get_devices` is.
+one dictionary deeper than `get_devices` above, which flattens the child level
+away.
 
 ```text
 {   'TH840-A': {   'Ethernet1': {'IF-MIB.ifAlias': None, 'IF-MIB.ifDescr': 'Ethernet 1'},
