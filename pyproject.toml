@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "akips"
-version = "0.6.0"
+version = "1.0.0"
 description = "Module to interact with the AKiPS Network Monitoring Software API interface"
 authors = ["William E Whitaker <will.whitaker@unc.edu>"]
 readme = "README.md"
@@ -29,6 +29,19 @@ black = "^26.3.1"
 pytest = "^9.0.3"
 ruff = "^0.16.1"
 pdoc = "^16.0.0"
+mypy = "^2.3.0"
+types-pytz = "^2026.3.1.20260727"
+
+[tool.mypy]
+# The package ships a py.typed marker, so its annotations are a promise to
+# consumers.  Check the package itself strictly enough that the promise
+# holds; the tests are left alone since they are mock heavy and unannotated.
+files = ["akips"]
+python_version = "3.10"
+disallow_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
 
 [tool.ruff]
 # Matches the line length the old pylama pycodestyle config allowed
@@ -42,8 +55,10 @@ line-length = 128
 select = ["E", "W", "F", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests assert; that is the point of them.
-"tests/*" = ["S101"]
+# Tests assert; that is the point of them. They also pass obviously fake
+# credentials to exercise redaction and request building, which S105 and S106
+# would otherwise read as hardcoded secrets.
+"tests/*" = ["S101", "S105", "S106"]
 
 [tool.black]
 exclude = '''

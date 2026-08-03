@@ -45,6 +45,12 @@ jobs:
       run: |
         poetry run black --check .
 
+    # The package ships a py.typed marker, so its annotations are a promise to
+    # anyone type checking against it.  This is what keeps that promise honest.
+    - name: Run mypy
+      run: |
+        poetry run mypy
+
   pytest:
     name: Std Test on Python ${{ matrix.python-version }} (${{ matrix.platform}})
     needs: linters

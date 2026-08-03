@@ -3,12 +3,22 @@
 # Install poetry
 poetry install
 
-# Run quality checks
+# Run quality checks.  These are the same four the pipeline runs, so anything
+# failing here will fail there.
 poetry run ruff check .
 poetry run black --check .
+poetry run mypy
 poetry run pytest -v -s tests
 
 # Fix errors before proceeding.
+#
+# mypy checks the akips package against its own type annotations.  It matters
+# because the package ships an akips/py.typed marker, which tells anyone type
+# checking their own code that our annotations can be trusted.  If they are
+# wrong, the breakage shows up in someone else's build, not ours.
+#
+# If mypy complains about missing stubs for a newly added dependency, the fix
+# is usually to add the matching types-* package to the dev dependencies.
 
 # Docs publish themselves.  The documentation workflow regenerates the API
 # docs and deploys them to https://unc-network.github.io/akips/ on every push
@@ -23,8 +33,10 @@ poetry run pdoc -d google akips
 # Roll the version in BOTH pyproject.toml and akips/__init__.py.
 # CI fails the release if the two disagree.
 
-# Move the CHANGELOG.md [Unreleased] entries under the new version and date,
-# then add the compare link at the bottom of the file
+# In CHANGELOG.md, put the release date on the version heading in place of
+# "unreleased", and point that version's compare link at the new tag instead
+# of develop.  The release workflow lifts its notes from this section, so
+# whatever is written here is what appears on the GitHub release.
 
 # Merge into main via pull request.
 #
