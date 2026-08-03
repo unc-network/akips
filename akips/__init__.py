@@ -250,9 +250,7 @@ class AKIPS:
             return data
         return None
 
-    def get_device(
-        self, device: str
-    ) -> dict[str, dict[str, dict[str, str | None]]] | None:
+    def get_device(self, device: str) -> dict[str, dict[str, str | None]] | None:
         """
         Pull all configuration attributes for a single device.  The name is the
         device's AKiPS name, its one primary key, which is either its sysName
@@ -268,10 +266,14 @@ class AKIPS:
         which varies by device type.  For the same fields across every device,
         see get_devices().
 
-        The reply keeps the parent, child and attribute levels AKiPS stores it
-        in, so the result is keyed by device name exactly as get_devices and
-        get_attributes are.  Asking for one device gives a dictionary with one
-        key rather than a differently shaped one.
+        The result is the one device's children and their attributes, not a
+        dictionary keyed by the name that was just passed in:
+
+            device = api.get_device('TH840-A')
+            device['sys']['ip4addr']
+
+        get_attributes() is the same query without that assumption, and keys
+        its result by device because it can match several.
 
         Supporting AKiPS command syntax:
 
@@ -280,18 +282,36 @@ class AKIPS:
                 [profile {profile name}] [any|all|not group {group name} ...]
 
         Args:
-            device (str): the AKiPS name of one device, exactly.  Unlike
-                get_attributes(), which takes a pattern, this identifies a
-                single device
+            device (str): the AKiPS name of one device, exactly.  AKiPS matches
+                a bare name in this position exactly, so this is unambiguous; a
+                '/regex/' is refused, since matching several devices is what
+                get_attributes() is for
         Returns:
-            A dictionary of the device name to its child names to attribute
-            names and values, or None if the device was not found
+            A dictionary of the device's child names to attribute names and
+            values, or None if the device was not found
         Raises:
+            ValueError: if a pattern is given, or if the reply somehow held
+                more than one device
             AkipsError: if the AKiPS server returns an error
         """
-        # This is get_attributes() with the filters left at their defaults, so
-        # it calls it rather than building the same command a second time.
-        return self.get_attributes(device=device)
+        # A bare name matches exactly in the parent position, but a '/regex/'
+        # does not, and this method has nowhere to put a second device.
+        if device.startswith("/") and device.endswith("/") and len(device) > 1:
+            raise ValueError(
+                "get_device takes one device name, not a pattern.  Use "
+                "get_attributes(device={!r}) to match several".format(device)
+            )
+        # get_attributes() with the filters left at their defaults, rather than
+        # building the same command a second time.
+        data = self.get_attributes(device=device)
+        if not data:
+            return None
+        if len(data) > 1:
+            raise ValueError(
+                "get_device matched {} devices ({}).  Use get_attributes() "
+                "for more than one".format(len(data), ", ".join(sorted(data)))
+            )
+        return next(iter(data.values()))
 
     # The children ping and SNMP state are reported under.  Naming them saves
     # AKiPS walking every child of every device, which is most of the cost of

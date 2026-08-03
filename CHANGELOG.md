@@ -30,17 +30,16 @@ December 2022 and unrevised across the twenty five releases since, so where it
 and a running server disagree this release follows the server.
 
 **Upgrading:** see [MIGRATING.md](MIGRATING.md) for what to change, with before
-and after for each one. Two are worth knowing before you read any further,
-because between them they account for most of the work:
+and after for each one. Two account for most of the work:
 
 ```py
-# get_device() is keyed by the device name, one more level than before
-device['sys']['ip4addr']                 # was
-device['TH840-A']['sys']['ip4addr']      # is
-
 # the client takes a password per account rather than one for all of them
-AKIPS('akips.example.com', password=pw)              # was
-AKIPS('akips.example.com', ro_password=pw)           # is
+AKIPS('akips.example.com', password=pw)      # was
+AKIPS('akips.example.com', ro_password=pw)   # is
+
+# nothing found is None everywhere, not an empty container
+if api.get_unreachable() == {}:              # was
+if api.get_unreachable() is None:            # is, and `if not down:` covers both
 ```
 
 ### Added
@@ -237,13 +236,15 @@ AKIPS('akips.example.com', ro_password=pw)           # is
 - `get_unreachable()` reports `child` as the matched string. It was a one
   element tuple, the only field in that structure with a surprising type.
   **Breaking.**
-- `get_device()` is keyed by device name, keeping the parent, child and
-  attribute levels AKiPS stores its data in. It previously dropped the parent
-  level and put the device name back as a `"name"` key sitting beside the
-  child dictionaries, so the obvious loop over the result raised
-  `AttributeError` on that one entry, and a child named `name` would have
-  collided with it. Asking for one device now gives a dictionary with one key,
-  the same shape `get_attributes()` returns. **Breaking.**
+- `get_device()` returns the one device's children and attributes, and no
+  longer carries a `"name"` key beside them. Reading an attribute is unchanged
+  — `device['sys']['ip4addr']` works as before — but the name is gone, since
+  the caller supplied it and a child legitimately named `name` would have
+  collided with it. Looping over the result no longer meets a string where
+  every other value is a dictionary. It also refuses a `/regex/`, having
+  nowhere to put a second device; `get_attributes()` takes patterns and keys
+  its result by device name for that reason. **Breaking** for anyone reading
+  `device['name']`.
 - `get_device()` returns `None` when a response parses to nothing, instead of a
   dictionary holding only the name that was asked for, which a caller could not
   tell apart from a device that has no attributes. **Breaking.**

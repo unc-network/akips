@@ -387,9 +387,7 @@ class TransportTest(unittest.TestCase):
         # anything not a credential is still there to debug with
         self.assertIn("ups-1", written)
         # and the caller still gets what it asked for
-        self.assertEqual(
-            device["dev1"]["sys"]["SNMP.community"], "not-a-real-community"
-        )
+        self.assertEqual(device["sys"]["SNMP.community"], "not-a-real-community")
 
     @patch("requests.Session.get")
     def test_a_parsed_device_is_not_dumped_into_the_log(self, session_mock: MagicMock):

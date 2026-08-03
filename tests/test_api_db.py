@@ -190,23 +190,20 @@ TH840-A Ethernet1 IF-MIB.ifAlias =
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         device = api.get_device("TH840-A")
-        # Keyed by device name, keeping the parent, child and attribute levels
-        # AKiPS stores.  Asking for one device gives one key rather than a
-        # differently shaped result.
-        self.assertEqual(list(device), ["TH840-A"])
-        self.assertEqual(device["TH840-A"]["sys"]["SNMPv2-MIB.sysName"], "TH840-A")
-        self.assertEqual(
-            device["TH840-A"]["sys"]["SNMPv2-MIB.sysLocation"], "Datacenter A"
-        )
-        self.assertEqual(device["TH840-A"]["Ethernet1"]["IF-MIB.ifDescr"], "Ethernet 1")
+        # The one device's children, not a dictionary keyed by the name that
+        # was just passed in.  get_attributes keys by device because it can
+        # match several; this cannot.
+        self.assertEqual(sorted(device), ["Ethernet1", "sys"])
+        self.assertEqual(device["sys"]["SNMPv2-MIB.sysName"], "TH840-A")
+        self.assertEqual(device["sys"]["SNMPv2-MIB.sysLocation"], "Datacenter A")
+        self.assertEqual(device["Ethernet1"]["IF-MIB.ifDescr"], "Ethernet 1")
         # An attribute with nothing after the equals has no value, reported
         # as None consistently across get_device, get_attributes and
         # get_devices
-        self.assertIsNone(device["TH840-A"]["Ethernet1"]["IF-MIB.ifAlias"])
-        # every value is a dictionary of children; nothing else is mixed in
-        for children in device.values():
-            for attributes in children.values():
-                self.assertIsInstance(attributes, dict)
+        self.assertIsNone(device["Ethernet1"]["IF-MIB.ifAlias"])
+        # every value is a dictionary of attributes; nothing else is mixed in
+        for attributes in device.values():
+            self.assertIsInstance(attributes, dict)
 
     @patch("requests.Session.get")
     def test_get_device_returns_none_for_empty_response(self, session_mock: MagicMock):
@@ -357,9 +354,7 @@ CrN-638-AP_110,radio.1,,WLSX-WLAN-MIB.wlanAPRadioNumAssociatedClients,4
         session_mock.return_value.text = r_text
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
-        self.assertIsNone(
-            api.get_device("TH840-A")["TH840-A"]["sys"]["SNMPv2-MIB.sysLocation"]
-        )
+        self.assertIsNone(api.get_device("TH840-A")["sys"]["SNMPv2-MIB.sysLocation"])
         self.assertIsNone(
             api.get_attributes(device="TH840-A")["TH840-A"]["sys"][
                 "SNMPv2-MIB.sysLocation"

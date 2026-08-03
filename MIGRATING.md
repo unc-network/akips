@@ -15,8 +15,7 @@ bottom first.
 | What you have | What it becomes |
 | --- | --- |
 | `AKIPS(host, password=pw)` | `AKIPS(host, ro_password=pw)` |
-| `device["sys"]["ip4addr"]` | `device["TH840-A"]["sys"]["ip4addr"]` |
-| `device["name"]` | the key of the outer dictionary |
+| `device["name"]` | you passed it in; the key is gone |
 | `entry["child"][0]` | `entry["child"]` |
 | `attributes["x"] == ""` | `attributes["x"] is None` |
 | `if api.get_unreachable() == {}` | `if api.get_unreachable() is None` |
@@ -65,29 +64,27 @@ Two behaviors are new here:
 `AkipsCredentialError` subclasses both `AkipsError` and `ValueError`, so
 existing `except` clauses for either still catch it.
 
-## `get_device()` is keyed by device name
+## `get_device()` drops its `"name"` key
 
-It used to drop the device level and put the name back as a `"name"` key beside
-the child dictionaries, so iterating the result hit a string where every other
-value was a dictionary.
+Reading an attribute is unchanged:
+
+```py
+device = api.get_device('TH840-A')
+device['sys']['ip4addr']        # '203.0.113.15', before and after
+```
+
+What has gone is the `"name"` key, which used to sit beside the child
+dictionaries holding a string where every other value was a dictionary:
 
 ```py
 # before
-device = api.get_device('TH840-A')
-device['sys']['ip4addr']        # '203.0.113.15'
 device['name']                  # 'TH840-A'
 
 # after
-device = api.get_device('TH840-A')
-device['TH840-A']['sys']['ip4addr']     # '203.0.113.15'
-next(iter(device))                      # 'TH840-A'
+                                # KeyError; you passed the name in
 ```
 
-The result now keeps the parent, child and attribute levels AKiPS stores, which
-is the same shape `get_attributes()` returns. Note `get_devices()` is one
-level shallower, being device and attribute with no child, because it asks for
-a single child and flattens. If you were
-looping over it, the special case for `"name"` can go:
+If you were looping over the result, the special case for it can go:
 
 ```py
 # before
@@ -97,9 +94,16 @@ for child, attributes in device.items():
     ...
 
 # after
-for child, attributes in device['TH840-A'].items():
+for child, attributes in device.items():
     ...
 ```
+
+A child legitimately named `name` would have collided with that key, which is
+why it went rather than being kept for convenience.
+
+`get_device()` now also refuses a pattern, because it has nowhere to put a
+second device. `get_attributes(device='/TH840-./')` is the way to match
+several, and it keys its result by device name for that reason.
 
 `get_device()` also returns `None` when a reply parses to nothing, instead of a
 dictionary holding only the name you asked for. If you were checking whether a

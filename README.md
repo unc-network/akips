@@ -153,18 +153,21 @@ device = api.get_device('TH840-A')
 pprint.pp(device, sort_dicts=True, width=120, indent=4)
 ```
 
-The result keeps the parent, child and attribute levels AKiPS stores, so it is
-one dictionary deeper than `get_devices` above, which flattens the child level
-away.
+You asked for one device, so you get that device's children and their
+attributes rather than a dictionary keyed by the name you just supplied.
 
 ```text
-{   'TH840-A': {   'Ethernet1': {'IF-MIB.ifAlias': None, 'IF-MIB.ifDescr': 'Ethernet 1'},
-                   'sys': {   'SNMPv2-MIB.sysLocation': 'Datacenter A',
-                              'SNMPv2-MIB.sysName': 'TH840-A',
-                              'ip4addr': '203.0.113.15'}}}
+{   'Ethernet1': {'IF-MIB.ifAlias': None, 'IF-MIB.ifDescr': 'Ethernet 1'},
+    'sys': {   'SNMPv2-MIB.sysLocation': 'Datacenter A',
+               'SNMPv2-MIB.sysName': 'TH840-A',
+               'ip4addr': '203.0.113.15'}}
 ```
 
 An attribute the device reported no value for is `None`.
+
+`get_attributes` runs the same query without that assumption, so it keys its
+result by device name and can match several. `get_device` takes one exact name
+and refuses a `/regex/`, having nowhere to put a second device.
 
 ### What the values mean
 

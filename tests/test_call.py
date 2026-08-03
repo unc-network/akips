@@ -238,14 +238,16 @@ class ParserAgreementTest(unittest.TestCase):
         )
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
-        # get_device and get_attributes send the same command and now return
-        # the same shape, keyed by device name
+        # The same command and the same parse.  get_device unwraps the one
+        # device it asked for; the other two key by device because they can
+        # return several.
         self.assertEqual(
-            api.get_device("TH840-A"), api.get_attributes(device="TH840-A")
+            api.get_device("TH840-A"),
+            api.get_attributes(device="TH840-A")["TH840-A"],
         )
         self.assertEqual(
             api.get_device("TH840-A"),
-            api.call("mget * TH840-A * *", output="attributes"),
+            api.call("mget * TH840-A * *", output="attributes")["TH840-A"],
         )
 
 

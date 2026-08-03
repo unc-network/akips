@@ -92,7 +92,8 @@ class DeviceIsAttributesTest(unittest.TestCase):
         session_mock.return_value.text = self.REPLY
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         self.assertEqual(
-            api.get_device("TH840-F"), api.get_attributes(device="TH840-F")
+            api.get_device("TH840-F"),
+            api.get_attributes(device="TH840-F")["TH840-F"],
         )
 
     @patch("requests.Session.get")
