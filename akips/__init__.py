@@ -170,14 +170,34 @@ class AKIPS:
         self, group_filter: str = "any", groups: list[str] | None = None
     ) -> dict[str, dict[str, str | None]] | None:
         """
-        Pull a list of all devices and their key attributes, optionally filtered by group
-        membership.  Key attributes include IP address, sysName, sysDescr, and sysLocation.
+        Pull a list of all devices and six key attributes of each, optionally
+        filtered by group membership.
 
-        This is the inventory view: every device carries all four of the
-        attributes above, as None where it reported no value, so they can be
-        listed or tabulated without checking each key first.  Anything else
-        the server returns for a device is kept alongside them rather than
-        dropped.  For everything a single device holds, see get_device().
+        This reads the 'sys' child and nothing else, and asks it for six
+        attributes: ip4addr, SNMPv2-MIB.sysName, SNMPv2-MIB.sysDescr,
+        SNMPv2-MIB.sysObjectID, SNMPv2-MIB.sysLocation and
+        SNMPv2-MIB.sysContact.  Those are the values the AKiPS device edit page
+        shows read only, being what SNMP reported rather than what an operator
+        set, plus the address.
+
+        Both the child and the six are fixed here rather than arguments,
+        because this is the inventory view: every device comes back carrying
+        all six, as None where it reported no value, so they can be listed or
+        tabulated without checking each key first.  Anything else the server
+        returns for a device is kept alongside them rather than dropped.
+
+        sysObjectID is worth knowing about: it identifies the model, such as
+        'ARUBA-MIB.ap225', which is often the field an inventory actually wants
+        and is more reliably populated than sysLocation.
+
+        For other attributes, other children, or a device's whole contents,
+        see get_attributes() and get_device().
+
+        Because it asks for one child, this is the only method returning
+        attributes that does not keep the child level; the result is flattened
+        to device and attribute, which is the shape a listing wants.  Should a
+        reply ever carry more than one child, their attributes are merged and
+        the last one read wins, where get_attributes() would keep them apart.
 
         Supporting AKiPS command syntax:
 
@@ -193,11 +213,16 @@ class AKIPS:
         Raises:
             AkipsError: if the AKiPS server returns an error
         """
+        # The polled values the AKiPS device edit page shows read only, plus
+        # the address.  Keeping to that set is deliberate: they are the
+        # standard SNMP system group fields an operator already recognizes.
         attributes = [
             "ip4addr",
             "SNMPv2-MIB.sysName",
             "SNMPv2-MIB.sysDescr",
+            "SNMPv2-MIB.sysObjectID",
             "SNMPv2-MIB.sysLocation",
+            "SNMPv2-MIB.sysContact",
         ]
         cmd_attributes = "|".join(attributes)
         params = {

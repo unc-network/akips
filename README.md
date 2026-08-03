@@ -84,10 +84,30 @@ and that pair is used for every section.
 
 ### List all devices, the inventory view (with an optional group filter)
 
-Every device carries the same handful of fields, as `None` where it reported no
-value, so you can list or tabulate them without checking each key first.
-Anything else the server returns for a device is kept alongside them. For
-everything a single device holds, see `get_device` below.
+This reads the **`sys` child only**, and asks it for six attributes:
+`ip4addr`, `SNMPv2-MIB.sysName`, `SNMPv2-MIB.sysDescr`,
+`SNMPv2-MIB.sysObjectID`, `SNMPv2-MIB.sysLocation` and
+`SNMPv2-MIB.sysContact` — the values AKiPS shows read only on its device edit
+page, being what SNMP reported rather than what an operator set, plus the
+address.
+
+Both the child and the six are fixed rather than arguments, because this is
+the inventory view: every device comes back carrying all six, as `None` where
+it reported no value, so you can list or tabulate them without checking each
+key first. Anything else the server returns for a device is kept alongside
+them.
+
+`sysObjectID` identifies the model, such as `ARUBA-MIB.ap225`. It is often the
+field an inventory actually wants, and is more reliably populated than
+`sysLocation`.
+
+For other attributes or other children, use `get_attributes`. For everything a
+single device holds, see `get_device` below.
+
+Because it asks for one child, this is the only method here that does **not**
+keep the child level: the result is flattened to device and attribute. Every
+other method returning attributes keeps all three, so `get_device` below is one
+dictionary deeper.
 
 ```py
 devices = api.get_devices(groups=['a10'])
@@ -95,13 +115,17 @@ pprint.pp(devices, sort_dicts=True, width=120, indent=4)
 ```
 
 ```text
-{   'TH840-A': {   'SNMPv2-MIB.sysDescr': 'Thunder Series Unified Application Service Gateway TH840 ACOS',
+{   'TH840-A': {   'SNMPv2-MIB.sysContact': 'Networking',
+                   'SNMPv2-MIB.sysDescr': 'Thunder Series Unified Application Service Gateway TH840 ACOS',
                    'SNMPv2-MIB.sysLocation': 'Datacenter A',
                    'SNMPv2-MIB.sysName': 'TH840-A',
+                   'SNMPv2-MIB.sysObjectID': 'A10-COMMON-MIB.a10AX.38',
                    'ip4addr': '192.168.20.15'},
-    'TH840-B': {   'SNMPv2-MIB.sysDescr': 'Thunder Series Unified Application Service Gateway TH840 ACOS',
+    'TH840-B': {   'SNMPv2-MIB.sysContact': None,
+                   'SNMPv2-MIB.sysDescr': 'Thunder Series Unified Application Service Gateway TH840 ACOS',
                    'SNMPv2-MIB.sysLocation': 'Datacenter B',
                    'SNMPv2-MIB.sysName': 'TH840-B',
+                   'SNMPv2-MIB.sysObjectID': 'A10-COMMON-MIB.a10AX.38',
                    'ip4addr': '192.168.30.25'}}
 ```
 

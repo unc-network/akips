@@ -204,6 +204,15 @@ AKIPS('akips.example.com', ro_password=pw)           # is
 
 ### Changed
 
+- `get_devices()` returns two more attributes, `SNMPv2-MIB.sysObjectID` and
+  `SNMPv2-MIB.sysContact`, bringing it to the set AKiPS shows read only on its
+  device edit page: what SNMP reported about a device rather than what an
+  operator set, plus the address. `sysObjectID` identifies the model, such as
+  `ARUBA-MIB.ap225`, which is often the field an inventory wants and is more
+  reliably populated than `sysLocation`. Additive for callers, since every
+  device already carried every requested key and there are now six rather than
+  four.
+
 - `get_unreachable()` searches the children AKiPS reports ping and SNMP state
   under, `ping4|ping6|sys`, rather than every child of every device. The
   wildcard it used made AKiPS walk the whole tree to return a handful of

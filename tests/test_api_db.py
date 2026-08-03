@@ -581,3 +581,69 @@ class LabeledAggregateTest(unittest.TestCase):
         self.assertEqual(points[2]["value"], 6.0)
         self.assertEqual(int(points[2]["time"].timestamp()), 1785682928 + 600)
         self.assertIn("nan-ish", logged.output[0])
+
+
+class InventoryAttributesTest(unittest.TestCase):
+    """
+    get_devices asks for the values the AKiPS device edit page shows read
+    only, being what SNMP reported rather than what an operator set.
+    """
+
+    @patch("requests.Session.get")
+    def test_it_asks_for_the_six_polled_values(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_devices()
+        self.assertEqual(
+            session_mock.call_args.kwargs["params"]["cmds"],
+            "mget text * sys /ip4addr|SNMPv2-MIB.sysName|SNMPv2-MIB.sysDescr"
+            "|SNMPv2-MIB.sysObjectID|SNMPv2-MIB.sysLocation"
+            "|SNMPv2-MIB.sysContact/",
+        )
+
+    @patch("requests.Session.get")
+    def test_every_device_carries_every_field(self, session_mock: MagicMock):
+        # The point of a fixed list: a device that reported only its name
+        # still comes back with all six keys, so a listing needs no per-key
+        # check.  A device reporting nothing for a field gets None.
+        session_mock.return_value.text = (
+            "dev-full sys ip4addr = 192.0.2.1\n"
+            "dev-full sys SNMPv2-MIB.sysName = dev-full\n"
+            "dev-full sys SNMPv2-MIB.sysObjectID = ARUBA-MIB.ap225\n"
+            "dev-full sys SNMPv2-MIB.sysContact = Networking\n"
+            "dev-bare sys SNMPv2-MIB.sysName = dev-bare\n"
+        )
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        devices = api.get_devices()
+        expected = {
+            "ip4addr",
+            "SNMPv2-MIB.sysName",
+            "SNMPv2-MIB.sysDescr",
+            "SNMPv2-MIB.sysObjectID",
+            "SNMPv2-MIB.sysLocation",
+            "SNMPv2-MIB.sysContact",
+        }
+        for name, entry in devices.items():
+            with self.subTest(device=name):
+                self.assertEqual(set(entry), expected)
+        self.assertEqual(
+            devices["dev-full"]["SNMPv2-MIB.sysObjectID"], "ARUBA-MIB.ap225"
+        )
+        self.assertEqual(devices["dev-full"]["SNMPv2-MIB.sysContact"], "Networking")
+        # the sparse device still has the keys, valued None
+        self.assertIsNone(devices["dev-bare"]["SNMPv2-MIB.sysObjectID"])
+        self.assertIsNone(devices["dev-bare"]["ip4addr"])
+
+    @patch("requests.Session.get")
+    def test_no_credential_attribute_is_requested(self, session_mock: MagicMock):
+        # AKiPS keeps SNMP credentials on the same child, so an inventory that
+        # widened its pattern carelessly would hand them back
+        session_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", ro_password="ro-secret")
+        api.get_devices()
+        cmds = session_mock.call_args.kwargs["params"]["cmds"]
+        for secret in ("community", "auth_password", "priv_password", "SNMP.user"):
+            self.assertNotIn(secret, cmds)
