@@ -86,7 +86,7 @@ This will also create a virtual environment located in .venv.
 # Should report all files as 'unchanged'
 % black --check .
 All done! ✨ 🍰 ✨
-11 files would be left unchanged.
+14 files would be left unchanged.
 
 # Linter should report nothing (at this point)
 % ruff check .
@@ -106,22 +106,50 @@ Unit tests should pass (once again we are testing on unchanged 'develop' branch 
 platform darwin -- Python 3.10.2, pytest-9.1.1, pluggy-1.6.0
 rootdir: /Users/wew/project/akips
 configfile: pyproject.toml
-collected 88 items
+collected 177 items
 
-tests/test_api_availability.py .....                                     [  5%]
-tests/test_api_db.py .......................                             [ 31%]
-tests/test_api_msg.py ......                                             [ 38%]
-tests/test_api_script.py .......                                         [ 46%]
-tests/test_call.py ...............                                       [ 63%]
-tests/test_credentials.py ............                                   [ 77%]
-tests/test_import_akips.py .                                             [ 78%]
-tests/test_transport.py ...................                              [100%]
+tests/test_api_availability.py .................                         [  9%]
+tests/test_api_db.py ........................................            [ 32%]
+tests/test_api_msg.py ...............                                    [ 40%]
+tests/test_api_script.py .........                                       [ 45%]
+tests/test_call.py .....................                                 [ 57%]
+tests/test_credentials.py ..............                                 [ 65%]
+tests/test_import_akips.py .                                             [ 66%]
+tests/test_nothing_found.py .......                                      [ 70%]
+tests/test_series.py .........                                           [ 75%]
+tests/test_transport.py .............................                    [ 91%]
+tests/test_ups.py ...............                                        [100%]
 
-============================== 88 passed in 0.19s ==============================
+============================= 177 passed in 0.30s ==============================
 ```
 
 The test files mirror the API sections in `akips/__init__.py`, so a test for a
-new method belongs in the file for the section it calls.
+new method belongs in the file for the section it calls. A few cut across
+sections instead — `test_nothing_found.py` asserts that every method answers
+"nothing found" the same way, and `test_transport.py` covers credentials and
+redaction — so a new method may need a line in those as well.
+
+### Writing test data
+
+**Invent it. Never capture it.** AKiPS stores SNMP community strings and v3
+passwords as ordinary device attributes, so a reply to something as innocent as
+`get_device` can carry credentials in fields that look like any other. Read a
+real reply for its shape, then write the fixture from scratch with obviously
+fake values, and use [RFC 5737](https://datatracker.ietf.org/doc/html/rfc5737)
+addresses — `192.0.2.x`, `198.51.100.x`, `203.0.113.x` — rather than real ones.
+
+Realism in a fixture is never worth a real value. A parser cannot tell the
+difference, and no automated check will catch it: GitHub push protection only
+matches recognized token formats, and an SNMP community has no format.
+
+[SECURITY.md](SECURITY.md) covers this and how to report a vulnerability.
+
+### A note on spelling
+
+This project uses American English throughout — code, comments, docstrings,
+documentation and commit messages. It is easy to drift, because AKiPS is an
+Australian company and its documentation is written in British English, so
+reading their guide while writing ours pulls the spelling across.
 
 ## Create a branch for your work
 
