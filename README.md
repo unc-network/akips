@@ -288,6 +288,87 @@ pprint.pp(group_list, sort_dicts=True, width=120, indent=4)
 {'TH840-A': ['A10', 'admin', 'Core-Routers', 'Not-Core', 'OpsCenter', 'Ungrouped', 'user ']}
 ```
 
+### What is down right now
+
+The devices AKiPS currently reports as unreachable, by ping, by SNMP, or by
+both. A device down on both checks is one entry, not two.
+
+```py
+down = api.get_unreachable()
+pprint.pp(down, sort_dicts=False, width=100)
+```
+
+```text
+{'sw-203-0-113-54': {'name': 'sw-203-0-113-54',
+                     'ping_state': 'down',
+                     'snmp_state': 'down',
+                     'event_start': datetime.datetime(2026, 8, 2, 13, 58, 19, tzinfo=...),
+                     'child': 'ping4',
+                     'index': '1',
+                     'device_added': datetime.datetime(2017, 1, 17, 15, 34, 17, tzinfo=...),
+                     'ip4addr': '203.0.113.54'},
+ 'ap-203-0-113-63': {'name': 'ap-203-0-113-63',
+                     'ping_state': 'down',
+                     'snmp_state': 'n/a',
+                     'event_start': datetime.datetime(2026, 8, 2, 13, 9, 57, tzinfo=...),
+                     'child': 'ping4',
+                     'index': '1',
+                     'device_added': datetime.datetime(2020, 11, 17, 1, 51, 35, tzinfo=...),
+                     'ip4addr': '203.0.113.63'}}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `name` | the device, same as the outer key |
+| `ping_state` | `'down'`, or `'n/a'` if ping did not report it |
+| `snmp_state` | `'down'`, or `'n/a'` if SNMP did not report it |
+| `event_start` | when the outage began, timezone aware in the server's timezone |
+| `child` | the child that reported it, `ping4`, `ping6` or `sys` |
+| `index` | the enum number behind the state |
+| `device_added` | when AKiPS first recorded the device |
+| `ip4addr` | the address; `None` when only SNMP reported |
+
+The second device above is down on ping while SNMP says nothing, which is the
+common shape for something that has lost power or its uplink. The first is down
+on both.
+
+A device down on both checks reports two lines with different children, and the
+entry has one. **The ping line wins**, because it is the only one carrying an
+address — so `child`, `index`, `device_added` and `ip4addr` all come from the
+same line and describe the same thing. A device down on SNMP alone gets `sys`
+and no address. Which line AKiPS sends first makes no difference.
+
+The query asks only for checks reporting `down`, so a check that is fine
+returns no line at all. That makes `'n/a'` mean *not reported as down* rather
+than *unknown*, and the pair of states diagnostic:
+
+| `ping_state` | `snmp_state` | What it means |
+| --- | --- | --- |
+| `down` | `down` | unreachable, both checks failing |
+| `n/a` | `down` | answering ping but not SNMP — commonly a device whose CPU is too busy to answer the agent, or an agent that has stopped |
+| `down` | `n/a` | answering SNMP but not ping, usually ICMP filtered somewhere in the path |
+
+The middle row is worth watching during an incident, because it often precedes
+the first: a device under load stops answering SNMP before it stops answering
+ping, so a device moving from that row to the top one is one getting worse.
+
+Note that row also has `ip4addr` of `None`, since the address rides on the ping
+line and no ping line was returned. The half-down device gives you the least to
+identify it by; `get_devices()` has the address if you need it.
+
+`event_start` is the **earlier** of the two times when a device is down on both
+checks, because the outage began when the first check failed. A device down for
+minutes is an event; one down for months is usually decommissioned equipment
+nobody removed.
+
+Returns `None` when nothing is down, not an empty dictionary — so `if down:`
+rather than iterating directly, which would raise `TypeError` on a quiet
+network.
+
+By default this searches the `ping4|ping6|sys` children rather than every child
+of every device, which is most of the query's cost. Pass `children='*'` if your
+AKiPS names them differently.
+
 ### UPS power and battery
 
 Three helpers return only the UPS devices in a state worth acting on, rather

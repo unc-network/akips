@@ -12,6 +12,18 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 > tags after the fact, by comparing the public API at each tag. They record the
 > user-visible changes but are not as detailed as entries written at the time.
 
+## [Unreleased]
+
+### Documentation
+
+- `get_unreachable()` is documented in the README, with the shape it returns
+  and three things that were only discoverable from the source: when a device
+  fails both checks the ping line supplies `child`, `index`, `device_added`
+  and `ip4addr`, because it is the only line carrying an address; `'n/a'`
+  means a check did **not** report as down, since the query asks only for
+  failing checks; and the pair of states reads as a progression, because a
+  device under load stops answering SNMP before it stops answering ping.
+
 ## [1.0.0] - 2026-08-03
 
 The first release to commit to a stable API. Return shapes that disagreed with
@@ -607,6 +619,7 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.0.0...develop
 [1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/unc-network/akips/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/unc-network/akips/compare/v0.5.0...v0.5.1
