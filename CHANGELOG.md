@@ -23,6 +23,12 @@ Those corrections are breaking, and they are gathered here deliberately: better
 to face them once than to meet them one at a time across several releases. From
 here, a breaking change means a 2.0.
 
+Developed and validated against **AKiPS v26.5**, with each pre-release
+exercised against a live fleet of roughly 17,000 devices. No lower bound is
+claimed. AKiPS's current published API guide is edition 17, covering release 22.10 of
+December 2022 and unrevised across the twenty five releases since, so where it
+and a running server disagree this release follows the server.
+
 **Upgrading:** see [MIGRATING.md](MIGRATING.md) for what to change, with before
 and after for each one. Two are worth knowing before you read any further,
 because between them they account for most of the work:

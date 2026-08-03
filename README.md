@@ -8,6 +8,19 @@
 This akips module provides a simple way for python scripts to interact with 
 the [AKiPS Network Monitoring Software](http://akips.com) API interface.
 
+## AKiPS compatibility
+
+Developed and validated against **AKiPS v26.5**. No lower bound is claimed:
+earlier releases may work, but nothing here is tested against them.
+
+AKiPS publishes an API reference guide. The current edition, 17, covers
+release 22.10 of December 2022 and has not been revised across the twenty five
+releases since. Some behavior this module depends on is therefore observed
+against a running server rather than documented — the `entity` parameter the
+availability calls use appears in no published syntax, for instance, and the
+guide's own description of `last1d` contradicts its example output. Where the
+two disagree, this module follows the server and says so in the docstring.
+
 ## Installation
 
 To install akips, simply use pip:
@@ -335,7 +348,8 @@ Ask for one type. On a large fleet an unfiltered hour can be hundreds of
 thousands of messages, almost all of it syslog, where the traps alone are a few
 thousand. Note also that `limit` fills from the *start* of the window, so it
 returns the oldest matches rather than the newest; for recent activity, narrow
-`period` instead.
+`period` instead. AKiPS 25.6 added a reverse sort option under Miscellaneous
+Settings, but it is server wide rather than per call.
 
 `ip_addr` is where the message came from, which is not necessarily the address
 AKiPS holds for the device. A device with several interfaces can send from any
@@ -454,6 +468,12 @@ covers what changes when moving to 1.0, with before and after for each one.
 ## API Documentation
 
 [API Documentation](https://unc-network.github.io/akips/docs/akips.html)
+
+## Security
+
+[SECURITY.md](https://github.com/unc-network/akips/blob/develop/SECURITY.md)
+covers how to report a vulnerability, and what this package does with the
+credentials it is given.
 
 ## Contributing
 

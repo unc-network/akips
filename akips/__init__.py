@@ -1265,11 +1265,14 @@ class AKIPS:
             device (str): device name to filter messages by (default: None)
             regex (str): regex pattern to filter message content by (default: None)
             limit (int): maximum number of messages to return (default: None).
-                AKiPS fills this from the start of the window, so it returns
-                the oldest matching messages rather than the newest, and there
-                is no ordering parameter to ask for the other end.  For recent
-                activity narrow 'period' instead: 'last15m' with no limit costs
-                far less than an hour of messages thrown away after the fact
+                AKiPS fills this from the start of the window, so by default it
+                returns the oldest matching messages rather than the newest,
+                and there is no ordering parameter on the request.  AKiPS 25.6
+                added a reverse sort option under Miscellaneous Settings, which
+                is server wide rather than per call; whether it reaches this
+                section has not been tested here.  For recent activity narrow
+                'period' instead: 'last15m' with no limit costs far less than
+                an hour of messages thrown away after the fact
         Returns:
             A list of dictionaries, each with 'time', 'type', 'ip_ver',
             'ip_addr' and 'message', or None if no data found.  'ip_addr' is
@@ -1380,8 +1383,9 @@ class AKIPS:
             regex (str): regex pattern to filter message content by
                 (default: None)
             limit (int): maximum number of messages to return (default: None).
-                This returns the oldest matching messages, not the newest;
-                narrow 'period' for recent activity
+                This returns the oldest matching messages by default, not the
+                newest; narrow 'period' for recent activity.  See get_msg()
+                for the server setting that may reverse it
         Returns:
             A list of dictionaries, each with 'time', 'type', 'ip_ver',
             'ip_addr' and 'message', or None if no data found.  'ip_addr' is
@@ -1433,8 +1437,9 @@ class AKIPS:
             regex (str): regex pattern to filter message content by
                 (default: None)
             limit (int): maximum number of messages to return (default: None).
-                This returns the oldest matching messages, not the newest;
-                narrow 'period' for recent activity
+                This returns the oldest matching messages by default, not the
+                newest; narrow 'period' for recent activity.  See get_msg()
+                for the server setting that may reverse it
         Returns:
             A list of dictionaries, each with 'time', 'type', 'ip_ver',
             'ip_addr' and 'message', or None if no data found.  'ip_addr' is
