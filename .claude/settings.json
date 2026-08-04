@@ -27,8 +27,6 @@
       "Bash(command -v:*)"
     ],
     "deny": [
-      "Bash(git push:*)",
-      "Bash(git commit:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean:*)",
       "Bash(git rebase:*)",

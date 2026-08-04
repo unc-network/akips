@@ -31,12 +31,26 @@ pip install akips
 
 ### AKiPS Setup
 
-AKiPS includes a way to extend the server through custom perl scripts.  They publish a list from
-their [Support - Site scripts](https://www.akips.com/customer-support/site-scripts/) page, along
-with install instructions.
+AKiPS can be extended with Perl site scripts running on the server, and two of
+this module's methods each depend on one:
 
-This module can use additional routines included in the *akips_setup* directory of 
-this repository, [site_scripting.pl](akips_setup/site_scripting.pl).
+| Script | Used by | Why a script is needed |
+| --- | --- | --- |
+| `web_manual_grouping` | `set_group_membership()` | there is no stock Web API path to group membership, which is also the only way to move a device in or out of maintenance mode |
+| `web_find_device_by_ip` | `get_device_by_ip()` | AKiPS keeps an address to device table that the Web API does not expose |
+
+Both are prerequisites rather than enhancements: without them installed those
+two methods cannot work, whatever credentials you hold.
+
+**AKiPS wrote and publishes both.** Copies are kept in
+[akips_setup/](akips_setup/), one file per function to match how AKiPS
+publishes them, with installation steps and a note on keeping them current.
+
+That page has many more — device discovery, rewalk, rename and delete, alert
+integrations, exports — several of which this module may wrap in future. If you
+write your own, prefer the forms that read SNMP parameters from the server's
+own configuration rather than taking them as arguments, so credentials stay in
+AKiPS rather than in a file on disk.
 
 ## Usage Examples
 
