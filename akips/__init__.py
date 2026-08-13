@@ -2385,10 +2385,14 @@ class AKIPS:
             # falling through to AkipsError rather than being forced into a
             # category.  Both subclass AkipsError, so callers catching that
             # are unaffected.
+            # Both carry what the call already knew, so a caller can act on
+            # the section or the account without parsing AKiPS's prose.
             if re.search(r"invalid username/password", message, re.IGNORECASE):
-                raise AkipsAuthenticationError(message=message)
+                raise AkipsAuthenticationError(
+                    message=message, section=section, username=username
+                )
             if re.search(r"access is turned off", message, re.IGNORECASE):
-                raise AkipsSectionDisabledError(message=message)
+                raise AkipsSectionDisabledError(message=message, section=section)
             raise AkipsError(message=message)
         else:
             logger.debug(

@@ -573,6 +573,23 @@ wording they recognize is not documented by AKiPS, so an error phrased some
 other way still arrives as a plain `AkipsError` rather than being sorted into
 the wrong one of the two.
 
+Both carry what the call already knew, so nothing needs to read the message:
+
+```py
+try:
+    api.call('stat *', section='api-flow')
+except AkipsSectionDisabledError as err:
+    print(f'Enable the {err.section} section in AKiPS')
+except AkipsAuthenticationError as err:
+    print(f'AKiPS refused the {err.username} account on {err.section}')
+```
+
+`.section` is on both and `.username` on `AkipsAuthenticationError`. Both come
+from the request rather than the reply, so they stay correct if AKiPS rewords
+its message or stops naming the section in it. There is no HTTP status worth
+carrying — AKiPS answers `200` to everything, errors included, which is why
+this library reads the body.
+
 An `AkipsCredentialError` is raised instead when the client has no password for
 the account a call needs. This is a configuration problem rather than a reply
 from AKiPS, so it is raised before any request is made:

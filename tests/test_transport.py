@@ -504,3 +504,47 @@ class ErrorClassificationTest(unittest.TestCase):
         # match must not depend on it
         self._raises("ERROR: invalid username/password", AkipsAuthenticationError)
         self._raises("ERROR: access is turned off", AkipsSectionDisabledError)
+
+    def test_the_disabled_section_is_carried_as_an_attribute(self):
+        # Consumers should not have to match on AKiPS's wording to find out
+        # which section was refused
+        error = self._raises(
+            "ERROR: api-db access is turned off", AkipsSectionDisabledError
+        )
+        self.assertEqual(error.section, "api-db")
+
+    def test_the_section_comes_from_the_request_not_the_message(self):
+        # Taken from what was asked for, so it stays right even if AKiPS
+        # rewords the reply or stops naming the section in it
+        with patch("requests.Session.post") as session_mock:
+            session_mock.return_value.text = "ERROR: access is turned off"
+            api = AKIPS("akips.example.com", ro_password="ro-secret")
+            with self.assertRaises(AkipsSectionDisabledError) as caught:
+                api.call("stat *", section="api-flow")
+        self.assertEqual(caught.exception.section, "api-flow")
+
+    def test_the_refused_account_is_carried_as_an_attribute(self):
+        error = self._raises(
+            "ERROR: api-db invalid username/password", AkipsAuthenticationError
+        )
+        self.assertEqual(error.section, "api-db")
+        self.assertEqual(error.username, "api-ro")
+
+    def test_the_rw_account_is_named_when_a_write_section_refuses(self):
+        # A section needing api-rw and given api-ro fails here rather than
+        # anywhere more obvious, so the account is the useful half
+        with patch("requests.Session.post") as session_mock:
+            session_mock.return_value.text = (
+                "ERROR: api-script invalid username/password"
+            )
+            api = AKIPS("akips.example.com", rw_password="rw-secret")
+            with self.assertRaises(AkipsAuthenticationError) as caught:
+                api.set_group_membership("dev1", "maintenance_mode", "assign")
+        self.assertEqual(caught.exception.section, "api-script")
+        self.assertEqual(caught.exception.username, "api-rw")
+
+    def test_the_attributes_default_to_none(self):
+        # Constructible without them, so nothing that raises these by hand breaks
+        self.assertIsNone(AkipsSectionDisabledError().section)
+        self.assertIsNone(AkipsAuthenticationError().section)
+        self.assertIsNone(AkipsAuthenticationError().username)

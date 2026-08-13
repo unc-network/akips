@@ -38,9 +38,26 @@ class AkipsAuthenticationError(AkipsError):
     It subclasses AkipsError alone, deliberately not AkipsCredentialError:
     that one is also a ValueError, which suits a bad argument and not a
     reply from a server.
+
+    Attributes:
+        section (str | None): the API section that refused the credentials
+        username (str | None): the account the request authenticated as,
+            which is usually the useful half — a section needing api-rw and
+            given api-ro fails here rather than anywhere more obvious
+
+    Both are None when the exception is constructed without them.  There is
+    no HTTP status worth carrying: AKiPS answers 200 to everything, errors
+    included, which is why the reply body is what this library reads.
     """
 
-    def __init__(self, message: str = "AKiPS rejected the credentials") -> None:
+    def __init__(
+        self,
+        message: str = "AKiPS rejected the credentials",
+        section: str | None = None,
+        username: str | None = None,
+    ) -> None:
+        self.section = section
+        self.username = username
         super().__init__(message)
 
 
@@ -52,7 +69,19 @@ class AkipsSectionDisabledError(AkipsError):
     Admin > API > Web API Settings.  The credentials were accepted, so this
     is a server configuration problem rather than anything wrong with the
     call, and it is the most common first-run failure.
+
+    Attributes:
+        section (str | None): the API section that is switched off, so a
+            caller can name it without matching on the message, which is
+            AKiPS's wording and may be reworded
+
+    It is None when the exception is constructed without it.
     """
 
-    def __init__(self, message: str = "The AKiPS API section is not enabled") -> None:
+    def __init__(
+        self,
+        message: str = "The AKiPS API section is not enabled",
+        section: str | None = None,
+    ) -> None:
+        self.section = section
         super().__init__(message)

@@ -25,6 +25,13 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
   wording they match on is undocumented, so an error AKiPS phrases some other
   way still raises `AkipsError` rather than being forced into a category.
 
+  Both carry what the call already knew, so nothing has to parse the message:
+  `.section` on each, and `.username` on `AkipsAuthenticationError` — which is
+  usually the useful half, since a section needing `api-rw` and given `api-ro`
+  fails there rather than anywhere more obvious. Both come from the request,
+  not from the reply, so they stay right if AKiPS rewords it. There is no HTTP
+  status worth carrying: AKiPS answers 200 to everything, errors included.
+
 - `use_post` on `AKIPS()`, default `True`. See below.
 
 ### Security
@@ -43,6 +50,12 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
   Nothing else moves. The username and every other parameter stay in the query
   string, no method signature changes, and callers see no difference.
+
+  **Tests that mock `requests.Session.get` will no longer intercept.** Mock
+  `post` as well, or pass `use_post=False`. Nothing announces this: the patch
+  simply stops matching and the call is attempted for real, so a suite that
+  passed yesterday fails on a connection error to a host it thought was faked.
+  On a machine where that hostname resolves, the request is sent.
 
 ### Documentation
 
