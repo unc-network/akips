@@ -12,6 +12,66 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 > tags after the fact, by comparing the public API at each tag. They record the
 > user-visible changes but are not as detailed as entries written at the time.
 
+## [Unreleased]
+
+## [1.1.0] - 2026-08-13
+
+### Added
+
+- `AkipsAuthenticationError` when AKiPS rejects the username and password, and
+  `AkipsSectionDisabledError` when the section is switched off on the server.
+  Both are ordinary first-run mistakes, and both used to arrive as a bare
+  `AkipsError` carrying only whatever AKiPS said.
+
+  Both subclass `AkipsError`, so code that catches that is unaffected. The
+  wording they match on is undocumented, so an error AKiPS phrases some other
+  way still raises `AkipsError` rather than being forced into a category.
+
+  Both carry what the call already knew, so nothing has to parse the message:
+  `.section` on each, and `.username` on `AkipsAuthenticationError` — which is
+  usually the useful half, since a section needing `api-rw` and given `api-ro`
+  fails there rather than anywhere more obvious. Both come from the request,
+  not from the reply, so they stay right if AKiPS rewords it. There is no HTTP
+  status worth carrying: AKiPS answers 200 to everything, errors included.
+
+- `use_post` on `AKIPS()`, default `True`. See below.
+
+### Security
+
+- The password is now sent in a POST body instead of the query string. A URL
+  is routinely recorded by web servers, proxies and load balancers in their
+  access logs, and turns up in exception messages and client history; a
+  request body is not. Credentials have no business in a URL, and this one had
+  been in every request the module made. Verified against AKiPS 26.5 across
+  all ten API sections and both accounts.
+
+  Pass `use_post=False` to send the previous GET form, for a server that will
+  not accept a POST. Nothing falls back on its own: a silent retry over GET
+  would put the password back in the URL at exactly the moment the server
+  turned out not to support the fix.
+
+  Nothing else moves. The username and every other parameter stay in the query
+  string, no method signature changes, and callers see no difference.
+
+  **Tests that mock `requests.Session.get` will no longer intercept.** Mock
+  `post` as well, or pass `use_post=False`. Nothing announces this: the patch
+  simply stops matching and the call is attempted for real, so a suite that
+  passed yesterday fails on a connection error to a host it thought was faked.
+  On a machine where that hostname resolves, the request is sent. This is also
+  in the README, because a changelog does not ship in the wheel and this is
+  the one note here that a consumer needs before they upgrade rather than
+  after.
+
+### Documentation
+
+- `get_unreachable()` is documented in the README, with the shape it returns
+  and three things that were only discoverable from the source: when a device
+  fails both checks the ping line supplies `child`, `index`, `device_added`
+  and `ip4addr`, because it is the only line carrying an address; `'n/a'`
+  means a check did **not** report as down, since the query asks only for
+  failing checks; and the pair of states reads as a progression, because a
+  device under load stops answering SNMP before it stops answering ping.
+
 ## [1.0.0] - 2026-08-03
 
 The first release to commit to a stable API. Return shapes that disagreed with
@@ -607,6 +667,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.1.0...develop
+[1.1.0]: https://github.com/unc-network/akips/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/unc-network/akips/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/unc-network/akips/compare/v0.5.0...v0.5.1

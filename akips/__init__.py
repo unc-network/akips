@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import csv
 import io
@@ -17,7 +17,12 @@ import pytz
 import requests
 import urllib3
 
-from akips.exceptions import AkipsCredentialError, AkipsError
+from akips.exceptions import (
+    AkipsAuthenticationError,
+    AkipsCredentialError,
+    AkipsError,
+    AkipsSectionDisabledError,
+)
 
 # Logging configuration
 logger = logging.getLogger(__name__)
@@ -108,6 +113,7 @@ class AKIPS:
         timeout: int = 30,
         ro_password: str | None = None,
         rw_password: str | None = None,
+        use_post: bool = True,
     ) -> None:
         self.server = server
         """The AKiPS server hostname or IP address."""
@@ -131,6 +137,17 @@ class AKIPS:
         self.timeout = timeout
         """HTTP timeout in seconds applied to every call.  Assign to it to
         change the timeout of an existing client, e.g. api.timeout = 60."""
+        self.use_post = use_post
+        """Whether to send the password in a POST body instead of the query
+        string.  True by default, and it should stay that way: URLs are
+        recorded by web servers, proxies and load balancers in their access
+        logs, and appear in exception messages and client history.  A request
+        body is not logged that way, and a credential does not belong in a URL.
+
+        Set it to False only for a server that will not accept the POST form,
+        which puts the password back in the URL.  Nothing falls back on its
+        own, because a silent retry over GET would leak the password at
+        exactly the moment the server turned out not to support this."""
         self.session = requests.Session()
         """The requests session every call is made through."""
         # Sections warned about already, so a caller legitimately using a
@@ -1147,12 +1164,13 @@ class AKIPS:
         address to device table, which the site script reads, so this maps any
         address the server has seen back to the device holding it.
 
-        That table is not the same as the device's attributes, and searching
-        the attributes is not a substitute.  Observed on a live server: an
-        address resolved here to a device whose whole attribute tree contained
-        no mention of it, the server having seen it on an interface at
-        discovery without storing it.  get_attributes() searches what AKiPS
-        recorded; this searches what AKiPS saw.
+        That table is not the device's attributes, and searching the attributes
+        is not a substitute.  AKiPS keeps the addresses configured on a device
+        in a CSV file rather than in its database, which is why an mget against
+        attributes does not find them; the GUI shows the same file as its
+        'Device to IP Mapping' report.  Confirmed on a live server, where an
+        address resolved here to a device whose entire attribute tree contained
+        no mention of it.
 
         This is the one read in this module that a read only deployment cannot
         perform.  AKiPS exposes it as a site script rather than a database
@@ -2233,7 +2251,13 @@ class AKIPS:
         user: str | None = None,
     ) -> str:
         """
-        Base HTTP GET against the AKiPS server for web API calls.
+        Base HTTP request against the AKiPS server for web API calls.
+
+        Sent as a POST with the password in the body, so it never appears in
+        the request URI.  Set use_post=False on the client to send the older
+        GET form instead, which puts the password in the query string.  The
+        name is kept from when this only did GET, because it is called in
+        two dozen places and is not part of the public API.
 
         Section options are individually enabled via the AKiPS Web API Settings page.
             api-availability      : Availability, default off
@@ -2256,7 +2280,10 @@ class AKIPS:
         Raises:
             AkipsCredentialError: if the account this section needs has no
                 password
-            AkipsError: if the AKiPS server returns an error
+            AkipsAuthenticationError: if AKiPS rejects the credentials
+            AkipsSectionDisabledError: if the section is not enabled on the
+                server
+            AkipsError: for any other error the AKiPS server returns
             requests.exceptions.HTTPError: for HTTP error responses
             requests.exceptions.ConnectionError: for connection errors
             requests.exceptions.Timeout: for request timeouts
@@ -2282,10 +2309,23 @@ class AKIPS:
         params = dict(params or {})
         username, password = self._credentials_for(section, user)
         params["username"] = username
-        params["password"] = password
 
-        logger.debug("GET url: {}".format(server_url))
-        logger.debug("GET params: {}".format(self._redact_sensitive_params(params)))
+        # The password travels in a POST body unless the caller has turned
+        # that off, so it stays out of the request URI and out of everything
+        # that records one.  Everything else stays in the query string either
+        # way, which is the form AKiPS documents and the only one older
+        # servers accept.
+        method = "POST" if self.use_post else "GET"
+        data: dict[str, str] | None = None
+        if self.use_post:
+            data = {"password": password}
+        else:
+            params["password"] = password
+
+        logger.debug("{} url: {}".format(method, server_url))
+        logger.debug(
+            "{} params: {}".format(method, self._redact_sensitive_params(params))
+        )
 
         try:
             with warnings.catch_warnings():
@@ -2298,9 +2338,21 @@ class AKIPS:
                     warnings.simplefilter(
                         "ignore", urllib3.exceptions.InsecureRequestWarning
                     )
-                r = self.session.get(
-                    server_url, params=params, verify=self.verify, timeout=self.timeout
-                )
+                if self.use_post:
+                    r = self.session.post(
+                        server_url,
+                        params=params,
+                        data=data,
+                        verify=self.verify,
+                        timeout=self.timeout,
+                    )
+                else:
+                    r = self.session.get(
+                        server_url,
+                        params=params,
+                        verify=self.verify,
+                        timeout=self.timeout,
+                    )
             r.raise_for_status()
         except requests.exceptions.RequestException as err:
             # One handler for every requests failure: HTTPError,
@@ -2321,6 +2373,26 @@ class AKIPS:
             # anywhere in the reply.
             message = self._redact_text(r.text, literals=False)
             logger.error("Web API request failed: {}".format(message))
+            # The two failures worth naming are the two that are nothing to do
+            # with the call: the wrong password, and a section left switched
+            # off.  Both are ordinary first-run mistakes and both used to
+            # arrive as an AkipsError saying only what AKiPS said.
+            #
+            # Matched loosely and on the distinctive phrase alone.  AKiPS
+            # prefixes the section name ('ERROR: api-db invalid
+            # username/password') but that is not documented anywhere and
+            # neither is the wording, so anything unrecognized has to keep
+            # falling through to AkipsError rather than being forced into a
+            # category.  Both subclass AkipsError, so callers catching that
+            # are unaffected.
+            # Both carry what the call already knew, so a caller can act on
+            # the section or the account without parsing AKiPS's prose.
+            if re.search(r"invalid username/password", message, re.IGNORECASE):
+                raise AkipsAuthenticationError(
+                    message=message, section=section, username=username
+                )
+            if re.search(r"access is turned off", message, re.IGNORECASE):
+                raise AkipsSectionDisabledError(message=message, section=section)
             raise AkipsError(message=message)
         else:
             logger.debug(

@@ -31,12 +31,26 @@ pip install akips
 
 ### AKiPS Setup
 
-AKiPS includes a way to extend the server through custom perl scripts.  They publish a list from
-their [Support - Site scripts](https://www.akips.com/customer-support/site-scripts/) page, along
-with install instructions.
+AKiPS can be extended with Perl site scripts running on the server, and two of
+this module's methods each depend on one:
 
-This module can use additional routines included in the *akips_setup* directory of 
-this repository, [site_scripting.pl](akips_setup/site_scripting.pl).
+| Script | Used by | Why a script is needed |
+| --- | --- | --- |
+| `web_manual_grouping` | `set_group_membership()` | there is no stock Web API path to group membership, which is also the only way to move a device in or out of maintenance mode |
+| `web_find_device_by_ip` | `get_device_by_ip()` | AKiPS keeps an address to device table that the Web API does not expose |
+
+Both are prerequisites rather than enhancements: without them installed those
+two methods cannot work, whatever credentials you hold.
+
+**AKiPS wrote and publishes both.** Copies are kept in
+[akips_setup/](akips_setup/), one file per function to match how AKiPS
+publishes them, with installation steps and a note on keeping them current.
+
+That page has many more — device discovery, rewalk, rename and delete, alert
+integrations, exports — several of which this module may wrap in future. If you
+write your own, prefer the forms that read SNMP parameters from the server's
+own configuration rather than taking them as arguments, so credentials stay in
+AKiPS rather than in a file on disk.
 
 ## Usage Examples
 
@@ -82,10 +96,33 @@ api = AKIPS(
     timeout=10,          # seconds, applied to every call, default 30
     verify='/etc/ssl/certs/akips-ca.pem',   # or True, or False to skip checks
     timezone='America/New_York',   # how the server reports its timestamps
+    use_post=True,       # keep the password out of the URL, default True
 )
 ```
 
 `timeout` can also be changed later with `api.timeout = 60`.
+
+### Where the password travels
+
+The password is sent in a POST body, so it never appears in the request URI.
+URLs are recorded by web servers, proxies and load balancers in their access
+logs, and turn up in exception messages and client history, none of which is a
+place for a credential. Request bodies are not logged that way. Everything
+else — the username, the command, every filter — stays in the query string.
+
+`use_post=False` sends the older form with the password in the URL. It exists
+for a server that will not accept a POST, and should not be used otherwise.
+Nothing falls back on its own, because a silent retry over GET would put the
+password back in the URL at exactly the moment the server turned out not to
+support this.
+
+**If your tests mock the transport, mock `requests.Session.post`.** Before
+1.1 this module only ever called `get`, so a suite patching that verb quietly
+stops intercepting: the patch no longer matches, the request is attempted for
+real, and what you see is a connection error to a host you believed was faked.
+Nothing in the symptom names the cause. Mock both verbs, or pass
+`use_post=False` in the fixture if that suits better. Two separate consumers
+hit this on upgrading, including this project's own test suite.
 
 `verify` takes a path to a CA bundle as well as `True` or `False`. A path is
 how to trust a server whose certificate chain is missing an intermediate,
@@ -288,6 +325,87 @@ pprint.pp(group_list, sort_dicts=True, width=120, indent=4)
 {'TH840-A': ['A10', 'admin', 'Core-Routers', 'Not-Core', 'OpsCenter', 'Ungrouped', 'user ']}
 ```
 
+### What is down right now
+
+The devices AKiPS currently reports as unreachable, by ping, by SNMP, or by
+both. A device down on both checks is one entry, not two.
+
+```py
+down = api.get_unreachable()
+pprint.pp(down, sort_dicts=False, width=100)
+```
+
+```text
+{'sw-203-0-113-54': {'name': 'sw-203-0-113-54',
+                     'ping_state': 'down',
+                     'snmp_state': 'down',
+                     'event_start': datetime.datetime(2026, 8, 2, 13, 58, 19, tzinfo=...),
+                     'child': 'ping4',
+                     'index': '1',
+                     'device_added': datetime.datetime(2017, 1, 17, 15, 34, 17, tzinfo=...),
+                     'ip4addr': '203.0.113.54'},
+ 'ap-203-0-113-63': {'name': 'ap-203-0-113-63',
+                     'ping_state': 'down',
+                     'snmp_state': 'n/a',
+                     'event_start': datetime.datetime(2026, 8, 2, 13, 9, 57, tzinfo=...),
+                     'child': 'ping4',
+                     'index': '1',
+                     'device_added': datetime.datetime(2020, 11, 17, 1, 51, 35, tzinfo=...),
+                     'ip4addr': '203.0.113.63'}}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `name` | the device, same as the outer key |
+| `ping_state` | `'down'`, or `'n/a'` if ping did not report it |
+| `snmp_state` | `'down'`, or `'n/a'` if SNMP did not report it |
+| `event_start` | when the outage began, timezone aware in the server's timezone |
+| `child` | the child that reported it, `ping4`, `ping6` or `sys` |
+| `index` | the enum number behind the state |
+| `device_added` | when AKiPS first recorded the device |
+| `ip4addr` | the address; `None` when only SNMP reported |
+
+The second device above is down on ping while SNMP says nothing, which is the
+common shape for something that has lost power or its uplink. The first is down
+on both.
+
+A device down on both checks reports two lines with different children, and the
+entry has one. **The ping line wins**, because it is the only one carrying an
+address — so `child`, `index`, `device_added` and `ip4addr` all come from the
+same line and describe the same thing. A device down on SNMP alone gets `sys`
+and no address. Which line AKiPS sends first makes no difference.
+
+The query asks only for checks reporting `down`, so a check that is fine
+returns no line at all. That makes `'n/a'` mean *not reported as down* rather
+than *unknown*, and the pair of states diagnostic:
+
+| `ping_state` | `snmp_state` | What it means |
+| --- | --- | --- |
+| `down` | `down` | unreachable, both checks failing |
+| `n/a` | `down` | answering ping but not SNMP — commonly a device whose CPU is too busy to answer the agent, or an agent that has stopped |
+| `down` | `n/a` | answering SNMP but not ping, usually ICMP filtered somewhere in the path |
+
+The middle row is worth watching during an incident, because it often precedes
+the first: a device under load stops answering SNMP before it stops answering
+ping, so a device moving from that row to the top one is one getting worse.
+
+Note that row also has `ip4addr` of `None`, since the address rides on the ping
+line and no ping line was returned. The half-down device gives you the least to
+identify it by; `get_devices()` has the address if you need it.
+
+`event_start` is the **earlier** of the two times when a device is down on both
+checks, because the outage began when the first check failed. A device down for
+minutes is an event; one down for months is usually decommissioned equipment
+nobody removed.
+
+Returns `None` when nothing is down, not an empty dictionary — so `if down:`
+rather than iterating directly, which would raise `TypeError` on a quiet
+network.
+
+By default this searches the `ping4|ping6|sys` children rather than every child
+of every device, which is most of the query's cost. Pass `children='*'` if your
+AKiPS names them differently.
+
 ### UPS power and battery
 
 Three helpers return only the UPS devices in a state worth acting on, rather
@@ -431,8 +549,11 @@ the reply unparsed. `cmd()` still works but raises a `DeprecationWarning`.
 
 ## API Errors
 
-An `AkipsError` is raised when AKiPS itself replies with an error message. The
-output below came from giving it an invalid password and making a call.
+An `AkipsError` is raised when AKiPS itself replies with an error message.
+
+Two of those replies have their own class, because both are ordinary setup
+mistakes rather than anything wrong with the call. An
+`AkipsAuthenticationError` means AKiPS rejected the username and password:
 
 ```py
 api = AKIPS('server', ro_password='badpassword')
@@ -444,8 +565,38 @@ Web API request failed: ERROR: api-db invalid username/password
 
 Traceback (most recent call last):
   ...
-akips.exceptions.AkipsError: ERROR: api-db invalid username/password
+akips.exceptions.AkipsAuthenticationError: ERROR: api-db invalid username/password
 ```
+
+An `AkipsSectionDisabledError` means the credentials were fine but the section
+is switched off. Every section is disabled by default and each is enabled
+separately under **Admin > API > Web API Settings**:
+
+```text
+akips.exceptions.AkipsSectionDisabledError: ERROR: api-flow access is turned off
+```
+
+Both subclass `AkipsError`, so code that catches that still catches these. The
+wording they recognize is not documented by AKiPS, so an error phrased some
+other way still arrives as a plain `AkipsError` rather than being sorted into
+the wrong one of the two.
+
+Both carry what the call already knew, so nothing needs to read the message:
+
+```py
+try:
+    api.call('stat *', section='api-flow')
+except AkipsSectionDisabledError as err:
+    print(f'Enable the {err.section} section in AKiPS')
+except AkipsAuthenticationError as err:
+    print(f'AKiPS refused the {err.username} account on {err.section}')
+```
+
+`.section` is on both and `.username` on `AkipsAuthenticationError`. Both come
+from the request rather than the reply, so they stay correct if AKiPS rewords
+its message or stops naming the section in it. There is no HTTP status worth
+carrying — AKiPS answers `200` to everything, errors included, which is why
+this library reads the body.
 
 An `AkipsCredentialError` is raised instead when the client has no password for
 the account a call needs. This is a configuration problem rather than a reply
@@ -462,7 +613,10 @@ but no rw_password was given to AKIPS()
 ```
 
 `AkipsCredentialError` subclasses both `AkipsError` and `ValueError`, so
-catching either of those still catches it.
+catching either of those still catches it. It is distinct from
+`AkipsAuthenticationError`: this one means no password was configured and is
+raised without contacting the server, that one means a password was sent and
+AKiPS refused it.
 
 ## Upgrading
 

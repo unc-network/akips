@@ -13,13 +13,14 @@ from akips.exceptions import AkipsCredentialError, AkipsError
 
 
 class CredentialTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def sent(self, api, call, session_mock: MagicMock):
         """Run a call and return the credentials that reached the request."""
         session_mock.return_value.text = ""
         call(api)
-        params = session_mock.call_args.kwargs["params"]
-        return params["username"], params["password"]
+        kwargs = session_mock.call_args.kwargs
+        # Username stays in the query string, password travels in the body
+        return kwargs["params"]["username"], kwargs["data"]["password"]
 
     def test_read_only_sections_use_the_ro_account(self):
         api = AKIPS("127.0.0.1", ro_password="ro-secret", rw_password="rw-secret")
@@ -48,7 +49,7 @@ class CredentialTest(unittest.TestCase):
             self.sent(api, lambda a: a.get_devices()), ("api-rw", "rw-secret")
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_section_needing_an_account_without_a_password_says_so(
         self, session_mock: MagicMock
     ):
@@ -124,7 +125,7 @@ class CredentialTest(unittest.TestCase):
             ("api-rw", "rw-secret"),
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_call_rejects_an_unknown_account(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -153,7 +154,7 @@ class CredentialTest(unittest.TestCase):
             },
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_read_write_only_client_is_told_what_it_needs(
         self, session_mock: MagicMock
     ):
