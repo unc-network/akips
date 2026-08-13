@@ -45,14 +45,14 @@ class NothingFoundTest(unittest.TestCase):
             "get_traps": lambda: api.get_traps(),
         }
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_empty_reply_is_none(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
         for name, call in self._all_calls().items():
             with self.subTest(method=name):
                 self.assertIsNone(call())
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_reply_that_parses_to_nothing_is_also_none(self, session_mock: MagicMock):
         # The case that used to differ.  An empty container here reads as
         # 'nothing to report' while the server actually said something this
@@ -76,7 +76,7 @@ class DeviceIsAttributesTest(unittest.TestCase):
         "TH840-F Ethernet1 IF-MIB.ifDescr = Ethernet 1\n"
     )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_it_sends_the_same_command(self, session_mock: MagicMock):
         session_mock.return_value.text = self.REPLY
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
@@ -87,7 +87,7 @@ class DeviceIsAttributesTest(unittest.TestCase):
         via_attributes = session_mock.call_args.kwargs["params"]["cmds"]
         self.assertEqual(via_device, via_attributes)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_it_returns_the_same_thing(self, session_mock: MagicMock):
         session_mock.return_value.text = self.REPLY
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
@@ -96,7 +96,7 @@ class DeviceIsAttributesTest(unittest.TestCase):
             api.get_attributes(device="TH840-F")["TH840-F"],
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_the_device_argument_is_named_device(self, session_mock: MagicMock):
         # It was 'name', the only method in the API not calling this 'device'
         session_mock.return_value.text = self.REPLY
@@ -111,7 +111,7 @@ class SeriesShapesAgreeTest(unittest.TestCase):
         "ap-2,radio.1,,SOME-MIB.clients,6,7\n"
     )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_the_list_form_keeps_its_time_axis(self, session_mock: MagicMock):
         # The list form is one row longer, and that row is the point of it:
         # the column headings are the timestamps for the readings underneath.
@@ -131,7 +131,7 @@ class SeriesShapesAgreeTest(unittest.TestCase):
         # both forms can put a reading against the time it was taken
         self.assertEqual(as_lists[1][4], as_dicts[0]["2024-02-21 09:10"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_header_with_no_data_rows_is_nothing_found(self, session_mock: MagicMock):
         # Dropping the header can empty the list form, and an empty list is
         # not the answer this module gives for nothing found

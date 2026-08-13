@@ -11,7 +11,7 @@ from akips import AKIPS, AkipsError
 
 
 class ApiScriptTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_by_ip(self, session_mock: MagicMock):
         r_text = """IP Address 192.0.2.65 is configured on cisco-sw1
 """  # noqa
@@ -23,7 +23,7 @@ class ApiScriptTest(unittest.TestCase):
         device_name = api.get_device_by_ip(ipaddr="192.0.2.65")
         self.assertEqual(device_name, "cisco-sw1")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_set_group_membership(self, session_mock: MagicMock):
         r_text = """"""  # noqa
         session_mock.return_value.ok = True
@@ -34,7 +34,7 @@ class ApiScriptTest(unittest.TestCase):
         output = api.set_group_membership("203.0.113.146", "test_group", "assign")
         self.assertIsNone(output)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_by_ip_returns_none_when_not_found(
         self, session_mock: MagicMock
     ):
@@ -51,7 +51,7 @@ class ApiScriptTest(unittest.TestCase):
         # a real answer, so it must not look like something went wrong
         warn.assert_not_called()
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_by_ip_sends_site_script_params(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -62,7 +62,7 @@ class ApiScriptTest(unittest.TestCase):
         self.assertEqual(kwargs["params"]["function"], "web_find_device_by_ip")
         self.assertEqual(kwargs["params"]["ipaddr"], "192.0.2.65")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_set_group_membership_sends_manual_grouping_params(
         self, session_mock: MagicMock
     ):
@@ -77,7 +77,7 @@ class ApiScriptTest(unittest.TestCase):
         self.assertEqual(params["mode"], "clear")
         self.assertEqual(params["device"], "203.0.113.146")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_set_group_membership_raises_on_server_output(
         self, session_mock: MagicMock
     ):
@@ -106,7 +106,7 @@ class SiteScriptMissingTest(unittest.TestCase):
     to be what the script would have written.
     """
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_unexpected_reply_points_at_the_site_script(
         self, session_mock: MagicMock
     ):
@@ -124,7 +124,7 @@ class SiteScriptMissingTest(unittest.TestCase):
                     self.assertIsNone(api.get_device_by_ip(ipaddr="192.0.2.65"))
                 self.assertIn("site script", logged.output[0])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_unknown_function_is_raised_not_warned(self, session_mock: MagicMock):
         session_mock.return_value.text = (
             "ERROR: api-script unknown function web_find_device_by_ip\n"

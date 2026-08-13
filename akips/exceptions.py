@@ -24,3 +24,35 @@ class AkipsCredentialError(AkipsError, ValueError):
 
     def __init__(self, message: str = "AKiPS credentials are not configured") -> None:
         super().__init__(message)
+
+
+class AkipsAuthenticationError(AkipsError):
+    """
+    Exception raised when AKiPS itself rejects the username and password.
+
+    Distinct from AkipsCredentialError, which means no password was
+    configured and is raised without contacting the server.  This one means a
+    password was sent and AKiPS refused it, so the account may not exist, the
+    password may be wrong, or the section may need the other account.
+
+    It subclasses AkipsError alone, deliberately not AkipsCredentialError:
+    that one is also a ValueError, which suits a bad argument and not a
+    reply from a server.
+    """
+
+    def __init__(self, message: str = "AKiPS rejected the credentials") -> None:
+        super().__init__(message)
+
+
+class AkipsSectionDisabledError(AkipsError):
+    """
+    Exception raised when the API section is switched off on the server.
+
+    Every section is disabled by default and each is enabled separately under
+    Admin > API > Web API Settings.  The credentials were accepted, so this
+    is a server configuration problem rather than anything wrong with the
+    call, and it is the most common first-run failure.
+    """
+
+    def __init__(self, message: str = "The AKiPS API section is not enabled") -> None:
+        super().__init__(message)

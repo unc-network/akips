@@ -21,7 +21,7 @@ BATTERY_VOLTAGE = (
 
 
 class LatestValuesTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_the_last_completed_interval_is_the_answer(self, session_mock: MagicMock):
         session_mock.return_value.text = BATTERY_VOLTAGE
 
@@ -40,7 +40,7 @@ class LatestValuesTest(unittest.TestCase):
         self.assertEqual(entry["time"].strftime("%Y-%m-%d %H:%M"), "2026-08-01 12:54")
         self.assertEqual(entry["attribute"], "UPS-MIB.upsBatteryVoltage")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_the_reading_is_timezone_aware(self, session_mock: MagicMock):
         session_mock.return_value.text = BATTERY_VOLTAGE
 
@@ -53,7 +53,7 @@ class LatestValuesTest(unittest.TestCase):
         self.assertIsNotNone(entry["time"].tzinfo)
         self.assertIn("EDT", entry["time"].strftime("%Z"))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_device_with_no_reading_is_kept_with_none(self, session_mock: MagicMock):
         # A device polled but with nothing recorded in the window is a
         # different answer from a device that was not asked about, so it is
@@ -70,7 +70,7 @@ class LatestValuesTest(unittest.TestCase):
         self.assertIsNone(result["ups-2"]["battery"]["value"])
         self.assertIsNone(result["ups-2"]["battery"]["time"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_several_children_on_one_device_are_all_kept(self, session_mock: MagicMock):
         # Keyed by device and child, because an attribute like interface
         # utilization has one reading per interface and a flat key would keep
@@ -87,7 +87,7 @@ class LatestValuesTest(unittest.TestCase):
         self.assertEqual(result["switch-1"]["eth0"]["value"], 12.0)
         self.assertEqual(result["switch-1"]["eth1"]["value"], 7.0)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_value_that_is_not_a_number_is_reported_not_dropped(
         self, session_mock: MagicMock
     ):
@@ -103,7 +103,7 @@ class LatestValuesTest(unittest.TestCase):
         self.assertEqual(list(result), ["ups-1"])
         self.assertIn("ups-2", logged.output[0])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_group_filtering_and_interval(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -119,14 +119,14 @@ class LatestValuesTest(unittest.TestCase):
         self.assertTrue(cmds.startswith("cseries interval avg 60 time last30m "))
         self.assertTrue(cmds.endswith(" all group datacenter"))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_nothing_returned_is_none(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         self.assertIsNone(api.get_latest_values("UPS-MIB.upsBatteryVoltage"))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_unreadable_column_heading_keeps_the_value(
         self, session_mock: MagicMock
     ):
@@ -147,7 +147,7 @@ class LatestValuesTest(unittest.TestCase):
         self.assertIsNone(entry["time"])
         warn.assert_not_called()
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_row_with_no_device_is_skipped(self, session_mock: MagicMock):
         # A blank leading field would otherwise key the result under an empty
         # string, which is worse than leaving the row out

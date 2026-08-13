@@ -11,7 +11,7 @@ from akips import AKIPS
 
 
 class CallTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_raw_is_the_default(self, session_mock: MagicMock):
         r_text = "TH840-A sys ip4addr = 203.0.113.15\n"
         session_mock.return_value.text = r_text
@@ -22,7 +22,7 @@ class CallTest(unittest.TestCase):
         self.assertTrue(args[0].endswith("/api-db"))
         self.assertEqual(kwargs["params"]["cmds"], "mget * TH840-A sys ip4addr")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_lines_output(self, session_mock: MagicMock):
         session_mock.return_value.text = "first line\n\nsecond line\n\n"
 
@@ -31,7 +31,7 @@ class CallTest(unittest.TestCase):
             api.call("mget * * * *", output="lines"), ["first line", "second line"]
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_key_value_output(self, session_mock: MagicMock):
         session_mock.return_value.text = (
             "203.0.113.146 = admin,Cisco,maintenance_mode\n"
@@ -43,7 +43,7 @@ class CallTest(unittest.TestCase):
         self.assertEqual(parsed["203.0.113.146"], "admin,Cisco,maintenance_mode")
         self.assertEqual(parsed["203.0.113.31"], "Security,admin,PaloAlto")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_attributes_output(self, session_mock: MagicMock):
         session_mock.return_value.text = (
             "TH840-A sys SNMPv2-MIB.sysName = TH840-A\n"
@@ -58,7 +58,7 @@ class CallTest(unittest.TestCase):
         # a value-less attribute is None here, as everywhere else
         self.assertIsNone(parsed["TH840-A"]["Ethernet1"]["IF-MIB.ifAlias"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_csv_output_without_a_header(self, session_mock: MagicMock):
         session_mock.return_value.text = "30,31,30\n29,28,27\n"
 
@@ -68,7 +68,7 @@ class CallTest(unittest.TestCase):
             [["30", "31", "30"], ["29", "28", "27"]],
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_csv_dict_output_uses_the_header_row(self, session_mock: MagicMock):
         session_mock.return_value.text = "parent,child,value\nTH840-A,sys,4\n"
 
@@ -78,7 +78,7 @@ class CallTest(unittest.TestCase):
         self.assertEqual(rows[0]["parent"], "TH840-A")
         self.assertEqual(rows[0]["value"], "4")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_reaches_other_sections_with_their_own_parameters(
         self, session_mock: MagicMock
     ):
@@ -93,7 +93,7 @@ class CallTest(unittest.TestCase):
         # no command string is invented for a section that takes none
         self.assertNotIn("cmds", kwargs["params"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_cmd_and_params_combine(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -103,7 +103,7 @@ class CallTest(unittest.TestCase):
         self.assertEqual(params["cmds"], "mget * * * *")
         self.assertEqual(params["profile"], "core")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_rejects_an_unknown_output_before_requesting(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -112,7 +112,7 @@ class CallTest(unittest.TestCase):
             api.call("mget * * * *", output="json")
         self.assertFalse(session_mock.called)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_requires_a_cmd_or_params(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -121,7 +121,7 @@ class CallTest(unittest.TestCase):
             api.call()
         self.assertFalse(session_mock.called)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_returns_none_for_an_empty_reply(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -129,7 +129,7 @@ class CallTest(unittest.TestCase):
         for output in AKIPS.OUTPUT_FORMATS:
             self.assertIsNone(api.call("mget * * * *", output=output))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_unknown_section_warns_but_still_runs(self, session_mock: MagicMock):
         # A typo lands here, and so does a section AKiPS added after this
         # release.  Refusing would mean the second case has to wait for a
@@ -144,7 +144,7 @@ class CallTest(unittest.TestCase):
         # the message lists what is known, so a typo is obvious
         self.assertIn("api-msg", logged.output[0])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_unknown_section_is_only_warned_about_once(
         self, session_mock: MagicMock
     ):
@@ -158,7 +158,7 @@ class CallTest(unittest.TestCase):
                 api.call(section="api-brand-new", params={"a": "b"})
         self.assertEqual(len(logged.output), 1)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_known_sections_do_not_warn(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -184,7 +184,7 @@ class ParserAgreementTest(unittest.TestCase):
         "TH840-B sys SNMPv2-MIB.sysName = TH840-B\n"
     )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_attributes_matches_the_attributes_output(
         self, session_mock: MagicMock
     ):
@@ -195,7 +195,7 @@ class ParserAgreementTest(unittest.TestCase):
             api.get_attributes(), api.call("mget * * * *", output="attributes")
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_group_membership_shares_the_key_value_parser(
         self, session_mock: MagicMock
     ):
@@ -211,7 +211,7 @@ class ParserAgreementTest(unittest.TestCase):
             {"203.0.113.146": "admin,Cisco"},
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_devices_is_the_attributes_shape_flattened(
         self, session_mock: MagicMock
     ):
@@ -228,7 +228,7 @@ class ParserAgreementTest(unittest.TestCase):
         self.assertIsNone(devices["TH840-A"]["SNMPv2-MIB.sysLocation"])
         self.assertIsNone(parsed["TH840-A"]["sys"]["SNMPv2-MIB.sysLocation"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_is_the_parser_shape_for_one_device(
         self, session_mock: MagicMock
     ):
@@ -259,7 +259,7 @@ class AttributeParserReportsWhatItCannotReadTest(unittest.TestCase):
     sent with nothing to say so.
     """
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_line_it_cannot_read_is_reported(self, session_mock: MagicMock):
         session_mock.return_value.text = (
             "dev1 sys SNMPv2-MIB.sysName = dev1\n"
@@ -275,7 +275,7 @@ class AttributeParserReportsWhatItCannotReadTest(unittest.TestCase):
         self.assertIn("Could not parse 1 of 3", logged.output[0])
         self.assertIn("not in the expected shape", logged.output[0])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_blank_lines_are_not_reported(self, session_mock: MagicMock):
         # A reply ends with a newline, and blank padding is not the server
         # saying something unreadable.  Warning on those would fire on every
@@ -291,7 +291,7 @@ class AttributeParserReportsWhatItCannotReadTest(unittest.TestCase):
         warn.assert_not_called()
         self.assertEqual(len(data["dev1"]["sys"]), 2)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_attribute_with_no_value_is_not_unreadable(
         self, session_mock: MagicMock
     ):

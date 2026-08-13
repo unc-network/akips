@@ -11,10 +11,11 @@ import traceback
 import urllib3
 
 from akips import AKIPS, AkipsError
+from akips.exceptions import AkipsAuthenticationError, AkipsSectionDisabledError
 
 
 class TransportTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_akips_error(self, session_mock: MagicMock):
         r_text = "ERROR: api-db invalid username/password"
 
@@ -29,7 +30,7 @@ class TransportTest(unittest.TestCase):
         self.assertRaises(AkipsError, api.get_devices)
         self.assertTrue(session_mock.called)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_http_error_propagates(self, session_mock: MagicMock):
         session_mock.return_value.raise_for_status.side_effect = (
             requests.exceptions.HTTPError("500 Server Error")
@@ -39,7 +40,7 @@ class TransportTest(unittest.TestCase):
         with self.assertRaises(requests.exceptions.HTTPError):
             api.get_devices()
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_connection_error_propagates(self, session_mock: MagicMock):
         session_mock.side_effect = requests.exceptions.ConnectionError("refused")
 
@@ -47,7 +48,7 @@ class TransportTest(unittest.TestCase):
         with self.assertRaises(requests.exceptions.ConnectionError):
             api.get_devices()
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_timeout_propagates(self, session_mock: MagicMock):
         session_mock.side_effect = requests.exceptions.Timeout("timed out")
 
@@ -55,7 +56,7 @@ class TransportTest(unittest.TestCase):
         with self.assertRaises(requests.exceptions.Timeout):
             api.get_devices()
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_request_exception_propagates(self, session_mock: MagicMock):
         session_mock.side_effect = requests.exceptions.RequestException("broken")
 
@@ -63,7 +64,7 @@ class TransportTest(unittest.TestCase):
         with self.assertRaises(requests.exceptions.RequestException):
             api.get_devices()
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_request_carries_credentials_and_timeout(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -72,11 +73,14 @@ class TransportTest(unittest.TestCase):
         args, kwargs = session_mock.call_args
         self.assertEqual(args[0], "https://akips.example.com/api-db")
         self.assertEqual(kwargs["params"]["username"], "api-rw")
-        self.assertEqual(kwargs["params"]["password"], "secret")
+        # The password goes in the body, never the query string, so that it
+        # cannot reach anything that records a URL
+        self.assertNotIn("password", kwargs["params"])
+        self.assertEqual(kwargs["data"], {"password": "secret"})
         self.assertEqual(kwargs["timeout"], 30)
         self.assertTrue(kwargs["verify"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_verify_false_is_passed_through(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -127,7 +131,7 @@ class TransportTest(unittest.TestCase):
         self.assertEqual(entry["value"], "full")
         self.assertEqual(entry["description"], "uplink to core")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_does_not_mutate_the_callers_params(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -137,9 +141,9 @@ class TransportTest(unittest.TestCase):
         # Credentials belong on the request, not in the dictionary the caller
         # still holds and may log or reuse
         self.assertEqual(caller_params, {"cmds": "mget * * * *"})
-        self.assertEqual(session_mock.call_args.kwargs["params"]["password"], "secret")
+        self.assertEqual(session_mock.call_args.kwargs["data"], {"password": "secret"})
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_accepts_no_params(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -148,7 +152,7 @@ class TransportTest(unittest.TestCase):
         self.assertEqual(api._get(section="api-db"), "")
         self.assertIn("username", session_mock.call_args.kwargs["params"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_verify_true_leaves_the_warning_filter_alone(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -157,7 +161,7 @@ class TransportTest(unittest.TestCase):
         api.get_devices()
         self.assertEqual(list(warnings.filters), before)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_verify_false_restores_the_warning_filter(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -168,7 +172,7 @@ class TransportTest(unittest.TestCase):
         # verify=False must not silence urllib3 for the whole process
         self.assertEqual(list(warnings.filters), before)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_default_timeout_is_thirty_seconds(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -176,7 +180,7 @@ class TransportTest(unittest.TestCase):
         api.get_devices()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 30)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_timeout_is_configurable_at_construction(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -193,7 +197,7 @@ class TransportTest(unittest.TestCase):
         api.get_group_availability()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_timeout_can_be_changed_on_an_existing_client(
         self, session_mock: MagicMock
     ):
@@ -206,7 +210,7 @@ class TransportTest(unittest.TestCase):
         api.get_devices()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 120)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_request_failures_do_not_leak_the_password(self, session_mock: MagicMock):
         # AKiPS authenticates by query string and requests reports the URL it
         # was fetching, so an unscrubbed exception carries the password into
@@ -230,7 +234,7 @@ class TransportTest(unittest.TestCase):
         # the exception type survives scrubbing, so existing handlers still work
         self.assertIsInstance(caught.exception, requests.exceptions.ConnectionError)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_url_encoded_password_is_scrubbed_too(self, session_mock: MagicMock):
         # requests percent encodes the query, so the literal password does not
         # appear; matching on the parameter catches it whatever it looks like
@@ -246,7 +250,7 @@ class TransportTest(unittest.TestCase):
         self.assertNotIn("p%40ss", "\n".join(logged.output))
         self.assertIn("password=****", "\n".join(logged.output))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_error_with_no_credentials_is_left_intact(self, session_mock: MagicMock):
         # Nothing to scrub means the exception keeps its original structure
         session_mock.side_effect = requests.exceptions.Timeout("timed out")
@@ -257,7 +261,7 @@ class TransportTest(unittest.TestCase):
                 api.get_devices()
         self.assertEqual(str(caught.exception), "timed out")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_the_whole_exception_chain_is_scrubbed(self, session_mock: MagicMock):
         # requests raises its error from the urllib3 one that caused it, and
         # that inner exception holds the same URL.  Anything rendering a full
@@ -287,7 +291,7 @@ class TransportTest(unittest.TestCase):
         self.assertNotIn(secret, str(err.__cause__))
         self.assertNotIn(secret, err.__cause__.url)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_the_response_url_on_an_http_error_is_scrubbed(
         self, session_mock: MagicMock
     ):
@@ -306,7 +310,7 @@ class TransportTest(unittest.TestCase):
         self.assertNotIn(secret, str(caught.exception))
         self.assertNotIn(secret, caught.exception.response.url)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_error_reply_body_is_redacted_without_mangling_data(
         self, session_mock: MagicMock
     ):
@@ -324,7 +328,7 @@ class TransportTest(unittest.TestCase):
         # the trailing 'up' is data, not a credential, and survives
         self.assertTrue(str(caught.exception).endswith("for up"))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_verify_accepts_a_ca_bundle_path(self, session_mock: MagicMock):
         # A server missing an intermediate can be trusted with its own bundle
         # rather than by turning verification off
@@ -334,7 +338,7 @@ class TransportTest(unittest.TestCase):
         api.get_devices()
         self.assertEqual(session_mock.call_args.kwargs["verify"], "/etc/ca.pem")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_scrubbing_never_masks_the_original_failure(self, session_mock: MagicMock):
         # Some exception could expose url as a read only property.  Scrubbing
         # must not turn that into an AttributeError raised in place of the
@@ -360,7 +364,7 @@ class TransportTest(unittest.TestCase):
         # the message is still scrubbed even though the attributes could not be
         self.assertNotIn("SuperSecret123", str(caught.exception))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_snmp_credentials_are_not_logged(self, session_mock: MagicMock):
         # AKiPS keeps SNMP credentials as ordinary device attributes, so a
         # reply to something as innocent as get_device carries the community
@@ -389,7 +393,7 @@ class TransportTest(unittest.TestCase):
         # and the caller still gets what it asked for
         self.assertEqual(device["sys"]["SNMP.community"], "not-a-real-community")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_parsed_device_is_not_dumped_into_the_log(self, session_mock: MagicMock):
         # get_device used to log the whole parsed structure, which is how the
         # credentials reached the log even once the reply itself was filtered
@@ -399,3 +403,104 @@ class TransportTest(unittest.TestCase):
         with self.assertLogs("akips", level="DEBUG") as logged:
             api.get_device("dev1")
         self.assertNotIn("secret-string", "\n".join(logged.output))
+
+
+class RequestMethodTest(unittest.TestCase):
+    """The password travels in a POST body unless a caller opts out."""
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_post_is_the_default(self, post_mock: MagicMock, get_mock: MagicMock):
+        post_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        api.get_devices()
+
+        self.assertTrue(post_mock.called)
+        self.assertFalse(get_mock.called)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_the_password_never_reaches_the_query_string(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        # The point of the whole exercise.  A URL reaches access logs,
+        # exception messages and client history; a request body does not
+        post_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        api.get_devices()
+
+        kwargs = post_mock.call_args.kwargs
+        self.assertNotIn("password", kwargs["params"])
+        self.assertEqual(kwargs["data"], {"password": "ro-secret"})
+        self.assertNotIn("ro-secret", str(kwargs["params"]))
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_use_post_false_sends_the_old_get_form(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        get_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret", use_post=False)
+        api.get_devices()
+
+        self.assertTrue(get_mock.called)
+        self.assertFalse(post_mock.called)
+        kwargs = get_mock.call_args.kwargs
+        self.assertEqual(kwargs["params"]["password"], "ro-secret")
+        # A GET carries no body, and sending one anyway would be a way for the
+        # password to travel twice
+        self.assertNotIn("data", kwargs)
+
+    @patch("requests.Session.post")
+    def test_the_password_is_not_logged_in_either_form(self, session_mock: MagicMock):
+        session_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        with self.assertLogs("akips", level="DEBUG") as logged:
+            api.get_devices()
+        self.assertNotIn("ro-secret", "\n".join(logged.output))
+
+
+class ErrorClassificationTest(unittest.TestCase):
+    """AKiPS reports two failures that are nothing to do with the call."""
+
+    def _raises(self, reply: str, expected: type[BaseException]):
+        with patch("requests.Session.post") as session_mock:
+            session_mock.return_value.text = reply
+            api = AKIPS("akips.example.com", ro_password="ro-secret")
+            with self.assertRaises(expected) as caught:
+                api.get_devices()
+        return caught.exception
+
+    def test_rejected_credentials_are_named(self):
+        error = self._raises(
+            "ERROR: api-db invalid username/password", AkipsAuthenticationError
+        )
+        self.assertIn("invalid username/password", str(error))
+
+    def test_a_disabled_section_is_named(self):
+        error = self._raises(
+            "ERROR: api-flow access is turned off", AkipsSectionDisabledError
+        )
+        self.assertIn("turned off", str(error))
+
+    def test_both_are_still_akips_errors(self):
+        # Callers written against 1.0.0 catch AkipsError, and must keep working
+        self._raises("ERROR: api-db invalid username/password", AkipsError)
+        self._raises("ERROR: api-flow access is turned off", AkipsError)
+
+    def test_an_unrecognized_error_stays_generic(self):
+        # The wording is undocumented, so anything unfamiliar must fall
+        # through rather than be forced into one of the two categories
+        error = self._raises("ERROR: Function doesn't exist", AkipsError)
+        self.assertNotIsInstance(error, AkipsAuthenticationError)
+        self.assertNotIsInstance(error, AkipsSectionDisabledError)
+
+    def test_the_section_name_is_not_required_to_match(self):
+        # AKiPS prefixes the section today, but that is not documented and the
+        # match must not depend on it
+        self._raises("ERROR: invalid username/password", AkipsAuthenticationError)
+        self._raises("ERROR: access is turned off", AkipsSectionDisabledError)

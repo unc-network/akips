@@ -9,7 +9,7 @@ from akips import AKIPS
 
 
 class ApiAvailabilityTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_group_availability(self, session_mock: MagicMock):
         # This endpoint returns no header row, so the parser supplies the
         # column names itself.
@@ -31,7 +31,7 @@ ping4,PING.icmpState,1-Building-16,44541195,44540002,9990,last1w
         self.assertEqual(rows[0]["tf"], "last1w")
         self.assertEqual(rows[2]["group name"], "1-Building-16")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_group_availability_keeps_schedule_in_time_filter(
         self, session_mock: MagicMock
     ):
@@ -52,7 +52,7 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
         # The schedule must not bleed into the preceding column
         self.assertEqual(rows[1]["group target"], "9999")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_group_availability_sends_expected_request(
         self, session_mock: MagicMock
     ):
@@ -71,7 +71,7 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
         self.assertEqual(params["report"], "snmp,ping4")
         self.assertEqual(params["group"], "Accedian")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_group_availability_defaults(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -86,7 +86,7 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
         # No group means no filter; requests drops a None valued parameter
         self.assertIsNone(params["group"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_group_availability_returns_none_for_empty_response(
         self, session_mock: MagicMock
     ):
@@ -97,7 +97,7 @@ ping4,PING.icmpState,Aerohive,589475,589475,9999,last1w;mon to fri 7:00 to 19:00
 
 
 class DeviceAvailabilityTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_availability(self, session_mock: MagicMock):
         # Six fields and no header row, and a device checked by both ping and
         # SNMP reports one row for each.
@@ -119,7 +119,7 @@ accedian-131-2-7,sys,SNMP.snmpState,136020,135900,9890
         self.assertEqual(rows[1]["child"], "sys")
         self.assertEqual(rows[1]["match time"], "135900")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_availability_sends_expected_request(
         self, session_mock: MagicMock
     ):
@@ -139,7 +139,7 @@ accedian-131-2-7,sys,SNMP.snmpState,136020,135900,9890
         self.assertEqual(params["entity"], "accedian-131-2-7")
         self.assertIsNone(params["group"])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_availability_needs_a_scope(self, session_mock: MagicMock):
         # AKiPS answers an unscoped device mode call with an empty body rather
         # than an error, which would reach the caller as None and read as
@@ -150,7 +150,7 @@ accedian-131-2-7,sys,SNMP.snmpState,136020,135900,9890
         self.assertIn("device or a group", str(caught.exception))
         self.assertFalse(session_mock.called)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_device_availability_returns_none_for_empty_response(
         self, session_mock: MagicMock
     ):
@@ -161,7 +161,7 @@ accedian-131-2-7,sys,SNMP.snmpState,136020,135900,9890
 
 
 class EventAvailabilityTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_event_availability(self, session_mock: MagicMock):
         r_text = """cisco-131-16-1,ping4,1603822871,1603822916,2389764,2388341
 cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
@@ -178,7 +178,7 @@ cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         self.assertEqual(rows[0]["total time"], "2389764")
         self.assertEqual(rows[0]["match time"], "2388341")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_event_availability_keeps_a_device_with_no_event_pair(
         self, session_mock: MagicMock
     ):
@@ -195,7 +195,7 @@ cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         self.assertEqual(rows[0]["total time"], "32017")
         self.assertEqual(rows[0]["match time"], "32017")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_event_availability_sends_expected_request(
         self, session_mock: MagicMock
     ):
@@ -208,7 +208,7 @@ cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         self.assertEqual(params["time"], "last1M")
         self.assertEqual(params["entity"], "cisco-131-16-1")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_event_availability_needs_a_scope(self, session_mock: MagicMock):
         # Confirmed against a server to behave the same way device mode does:
         # an unscoped call comes back empty rather than erroring, which would
@@ -219,7 +219,7 @@ cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         self.assertIn("device or a group", str(caught.exception))
         self.assertFalse(session_mock.called)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_event_availability_returns_none_for_empty_response(
         self, session_mock: MagicMock
     ):
@@ -229,7 +229,7 @@ cisco-131-16-1,ping4,1603088563,1603089823,2389764,2388341
         api = AKIPS("127.0.0.1", ro_password="ro-secret")
         self.assertIsNone(api.get_event_availability(device="cisco-131-16-1"))
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_event_availability_reports_each_outage_separately(
         self, session_mock: MagicMock
     ):
@@ -278,7 +278,7 @@ class AvailabilityPeriodTest(unittest.TestCase):
         # rolling form that means what its name says.
         self.assertEqual(AKIPS.AVAILABILITY_PERIOD, "last24h")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_the_default_reaches_every_availability_method(
         self, session_mock: MagicMock
     ):

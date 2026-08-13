@@ -32,7 +32,7 @@ class UpsOutputSourceTest(unittest.TestCase):
             ("other", "none", "bypass", "battery", "booster", "reducer"),
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_defaults_to_the_states_worth_looking_at(self, session_mock: MagicMock):
         session_mock.return_value.text = OUTPUT_SOURCE
 
@@ -52,7 +52,7 @@ class UpsOutputSourceTest(unittest.TestCase):
         self.assertEqual(entry["modified"].year, 2026)
         self.assertEqual(entry["created"].year, 2016)
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_no_states_means_every_ups(self, session_mock: MagicMock):
         session_mock.return_value.text = OUTPUT_SOURCE
 
@@ -63,7 +63,7 @@ class UpsOutputSourceTest(unittest.TestCase):
             "mget * * ups UPS-MIB.upsOutputSource",
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_narrower_state_list(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -75,7 +75,7 @@ class UpsOutputSourceTest(unittest.TestCase):
             )
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_group_filtering(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -87,7 +87,7 @@ class UpsOutputSourceTest(unittest.TestCase):
             )
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_nothing_reported_is_none(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -96,7 +96,7 @@ class UpsOutputSourceTest(unittest.TestCase):
 
 
 class LiebertBatteryTestTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_defaults_to_failures_only(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -108,7 +108,7 @@ class LiebertBatteryTestTest(unittest.TestCase):
             "value /failed/",
         )
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_no_results_filter_returns_every_test(self, session_mock: MagicMock):
         session_mock.return_value.text = BATTERY_TEST
 
@@ -122,7 +122,7 @@ class LiebertBatteryTestTest(unittest.TestCase):
         self.assertEqual(devices["192.0.2.121"]["value"], "passed")
         self.assertEqual(devices["192.0.2.128"]["child"], "battery")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_another_vendor_attribute_can_be_given(self, session_mock: MagicMock):
         # The Liebert attribute is a default, not a limit.  A fleet from
         # another vendor should be able to ask rather than get an empty
@@ -140,7 +140,7 @@ class LiebertBatteryTestTest(unittest.TestCase):
 
 
 class EnumAttributeParsingTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_value_that_is_not_an_enum_is_reported_not_dropped(
         self, session_mock: MagicMock
     ):
@@ -158,7 +158,7 @@ class EnumAttributeParsingTest(unittest.TestCase):
         self.assertIn("Could not parse 1 of 2", logged.output[0])
         self.assertIn("ups-2", logged.output[0])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_a_device_reporting_on_two_children_is_reported(
         self, session_mock: MagicMock
     ):
@@ -175,7 +175,7 @@ class EnumAttributeParsingTest(unittest.TestCase):
         self.assertEqual(devices["ups-1"]["child"], "ups")
         self.assertIn("more than one child", logged.output[0])
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_an_attribute_with_no_value_is_skipped(self, session_mock: MagicMock):
         # A device that reports the attribute but no value for it is not an
         # unreadable enum, it simply has nothing to say
@@ -193,7 +193,7 @@ class EnumAttributeParsingTest(unittest.TestCase):
 
 
 class UpsBatteryStatusTest(unittest.TestCase):
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_defaults_to_the_states_worth_looking_at(self, session_mock: MagicMock):
         session_mock.return_value.text = (
             "192.0.2.24 battery UPS-MIB.upsBatteryStatus "
@@ -211,7 +211,7 @@ class UpsBatteryStatusTest(unittest.TestCase):
         self.assertEqual(entry["value"], "batteryLow")
         self.assertEqual(entry["child"], "battery")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_no_states_means_every_ups(self, session_mock: MagicMock):
         # Taken from an AKiPS command console
         session_mock.return_value.text = (
@@ -227,7 +227,7 @@ class UpsBatteryStatusTest(unittest.TestCase):
         )
         self.assertEqual(devices["192.0.2.24"]["value"], "batteryNormal")
 
-    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_it_is_separate_from_the_output_source(self, session_mock: MagicMock):
         # A UPS can be on battery while its battery reports normal, and can
         # have a failing battery while running on mains, so these are two

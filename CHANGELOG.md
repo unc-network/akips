@@ -14,6 +14,36 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+### Added
+
+- `AkipsAuthenticationError` when AKiPS rejects the username and password, and
+  `AkipsSectionDisabledError` when the section is switched off on the server.
+  Both are ordinary first-run mistakes, and both used to arrive as a bare
+  `AkipsError` carrying only whatever AKiPS said.
+
+  Both subclass `AkipsError`, so code that catches that is unaffected. The
+  wording they match on is undocumented, so an error AKiPS phrases some other
+  way still raises `AkipsError` rather than being forced into a category.
+
+- `use_post` on `AKIPS()`, default `True`. See below.
+
+### Security
+
+- The password is now sent in a POST body instead of the query string. A URL
+  is routinely recorded by web servers, proxies and load balancers in their
+  access logs, and turns up in exception messages and client history; a
+  request body is not. Credentials have no business in a URL, and this one had
+  been in every request the module made. Verified against AKiPS 26.5 across
+  all ten API sections and both accounts.
+
+  Pass `use_post=False` to send the previous GET form, for a server that will
+  not accept a POST. Nothing falls back on its own: a silent retry over GET
+  would put the password back in the URL at exactly the moment the server
+  turned out not to support the fix.
+
+  Nothing else moves. The username and every other parameter stay in the query
+  string, no method signature changes, and callers see no difference.
+
 ### Documentation
 
 - `get_unreachable()` is documented in the README, with the shape it returns

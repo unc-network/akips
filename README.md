@@ -96,10 +96,25 @@ api = AKIPS(
     timeout=10,          # seconds, applied to every call, default 30
     verify='/etc/ssl/certs/akips-ca.pem',   # or True, or False to skip checks
     timezone='America/New_York',   # how the server reports its timestamps
+    use_post=True,       # keep the password out of the URL, default True
 )
 ```
 
 `timeout` can also be changed later with `api.timeout = 60`.
+
+### Where the password travels
+
+The password is sent in a POST body, so it never appears in the request URI.
+URLs are recorded by web servers, proxies and load balancers in their access
+logs, and turn up in exception messages and client history, none of which is a
+place for a credential. Request bodies are not logged that way. Everything
+else — the username, the command, every filter — stays in the query string.
+
+`use_post=False` sends the older form with the password in the URL. It exists
+for a server that will not accept a POST, and should not be used otherwise.
+Nothing falls back on its own, because a silent retry over GET would put the
+password back in the URL at exactly the moment the server turned out not to
+support this.
 
 `verify` takes a path to a CA bundle as well as `True` or `False`. A path is
 how to trust a server whose certificate chain is missing an intermediate,
@@ -526,8 +541,11 @@ the reply unparsed. `cmd()` still works but raises a `DeprecationWarning`.
 
 ## API Errors
 
-An `AkipsError` is raised when AKiPS itself replies with an error message. The
-output below came from giving it an invalid password and making a call.
+An `AkipsError` is raised when AKiPS itself replies with an error message.
+
+Two of those replies have their own class, because both are ordinary setup
+mistakes rather than anything wrong with the call. An
+`AkipsAuthenticationError` means AKiPS rejected the username and password:
 
 ```py
 api = AKIPS('server', ro_password='badpassword')
@@ -539,8 +557,21 @@ Web API request failed: ERROR: api-db invalid username/password
 
 Traceback (most recent call last):
   ...
-akips.exceptions.AkipsError: ERROR: api-db invalid username/password
+akips.exceptions.AkipsAuthenticationError: ERROR: api-db invalid username/password
 ```
+
+An `AkipsSectionDisabledError` means the credentials were fine but the section
+is switched off. Every section is disabled by default and each is enabled
+separately under **Admin > API > Web API Settings**:
+
+```text
+akips.exceptions.AkipsSectionDisabledError: ERROR: api-flow access is turned off
+```
+
+Both subclass `AkipsError`, so code that catches that still catches these. The
+wording they recognize is not documented by AKiPS, so an error phrased some
+other way still arrives as a plain `AkipsError` rather than being sorted into
+the wrong one of the two.
 
 An `AkipsCredentialError` is raised instead when the client has no password for
 the account a call needs. This is a configuration problem rather than a reply
@@ -557,7 +588,10 @@ but no rw_password was given to AKIPS()
 ```
 
 `AkipsCredentialError` subclasses both `AkipsError` and `ValueError`, so
-catching either of those still catches it.
+catching either of those still catches it. It is distinct from
+`AkipsAuthenticationError`: this one means no password was configured and is
+raised without contacting the server, that one means a password was sent and
+AKiPS refused it.
 
 ## Upgrading
 
