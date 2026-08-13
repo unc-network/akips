@@ -55,7 +55,10 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
   `post` as well, or pass `use_post=False`. Nothing announces this: the patch
   simply stops matching and the call is attempted for real, so a suite that
   passed yesterday fails on a connection error to a host it thought was faked.
-  On a machine where that hostname resolves, the request is sent.
+  On a machine where that hostname resolves, the request is sent. This is also
+  in the README, because a changelog does not ship in the wheel and this is
+  the one note here that a consumer needs before they upgrade rather than
+  after.
 
 ### Documentation
 

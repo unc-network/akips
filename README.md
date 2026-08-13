@@ -116,6 +116,14 @@ Nothing falls back on its own, because a silent retry over GET would put the
 password back in the URL at exactly the moment the server turned out not to
 support this.
 
+**If your tests mock the transport, mock `requests.Session.post`.** Before
+1.1 this module only ever called `get`, so a suite patching that verb quietly
+stops intercepting: the patch no longer matches, the request is attempted for
+real, and what you see is a connection error to a host you believed was faked.
+Nothing in the symptom names the cause. Mock both verbs, or pass
+`use_post=False` in the fixture if that suits better. Two separate consumers
+hit this on upgrading, including this project's own test suite.
+
 `verify` takes a path to a CA bundle as well as `True` or `False`. A path is
 how to trust a server whose certificate chain is missing an intermediate,
 which is common on an internal deployment, without turning verification off
