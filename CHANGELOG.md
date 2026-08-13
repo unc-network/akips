@@ -14,6 +14,8 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-13
+
 ### Added
 
 - `AkipsAuthenticationError` when AKiPS rejects the username and password, and
@@ -665,7 +667,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.0.0...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.1.0...develop
+[1.1.0]: https://github.com/unc-network/akips/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/unc-network/akips/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/unc-network/akips/compare/v0.5.0...v0.5.1
