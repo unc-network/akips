@@ -14,32 +14,15 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
-### Fixed
+## [1.2.0] - 2026-08-21
 
-- **`api-script` is now sent as GET, so the three site script methods work
-  again.** That section does not answer a POST: it returns 200 headers, then
-  no body, and holds the connection open until the client gives up. Every call
-  to `get_device_by_ip()`, `set_group_membership()` and `delete_device()` has
-  hung since 1.1.0 moved the module to POST. Reported to AKiPS 2026-08-21.
+Adds the module's first destructive call, and repairs three methods that
+1.1.0 broke.
 
-  `api-db` accepts a POST with the identical header, so this is `api-script`
-  specifically rather than anything wrong with the request.
-
-  **The cost is that those three calls put the password back in the query
-  string**, which is exactly what `use_post` exists to prevent, and it is the
-  `api-rw` password for two of them. There is no third option — the
-  alternative is a call that never returns — but anyone who moved to POST for
-  the security reason should know they are not getting it here.
-
-  The verb is chosen per section from `SECTION_METHODS`, a class attribute
-  beside `SECTION_USERS`. On a server where AKiPS has fixed this, put it back
-  without waiting for a release:
-
-  ```py
-  AKIPS.SECTION_METHODS['api-script'] = 'POST'
-  ```
-
-  `use_post=False` still sends everything as GET, as before.
+**Anyone on 1.1.0 should take this.** Moving the password into a POST body
+made every `api-script` call hang, so `get_device_by_ip()`,
+`set_group_membership()` and `delete_device()` have been unusable since
+2026-08-13. Nothing about the symptom names the cause.
 
 ### Added
 
@@ -83,6 +66,33 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
   or not the client is still listening — the delete above raised `Read timed
   out` and removed the device anyway. On any exception, ask AKiPS again rather
   than recording a failure.
+
+### Fixed
+
+- **`api-script` is now sent as GET, so the three site script methods work
+  again.** That section does not answer a POST: it returns 200 headers, then
+  no body, and holds the connection open until the client gives up. Every call
+  to `get_device_by_ip()`, `set_group_membership()` and `delete_device()` has
+  hung since 1.1.0 moved the module to POST. Reported to AKiPS 2026-08-21.
+
+  `api-db` accepts a POST with the identical header, so this is `api-script`
+  specifically rather than anything wrong with the request.
+
+  **The cost is that those three calls put the password back in the query
+  string**, which is exactly what `use_post` exists to prevent, and it is the
+  `api-rw` password for two of them. There is no third option — the
+  alternative is a call that never returns — but anyone who moved to POST for
+  the security reason should know they are not getting it here.
+
+  The verb is chosen per section from `SECTION_METHODS`, a class attribute
+  beside `SECTION_USERS`. On a server where AKiPS has fixed this, put it back
+  without waiting for a release:
+
+  ```py
+  AKIPS.SECTION_METHODS['api-script'] = 'POST'
+  ```
+
+  `use_post=False` still sends everything as GET, as before.
 
 ## [1.1.0] - 2026-08-13
 
@@ -737,7 +747,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.1.0...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.2.0...develop
+[1.2.0]: https://github.com/unc-network/akips/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/unc-network/akips/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/unc-network/akips/compare/v0.5.1...v0.6.0
