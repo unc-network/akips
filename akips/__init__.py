@@ -115,14 +115,19 @@ class AKIPS:
     call as GET returns normally, and api-db takes a POST with the identical
     header, so it is api-script specifically.  Reported to AKiPS 2026-08-21.
 
-    **The cost of the workaround is that those calls put the password back in
-    the query string**, which is what use_post exists to prevent.  It applies
-    to get_device_by_ip(), set_group_membership() and delete_device(), and it
-    is api-rw for two of them.  There is no third option: the alternative is
-    a call that never returns.
+    **The cost is that those calls put the password back in the query
+    string**, which is what use_post exists to prevent.  It applies to
+    get_device_by_ip(), set_group_membership() and delete_device(), and it is
+    api-rw for two of them.  GET is not a preference: it is what the section
+    answers, and there is no third option, since the alternative is a call
+    that never returns.
 
-    This is a class attribute so it can be changed without waiting for a
-    release.  On a server where AKiPS has fixed it:
+    Nothing here assumes that will change.  Sending the password in a POST
+    body is itself undocumented — AKiPS support gave it out rather than the
+    API guide describing it — so what any given server accepts is a question
+    for that server rather than something this module can predict.  This is a
+    class attribute for that reason: if a server does take a POST on a
+    section, say so without waiting for a release here.
 
         AKIPS.SECTION_METHODS["api-script"] = "POST"
 
@@ -1210,7 +1215,8 @@ class AKIPS:
         **This call is sent as GET, not POST**, so its password travels in
         the query string.  api-script does not answer a POST: the server sends
         no body and holds the connection open until the client gives up.  See
-        SECTION_METHODS, which is where to put it back on a fixed server.
+        SECTION_METHODS, which is where to say so if a server of yours does
+        take a POST on this section.
 
         Supporting AKiPS site script function (which requires the api-rw user):
 
@@ -1254,7 +1260,8 @@ class AKIPS:
         **This call is sent as GET, not POST**, so its password travels in
         the query string.  api-script does not answer a POST: the server sends
         no body and holds the connection open until the client gives up.  See
-        SECTION_METHODS, which is where to put it back on a fixed server.
+        SECTION_METHODS, which is where to say so if a server of yours does
+        take a POST on this section.
 
         Supporting AKiPS site script function (which requires the api-rw user):
 
@@ -1296,13 +1303,34 @@ class AKIPS:
             raise AkipsError(message=text)
         return None
 
-    DELETE_DEVICE_TIMEOUT = 300
-    """Seconds delete_device() waits by default, in place of the client's
-    timeout.  A delete observed against a device AKiPS had held for over a
-    year took slightly more than 30 seconds, just past the 30 second default,
-    and the client gave up before the server finished while the delete went
-    through anyway.  A client configured with a longer timeout than this
-    keeps it; this is a floor, not a ceiling."""
+    SCRIPT_TIMEOUT = 300
+    """Seconds a site script that does work is given, in place of the
+    client's timeout.
+
+    Site scripts divide into two kinds.  Most answer a question and return at
+    once — get_device_by_ip() and set_group_membership() are ordinary
+    requests and keep the client's timeout, so a hung one fails as promptly
+    as any other call.  A few go away and do something: deleting a device
+    today, and discovery, rewalk and rename if those are ever wrapped.  Those
+    are what this is for.
+
+    It is not per method on purpose.  Every long running script wants the
+    same thing — more room than a read gets — and a constant for each would
+    be a new name to learn for every script added.  A method needing
+    something different takes a timeout argument instead.
+
+    Why generous: a timeout part way through work that changes the server
+    leaves the worst of the three outcomes, where the caller cannot tell
+    whether it happened, since nothing can confirm an outcome when the call
+    itself raises.  Waiting longer costs only waiting.
+
+    How long any of these really take is not known.  The one timing on
+    record, a delete just past 30 seconds against a 30 second timeout, was
+    taken while api-script still hung on every POST, so it measures the
+    client giving up rather than the work — see SECTION_METHODS.
+
+    A client configured with a longer timeout than this keeps it; this is a
+    floor, not a ceiling."""
 
     def delete_device(self, device: str, timeout: int | None = None) -> bool:
         """
@@ -1320,7 +1348,8 @@ class AKIPS:
         **This call is sent as GET, not POST**, so its password travels in
         the query string.  api-script does not answer a POST: the server sends
         no body and holds the connection open until the client gives up.  See
-        SECTION_METHODS, which is where to put it back on a fixed server.
+        SECTION_METHODS, which is where to say so if a server of yours does
+        take a POST on this section.
 
         Supporting AKiPS site script function (which requires the api-rw user):
 
@@ -1350,9 +1379,9 @@ class AKIPS:
                 such a name would delete more than was asked for, and a
                 partial or oversized delete cannot be walked back.
             timeout (int): seconds to wait for the delete itself.  Defaults
-                to DELETE_DEVICE_TIMEOUT, or the client's timeout if that is
-                longer, because this call has been seen to run well past the
-                usual default.  The two lookups either side are ordinary
+                to SCRIPT_TIMEOUT, or the client's timeout if that is longer,
+                because a timeout during a destructive call leaves an outcome
+                nobody can read.  The two lookups either side are ordinary
                 reads and use the client's timeout.
         Returns:
             True if the device was deleted, False if there was no such device.
@@ -1401,7 +1430,7 @@ class AKIPS:
         if timeout is None:
             # A floor rather than a replacement: a client deliberately given
             # longer than this keeps it.
-            timeout = max(self.timeout, self.DELETE_DEVICE_TIMEOUT)
+            timeout = max(self.timeout, self.SCRIPT_TIMEOUT)
         text = self._get(section="api-script", params=params, timeout=timeout)
         if text:
             logger.error("Web API request failed: {}".format(text))

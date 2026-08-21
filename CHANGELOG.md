@@ -54,12 +54,20 @@ made every `api-script` call hang, so `get_device_by_ip()`,
   whatever the surviving record should keep has to be copied across before the
   other is deleted.
 
-  It waits `DELETE_DEVICE_TIMEOUT` seconds, 300 by default, rather than the
-  client's timeout, and takes a `timeout` argument of its own. A delete
-  observed against a device AKiPS had held for over a year took slightly more
-  than 30 seconds, just past the 30 second default. A client configured with
-  something longer keeps it — this is a floor, not a ceiling. The two lookups
-  either side are ordinary reads and use the client's timeout.
+  It waits `SCRIPT_TIMEOUT` seconds, 300 by default, rather than the
+  client's timeout, and takes a `timeout` argument of its own. A timeout part
+  way through a destructive call leaves the outcome unreadable, and waiting
+  longer costs only waiting. A client configured with something longer keeps
+  it — this is a floor, not a ceiling. The two lookups either side are
+  ordinary reads and use the client's timeout.
+
+  `SCRIPT_TIMEOUT` is deliberately not named for the delete. Every site
+  script that goes away and does work wants the same thing — more room than a
+  read gets — so discovery, rewalk and rename would use this rather than each
+  bringing a constant of its own. Site scripts that answer at once,
+  `get_device_by_ip()` and `set_group_membership()`, keep the client's
+  timeout, so a hung lookup still fails promptly. `_get()` takes a per-request
+  `timeout` as well.
 
   **An exception from it does not mean nothing happened.** The confirmation
   cannot run when the call itself fails, and AKiPS finishes the work whether
@@ -85,12 +93,17 @@ made every `api-script` call hang, so `get_device_by_ip()`,
   the security reason should know they are not getting it here.
 
   The verb is chosen per section from `SECTION_METHODS`, a class attribute
-  beside `SECTION_USERS`. On a server where AKiPS has fixed this, put it back
-  without waiting for a release:
+  beside `SECTION_USERS`. It is a class attribute so that a server behaving
+  differently from the ones seen here can be accommodated without waiting for
+  a release:
 
   ```py
-  AKIPS.SECTION_METHODS['api-script'] = 'POST'
+  AKIPS.SECTION_METHODS['api-script'] = 'POST'   # if a server takes it
   ```
+
+  Sending the password in a POST body is itself undocumented, given out by
+  AKiPS support rather than described in the API guide, so what a particular
+  server accepts is best treated as a property of that server.
 
   `use_post=False` still sends everything as GET, as before.
 

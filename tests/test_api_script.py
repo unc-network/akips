@@ -239,8 +239,8 @@ class DeleteDeviceTest(unittest.TestCase):
     def test_the_delete_gets_longer_than_the_client_timeout(
         self, post_mock: MagicMock, get_mock: MagicMock
     ):
-        # A delete observed against a device held for over a year ran
-        # slightly past the 30s default, so this call gets its own floor.
+        # A timeout during a destructive call leaves an outcome nobody can
+        # read, so this one gets a floor well past what a read would get.
         post_mock.side_effect = [
             MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
             MagicMock(text=""),
@@ -248,9 +248,7 @@ class DeleteDeviceTest(unittest.TestCase):
         get_mock.return_value = MagicMock(text="")
 
         self._api().delete_device("dev1")
-        self.assertEqual(
-            get_mock.call_args.kwargs["timeout"], AKIPS.DELETE_DEVICE_TIMEOUT
-        )
+        self.assertEqual(get_mock.call_args.kwargs["timeout"], AKIPS.SCRIPT_TIMEOUT)
         # the lookups either side are ordinary reads
         for call in post_mock.call_args_list:
             self.assertEqual(call.kwargs["timeout"], 30)

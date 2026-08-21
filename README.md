@@ -130,12 +130,18 @@ answer a POST — it returns headers, then no body, and holds the connection
 open until the client gives up — so `get_device_by_ip()`,
 `set_group_membership()` and `delete_device()` would hang. Their password
 therefore does travel in the query string. The verb comes from
-`SECTION_METHODS`, a class attribute, so a server where AKiPS has fixed this
-can have it back without waiting for a release:
+`SECTION_METHODS`, a class attribute, so a server that behaves differently
+from the ones this was tested against can be accommodated without waiting for
+a release:
 
 ```py
-AKIPS.SECTION_METHODS['api-script'] = 'POST'
+AKIPS.SECTION_METHODS['api-script'] = 'POST'   # if a server takes it
 ```
+
+Sending the password in a POST body is undocumented — AKiPS support gave it
+out rather than the API guide describing it — so what a particular server
+accepts is best treated as a property of that server. `use_post=False` is the
+remedy if yours will not take a POST anywhere.
 
 `verify` takes a path to a CA bundle as well as `True` or `False`. A path is
 how to trust a server whose certificate chain is missing an intermediate,
@@ -588,11 +594,11 @@ refused with a `ValueError` before anything is sent — the site script reads it
 argument as one parameter and splits it on commas itself, so a comma names a
 second device rather than an odd one.
 
-A delete observed against a device AKiPS had held for over a year took
-slightly more than 30 seconds. It therefore waits `DELETE_DEVICE_TIMEOUT`
-seconds, 300 by default, rather than the client's timeout, and takes a
-`timeout` of its own. A client already configured with something longer keeps
-it.
+It waits `SCRIPT_TIMEOUT` seconds, 300 by default, rather than the
+client's timeout, and takes a `timeout` of its own. A timeout part way through
+a destructive call leaves the outcome unreadable — the device may or may not
+be gone — and waiting longer costs only waiting. A client already configured
+with something longer keeps it.
 
 **An exception does not mean nothing happened.** The confirmation cannot run
 when the call itself fails, and AKiPS finishes the work whether or not the
