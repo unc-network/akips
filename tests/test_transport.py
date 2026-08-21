@@ -192,10 +192,18 @@ class TransportTest(unittest.TestCase):
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
         api.get_msg()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
-        api.get_device_by_ip(ipaddr="192.0.2.101")
-        self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
         api.get_group_availability()
         self.assertEqual(session_mock.call_args.kwargs["timeout"], 5)
+
+    @patch("requests.Session.get")
+    def test_the_timeout_reaches_a_section_sent_as_get(self, get_mock: MagicMock):
+        # api-script travels by GET, and the client timeout has to reach it
+        # too rather than only the sections that take a POST
+        get_mock.return_value.text = ""
+
+        api = AKIPS("127.0.0.1", rw_password="rw-secret", timeout=5)
+        api.get_device_by_ip(ipaddr="192.0.2.65")
+        self.assertEqual(get_mock.call_args.kwargs["timeout"], 5)
 
     @patch("requests.Session.post")
     def test_timeout_can_be_changed_on_an_existing_client(
@@ -533,7 +541,7 @@ class ErrorClassificationTest(unittest.TestCase):
     def test_the_rw_account_is_named_when_a_write_section_refuses(self):
         # A section needing api-rw and given api-ro fails here rather than
         # anywhere more obvious, so the account is the useful half
-        with patch("requests.Session.post") as session_mock:
+        with patch("requests.Session.get") as session_mock:
             session_mock.return_value.text = (
                 "ERROR: api-script invalid username/password"
             )
@@ -548,3 +556,85 @@ class ErrorClassificationTest(unittest.TestCase):
         self.assertIsNone(AkipsSectionDisabledError().section)
         self.assertIsNone(AkipsAuthenticationError().section)
         self.assertIsNone(AkipsAuthenticationError().username)
+
+
+class SectionMethodTest(unittest.TestCase):
+    """api-script does not answer a POST, so the verb is chosen per section."""
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_api_script_is_sent_as_get_even_when_post_is_on(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        get_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", rw_password="rw-secret")
+        self.assertTrue(api.use_post)
+        api.get_device_by_ip(ipaddr="192.0.2.65")
+
+        self.assertTrue(get_mock.called)
+        self.assertFalse(post_mock.called)
+        # and the cost of the workaround: the password is back in the URL
+        kwargs = get_mock.call_args.kwargs
+        self.assertEqual(kwargs["params"]["password"], "rw-secret")
+        self.assertNotIn("data", kwargs)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_every_other_section_still_posts(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        post_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        api.get_devices()
+        api.get_msg()
+        api.get_group_availability()
+
+        self.assertEqual(post_mock.call_count, 3)
+        self.assertFalse(get_mock.called)
+        for call in post_mock.call_args_list:
+            self.assertNotIn("password", call.kwargs["params"])
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_the_map_can_be_put_back_without_a_release(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        # This is a workaround for a server bug AKiPS may fix, so a caller on
+        # a fixed server must be able to undo it themselves
+        post_mock.return_value.text = ""
+        original = dict(AKIPS.SECTION_METHODS)
+        try:
+            AKIPS.SECTION_METHODS["api-script"] = "POST"
+            api = AKIPS("akips.example.com", rw_password="rw-secret")
+            api.get_device_by_ip(ipaddr="192.0.2.65")
+            self.assertTrue(post_mock.called)
+            self.assertFalse(get_mock.called)
+            self.assertEqual(
+                post_mock.call_args.kwargs["data"], {"password": "rw-secret"}
+            )
+        finally:
+            AKIPS.SECTION_METHODS.clear()
+            AKIPS.SECTION_METHODS.update(original)
+
+    @patch("requests.Session.get")
+    def test_use_post_false_still_sends_everything_as_get(self, get_mock: MagicMock):
+        get_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret", use_post=False)
+        api.get_devices()
+        self.assertTrue(get_mock.called)
+
+    @patch("requests.Session.get")
+    def test_the_fallback_is_logged_once_per_section(self, get_mock: MagicMock):
+        get_mock.return_value.text = ""
+
+        api = AKIPS("akips.example.com", rw_password="rw-secret")
+        with self.assertLogs("akips", level="INFO") as logged:
+            api.get_device_by_ip(ipaddr="192.0.2.65")
+            api.get_device_by_ip(ipaddr="192.0.2.66")
+        said = [line for line in logged.output if "rather than POST" in line]
+        self.assertEqual(len(said), 1)
+        self.assertIn("api-script", said[0])
+        self.assertNotIn("rw-secret", said[0])

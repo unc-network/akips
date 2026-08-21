@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 import csv
 import io
@@ -103,6 +103,36 @@ class AKIPS:
     None marks a section taking either, where the read only account is
     preferred.  Also the list of sections known to exist."""
 
+    SECTION_METHODS: dict[str, str] = {
+        "api-script": "GET",
+    }
+    """HTTP method to use per section, for the sections that cannot take the
+    default.  Anything absent here is sent as POST when use_post is on.
+
+    **api-script does not answer a POST.**  The server returns 200 headers in
+    about a quarter of a second, then sends no body and holds the connection
+    open until the client gives up, so every site script call hangs.  The same
+    call as GET returns normally, and api-db takes a POST with the identical
+    header, so it is api-script specifically.  Reported to AKiPS 2026-08-21.
+
+    **The cost is that those calls put the password back in the query
+    string**, which is what use_post exists to prevent.  It applies to
+    get_device_by_ip(), set_group_membership() and delete_device(), and it is
+    api-rw for two of them.  GET is not a preference: it is what the section
+    answers, and there is no third option, since the alternative is a call
+    that never returns.
+
+    Nothing here assumes that will change.  Sending the password in a POST
+    body is itself undocumented — AKiPS support gave it out rather than the
+    API guide describing it — so what any given server accepts is a question
+    for that server rather than something this module can predict.  This is a
+    class attribute for that reason: if a server does take a POST on a
+    section, say so without waiting for a release here.
+
+        AKIPS.SECTION_METHODS["api-script"] = "POST"
+
+    That is class wide and affects every client in the process."""
+
     def __init__(
         self,
         server: str,
@@ -154,6 +184,9 @@ class AKIPS:
         # section this release does not know about is told once rather
         # than on every call
         self._unknown_sections: set[str] = set()
+        # Sections already warned about for falling back to GET, so a poll
+        # loop is told once rather than on every call
+        self._method_warned: set[str] = set()
 
         # A username other than the two built in accounts is used for every
         # section.  AKiPS does not offer custom API accounts yet, but this is
@@ -1179,6 +1212,12 @@ class AKIPS:
         AkipsCredentialError rather than returning None, so a caller building
         on it should not plan for a read only deployment.
 
+        **This call is sent as GET, not POST**, so its password travels in
+        the query string.  api-script does not answer a POST: the server sends
+        no body and holds the connection open until the client gives up.  See
+        SECTION_METHODS, which is where to say so if a server of yours does
+        take a POST on this section.
+
         Supporting AKiPS site script function (which requires the api-rw user):
 
             web_find_device_by_ip(ipaddr)
@@ -1217,6 +1256,12 @@ class AKIPS:
         """
         Update manual grouping rules for a device, including the special 'maintenance_mode'
         group.  The web api script fails silently if the device or group does not exist.
+
+        **This call is sent as GET, not POST**, so its password travels in
+        the query string.  api-script does not answer a POST: the server sends
+        no body and holds the connection open until the client gives up.  See
+        SECTION_METHODS, which is where to say so if a server of yours does
+        take a POST on this section.
 
         Supporting AKiPS site script function (which requires the api-rw user):
 
@@ -1257,6 +1302,151 @@ class AKIPS:
             logger.error("Web API request failed: {}".format(text))
             raise AkipsError(message=text)
         return None
+
+    SCRIPT_TIMEOUT = 300
+    """Seconds a site script that does work is given, in place of the
+    client's timeout.
+
+    Site scripts divide into two kinds.  Most answer a question and return at
+    once — get_device_by_ip() and set_group_membership() are ordinary
+    requests and keep the client's timeout, so a hung one fails as promptly
+    as any other call.  A few go away and do something: deleting a device
+    today, and discovery, rewalk and rename if those are ever wrapped.  Those
+    are what this is for.
+
+    It is not per method on purpose.  Every long running script wants the
+    same thing — more room than a read gets — and a constant for each would
+    be a new name to learn for every script added.  A method needing
+    something different takes a timeout argument instead.
+
+    Why generous: a timeout part way through work that changes the server
+    leaves the worst of the three outcomes, where the caller cannot tell
+    whether it happened, since nothing can confirm an outcome when the call
+    itself raises.  Waiting longer costs only waiting.
+
+    How long any of these really take is not known.  The one timing on
+    record, a delete just past 30 seconds against a 30 second timeout, was
+    taken while api-script still hung on every POST, so it measures the
+    client giving up rather than the work — see SECTION_METHODS.
+
+    A client configured with a longer timeout than this keeps it; this is a
+    floor, not a ceiling."""
+
+    def delete_device(self, device: str, timeout: int | None = None) -> bool:
+        """
+        Delete one device from AKiPS.
+
+        **This cannot be undone.**  Whether the samples, events and
+        availability held against the device go with it is a property of
+        AKiPS's own config_delete_device built in, which the site script calls
+        and this module cannot see into, so treat the whole record as lost
+        until AKiPS says otherwise.  There is no merge: where the same box is
+        registered twice under two names, copy whatever the surviving record
+        should keep before deleting the other one, because nothing moves
+        across on its own.
+
+        **This call is sent as GET, not POST**, so its password travels in
+        the query string.  api-script does not answer a POST: the server sends
+        no body and holds the connection open until the client gives up.  See
+        SECTION_METHODS, which is where to say so if a server of yours does
+        take a POST on this section.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_delete_device(device_names)
+
+        AKiPS publishes that script and does not install it by default; see
+        akips_setup/README.md.  It prints nothing whether it worked or not, so
+        this method confirms the outcome rather than trusting the silence.  It
+        checks the device is there first, which is how a name that never
+        existed is told apart from one that was removed, and checks it is gone
+        afterwards, which is how a script that quietly did nothing is caught.
+        That costs two extra requests, which is the right trade for an
+        operation with no undo.
+
+        **An exception does not mean nothing happened.**  The confirmation
+        below cannot run when the call itself fails, and AKiPS finishes the
+        work whether or not the client is still listening: a delete that ran
+        just past a 30 second timeout removed the device and raised anyway,
+        so the caller recorded a failure against a device already gone.  On any exception, ask AKiPS again rather than
+        recording a failure.  Gone, still there, and could not tell are three
+        different outcomes and only the first two are knowable from here.
+
+        Args:
+            device (str): the AKiPS name of one device, exactly.  This takes
+                no pattern and no list.  A name holding a comma or an asterisk
+                is refused: the site script splits its argument on commas, so
+                such a name would delete more than was asked for, and a
+                partial or oversized delete cannot be walked back.
+            timeout (int): seconds to wait for the delete itself.  Defaults
+                to SCRIPT_TIMEOUT, or the client's timeout if that is longer,
+                because a timeout during a destructive call leaves an outcome
+                nobody can read.  The two lookups either side are ordinary
+                reads and use the client's timeout.
+        Returns:
+            True if the device was deleted, False if there was no such device.
+            The two are distinguishable on purpose, so a caller does not
+            report success for a name that was never there.
+        Raises:
+            ValueError: if device is empty, is a pattern, or could name more
+                than one device
+            AkipsCredentialError: if no rw_password was given to AKIPS()
+            AkipsError: if AKiPS returns an error, or if the device is still
+                present afterwards
+        """
+        if not device:
+            raise ValueError("a device name must be provided to delete a device")
+        if device.startswith("/") and device.endswith("/") and len(device) > 1:
+            raise ValueError(
+                "delete_device takes one device name, not a pattern.  Got "
+                "{!r}".format(device)
+            )
+        for char in (",", "*"):
+            if char in device:
+                # web_delete_device does cgi_param("device_names") in scalar
+                # context and splits on commas itself, so a comma here is not
+                # an odd name but a second device.  Refused rather than
+                # escaped, because there is no undo to fall back on.
+                raise ValueError(
+                    "refusing to delete {!r}: a name containing {!r} can match "
+                    "more than one device, and this cannot be undone".format(
+                        device, char
+                    )
+                )
+
+        # Checked before anything is looked up, so a client with no rw
+        # password fails on the credential rather than after spending a
+        # request on a delete it could never have made.
+        self._credentials_for("api-script")
+
+        if self.get_device(device) is None:
+            logger.info("No AKiPS device named {!r}, nothing to delete".format(device))
+            return False
+
+        params = {
+            "function": "web_delete_device",
+            "device_names": device,  # one name; the script splits on commas
+        }
+        if timeout is None:
+            # A floor rather than a replacement: a client deliberately given
+            # longer than this keeps it.
+            timeout = max(self.timeout, self.SCRIPT_TIMEOUT)
+        text = self._get(section="api-script", params=params, timeout=timeout)
+        if text:
+            logger.error("Web API request failed: {}".format(text))
+            raise AkipsError(message=text)
+
+        if self.get_device(device) is not None:
+            raise AkipsError(
+                message=(
+                    "AKiPS still holds a device named {!r} after "
+                    "web_delete_device returned nothing.  Check that the site "
+                    "script is installed and that api-rw is allowed to run "
+                    "it".format(device)
+                )
+            )
+        logger.info("Deleted AKiPS device {!r} and its history".format(device))
+        return True
 
     # ---------------------------------------------------------------------------
     # api-msg methods, these require the 'api-ro' user
@@ -2249,6 +2439,7 @@ class AKIPS:
         section: str = "api-db",
         params: dict[str, Any] | None = None,
         user: str | None = None,
+        timeout: int | None = None,
     ) -> str:
         """
         Base HTTP request against the AKiPS server for web API calls.
@@ -2275,6 +2466,9 @@ class AKIPS:
             section (str): API section to call (default: 'api-db')
             params (dict): dictionary of parameters to pass to the server
             user (str): force the 'ro' or 'rw' account for this request
+            timeout (int): seconds to wait for this one request, overriding
+                the client's timeout.  For a call whose cost does not depend
+                on the client's usual work, such as a delete
         Returns:
             text output from the server
         Raises:
@@ -2315,9 +2509,29 @@ class AKIPS:
         # that records one.  Everything else stays in the query string either
         # way, which is the form AKiPS documents and the only one older
         # servers accept.
-        method = "POST" if self.use_post else "GET"
+        request_timeout = timeout if timeout is not None else self.timeout
+        # A section may refuse the default method, so the choice is per
+        # section rather than per client.  See SECTION_METHODS.
+        section_method = self.SECTION_METHODS.get(section, "POST")
+        post = self.use_post and section_method == "POST"
+        if self.use_post and not post and section not in self._method_warned:
+            self._method_warned.add(section)
+            # Logged at info, not warning.  It is worth being able to see,
+            # but an operator cannot act on it — the server is what refuses
+            # the POST — and a permanent warning on every client teaches
+            # people to ignore warnings, including the actionable ones this
+            # module raises about a missing site script.
+            logger.info(
+                "Sending {} as {} rather than POST, so its password travels "
+                "in the query string.  {} does not answer a POST on any "
+                "server seen so far.  Set AKIPS.SECTION_METHODS[{!r}] = "
+                "'POST' on a server where that is fixed.".format(
+                    section, section_method, section, section
+                )
+            )
+        method = "POST" if post else "GET"
         data: dict[str, str] | None = None
-        if self.use_post:
+        if post:
             data = {"password": password}
         else:
             params["password"] = password
@@ -2338,20 +2552,20 @@ class AKIPS:
                     warnings.simplefilter(
                         "ignore", urllib3.exceptions.InsecureRequestWarning
                     )
-                if self.use_post:
+                if post:
                     r = self.session.post(
                         server_url,
                         params=params,
                         data=data,
                         verify=self.verify,
-                        timeout=self.timeout,
+                        timeout=request_timeout,
                     )
                 else:
                     r = self.session.get(
                         server_url,
                         params=params,
                         verify=self.verify,
-                        timeout=self.timeout,
+                        timeout=request_timeout,
                     )
             r.raise_for_status()
         except requests.exceptions.RequestException as err:

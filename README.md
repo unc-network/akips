@@ -31,22 +31,23 @@ pip install akips
 
 ### AKiPS Setup
 
-AKiPS can be extended with Perl site scripts running on the server, and two of
-this module's methods each depend on one:
+AKiPS can be extended with Perl site scripts running on the server, and three
+of this module's methods each depend on one:
 
 | Script | Used by | Why a script is needed |
 | --- | --- | --- |
+| `web_delete_device` | `delete_device()` | there is no stock Web API path to removing a device |
 | `web_manual_grouping` | `set_group_membership()` | there is no stock Web API path to group membership, which is also the only way to move a device in or out of maintenance mode |
 | `web_find_device_by_ip` | `get_device_by_ip()` | AKiPS keeps an address to device table that the Web API does not expose |
 
-Both are prerequisites rather than enhancements: without them installed those
-two methods cannot work, whatever credentials you hold.
+These are prerequisites rather than enhancements: without them installed those
+methods cannot work, whatever credentials you hold.
 
-**AKiPS wrote and publishes both.** Copies are kept in
+**AKiPS wrote and publishes all three.** Copies are kept in
 [akips_setup/](akips_setup/), one file per function to match how AKiPS
 publishes them, with installation steps and a note on keeping them current.
 
-That page has many more — device discovery, rewalk, rename and delete, alert
+That page has many more — device discovery, rewalk and rename, alert
 integrations, exports — several of which this module may wrap in future. If you
 write your own, prefer the forms that read SNMP parameters from the server's
 own configuration rather than taking them as arguments, so credentials stay in
@@ -78,7 +79,7 @@ api = AKIPS('akips.example.com', ro_password='something', rw_password='other')
 | --- | --- | --- |
 | `api-db` | either, prefers `api-ro` | most of the client |
 | `api-msg` | `api-ro` | `get_msg`, `get_syslog`, `get_traps` |
-| `api-script` | `api-rw` | `get_device_by_ip`, `set_group_membership` |
+| `api-script` | `api-rw` | `get_device_by_ip`, `set_group_membership`, `delete_device` |
 | `api-availability` | `api-ro` | `get_group_availability`, `get_device_availability`, `get_event_availability` |
 
 AKiPS publishes six further sections that this module does not wrap. `call()`
@@ -123,6 +124,24 @@ real, and what you see is a connection error to a host you believed was faked.
 Nothing in the symptom names the cause. Mock both verbs, or pass
 `use_post=False` in the fixture if that suits better. Two separate consumers
 hit this on upgrading, including this project's own test suite.
+
+**`api-script` is the exception, and is sent as GET.** That section does not
+answer a POST — it returns headers, then no body, and holds the connection
+open until the client gives up — so `get_device_by_ip()`,
+`set_group_membership()` and `delete_device()` would hang. Their password
+therefore does travel in the query string. The verb comes from
+`SECTION_METHODS`, a class attribute, so a server that behaves differently
+from the ones this was tested against can be accommodated without waiting for
+a release:
+
+```py
+AKIPS.SECTION_METHODS['api-script'] = 'POST'   # if a server takes it
+```
+
+Sending the password in a POST body is undocumented — AKiPS support gave it
+out rather than the API guide describing it — so what a particular server
+accepts is best treated as a property of that server. `use_post=False` is the
+remedy if yours will not take a POST anywhere.
 
 `verify` takes a path to a CA bundle as well as `True` or `False`. A path is
 how to trust a server whose certificate chain is missing an intermediate,
@@ -546,6 +565,56 @@ usually does, pass `user='ro'` or `user='rw'`.
 
 `call()` replaces `cmd()`, which reached only `api-db` and could only return
 the reply unparsed. `cmd()` still works but raises a `DeprecationWarning`.
+
+## Deleting a device
+
+`delete_device()` removes one device. **It cannot be undone**, and it needs
+`web_delete_device` from AKiPS's site scripts page, which is not installed by
+default.
+
+Whether the samples, events and availability held against the device go with
+it is decided by AKiPS's own `config_delete_device`, which the site script
+calls and which nothing here can see into. Treat the whole record as lost.
+
+```py
+if api.delete_device('old-switch_RENAME'):
+    print('deleted')
+else:
+    print('there was no such device')
+```
+
+It returns `True` when a device was deleted and `False` when there was nothing
+to delete, so a caller does not report success for a name that never existed.
+If the device is still there afterwards it raises `AkipsError`, because the
+site script prints nothing whether it worked or not and silence is not
+evidence.
+
+It takes one exact name. A pattern, an `*`, or a name containing a comma is
+refused with a `ValueError` before anything is sent — the site script reads its
+argument as one parameter and splits it on commas itself, so a comma names a
+second device rather than an odd one.
+
+It waits `SCRIPT_TIMEOUT` seconds, 300 by default, rather than the
+client's timeout, and takes a `timeout` of its own. A timeout part way through
+a destructive call leaves the outcome unreadable — the device may or may not
+be gone — and waiting longer costs only waiting. A client already configured
+with something longer keeps it.
+
+**An exception does not mean nothing happened.** The confirmation cannot run
+when the call itself fails, and AKiPS finishes the work whether or not the
+client is still listening. Ask AKiPS again rather than recording a failure:
+
+```py
+try:
+    deleted = api.delete_device(name)
+except Exception:
+    # gone, still there, and could not tell are three different outcomes
+    still_there = api.get_device(name) is not None
+```
+
+There is no merge. Where the same device is registered twice under two names,
+copy whatever the survivor should keep — group membership in particular —
+before deleting the other, because nothing moves across on its own.
 
 ## API Errors
 

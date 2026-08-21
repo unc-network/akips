@@ -1,6 +1,6 @@
 """
 Tests for the api-script section, which is backed by the site scripts
-in akips_setup/site_scripting.pl and requires the api-rw user.
+in akips_setup/ and require the api-rw user.
 """
 
 import logging
@@ -8,10 +8,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from akips import AKIPS, AkipsError
+from akips.exceptions import AkipsCredentialError
 
 
 class ApiScriptTest(unittest.TestCase):
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_get_device_by_ip(self, session_mock: MagicMock):
         r_text = """IP Address 192.0.2.65 is configured on cisco-sw1
 """  # noqa
@@ -23,7 +24,7 @@ class ApiScriptTest(unittest.TestCase):
         device_name = api.get_device_by_ip(ipaddr="192.0.2.65")
         self.assertEqual(device_name, "cisco-sw1")
 
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_set_group_membership(self, session_mock: MagicMock):
         r_text = """"""  # noqa
         session_mock.return_value.ok = True
@@ -34,7 +35,7 @@ class ApiScriptTest(unittest.TestCase):
         output = api.set_group_membership("203.0.113.146", "test_group", "assign")
         self.assertIsNone(output)
 
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_get_device_by_ip_returns_none_when_not_found(
         self, session_mock: MagicMock
     ):
@@ -51,7 +52,7 @@ class ApiScriptTest(unittest.TestCase):
         # a real answer, so it must not look like something went wrong
         warn.assert_not_called()
 
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_get_device_by_ip_sends_site_script_params(self, session_mock: MagicMock):
         session_mock.return_value.text = ""
 
@@ -62,7 +63,7 @@ class ApiScriptTest(unittest.TestCase):
         self.assertEqual(kwargs["params"]["function"], "web_find_device_by_ip")
         self.assertEqual(kwargs["params"]["ipaddr"], "192.0.2.65")
 
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_set_group_membership_sends_manual_grouping_params(
         self, session_mock: MagicMock
     ):
@@ -77,7 +78,7 @@ class ApiScriptTest(unittest.TestCase):
         self.assertEqual(params["mode"], "clear")
         self.assertEqual(params["device"], "203.0.113.146")
 
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_set_group_membership_raises_on_server_output(
         self, session_mock: MagicMock
     ):
@@ -106,7 +107,7 @@ class SiteScriptMissingTest(unittest.TestCase):
     to be what the script would have written.
     """
 
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_an_unexpected_reply_points_at_the_site_script(
         self, session_mock: MagicMock
     ):
@@ -124,7 +125,7 @@ class SiteScriptMissingTest(unittest.TestCase):
                     self.assertIsNone(api.get_device_by_ip(ipaddr="192.0.2.65"))
                 self.assertIn("site script", logged.output[0])
 
-    @patch("requests.Session.post")
+    @patch("requests.Session.get")
     def test_an_unknown_function_is_raised_not_warned(self, session_mock: MagicMock):
         session_mock.return_value.text = (
             "ERROR: api-script unknown function web_find_device_by_ip\n"
@@ -132,3 +133,156 @@ class SiteScriptMissingTest(unittest.TestCase):
         api = AKIPS("127.0.0.1", rw_password="rw-secret")
         with self.assertRaises(AkipsError):
             api.get_device_by_ip(ipaddr="192.0.2.65")
+
+
+class DeleteDeviceTest(unittest.TestCase):
+    """Deleting is irreversible, so most of this is about refusing to."""
+
+    def _api(self):
+        return AKIPS("akips.example.com", ro_password="ro-secret", rw_password="rw")
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_a_device_is_looked_up_deleted_and_confirmed_gone(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        # The lookups are api-db and travel by POST; the delete is api-script
+        # and travels by GET, because that section does not answer a POST.
+        post_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+        ]
+        get_mock.return_value = MagicMock(text="")
+
+        self.assertTrue(self._api().delete_device("dev1"))
+        self.assertEqual(post_mock.call_count, 2)
+        self.assertEqual(get_mock.call_count, 1)
+        sent = get_mock.call_args.kwargs["params"]
+        self.assertEqual(sent["function"], "web_delete_device")
+        self.assertEqual(sent["device_names"], "dev1")
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_a_name_that_does_not_exist_returns_false_without_deleting(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        # A UI reporting success for a name that was never there teaches
+        # nothing, so the two outcomes stay distinguishable
+        post_mock.return_value.text = ""
+
+        self.assertFalse(self._api().delete_device("never-existed"))
+        self.assertEqual(post_mock.call_count, 1)
+        self.assertFalse(get_mock.called)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_a_device_still_present_afterwards_raises(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        # The script prints nothing whether it worked or not, so silence is
+        # not evidence that anything happened
+        post_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+        ]
+        get_mock.return_value = MagicMock(text="")
+
+        with self.assertRaises(AkipsError) as caught:
+            self._api().delete_device("dev1")
+        self.assertIn("still holds", str(caught.exception))
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_a_comma_is_refused_because_the_script_splits_on_it(
+        self, session_mock: MagicMock, get_mock: MagicMock
+    ):
+        # This is the dangerous one: the site script splits device_names on
+        # commas, so a comma is a second device rather than an odd name
+        with self.assertRaises(ValueError) as caught:
+            self._api().delete_device("dev1,dev2")
+        self.assertIn("more than one device", str(caught.exception))
+        self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_a_wildcard_is_refused(self, session_mock: MagicMock, get_mock: MagicMock):
+        with self.assertRaises(ValueError):
+            self._api().delete_device("*")
+        self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_a_pattern_is_refused(self, session_mock: MagicMock, get_mock: MagicMock):
+        with self.assertRaises(ValueError) as caught:
+            self._api().delete_device("/^dev/")
+        self.assertIn("not a pattern", str(caught.exception))
+        self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_an_empty_name_is_refused(
+        self, session_mock: MagicMock, get_mock: MagicMock
+    ):
+        with self.assertRaises(ValueError):
+            self._api().delete_device("")
+        self.assertFalse(session_mock.called)
+
+    def test_it_needs_the_rw_account(self):
+        # api-script is routed to api-rw by SECTION_USERS, so a client with
+        # only a read password is refused before anything is sent
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        with self.assertRaises(AkipsCredentialError):
+            api.delete_device("dev1")
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_the_delete_gets_longer_than_the_client_timeout(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        # A timeout during a destructive call leaves an outcome nobody can
+        # read, so this one gets a floor well past what a read would get.
+        post_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+        ]
+        get_mock.return_value = MagicMock(text="")
+
+        self._api().delete_device("dev1")
+        self.assertEqual(get_mock.call_args.kwargs["timeout"], AKIPS.SCRIPT_TIMEOUT)
+        # the lookups either side are ordinary reads
+        for call in post_mock.call_args_list:
+            self.assertEqual(call.kwargs["timeout"], 30)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_an_explicit_timeout_wins(self, post_mock: MagicMock, get_mock: MagicMock):
+        post_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+        ]
+        get_mock.return_value = MagicMock(text="")
+
+        self._api().delete_device("dev1", timeout=900)
+        self.assertEqual(get_mock.call_args.kwargs["timeout"], 900)
+
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
+    def test_a_longer_client_timeout_is_kept(
+        self, post_mock: MagicMock, get_mock: MagicMock
+    ):
+        # The default is a floor, not a replacement: a client deliberately
+        # given longer than this must not be shortened by it
+        post_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+        ]
+        get_mock.return_value = MagicMock(text="")
+
+        api = AKIPS(
+            "akips.example.com",
+            ro_password="ro-secret",
+            rw_password="rw",
+            timeout=1200,
+        )
+        api.delete_device("dev1")
+        self.assertEqual(get_mock.call_args.kwargs["timeout"], 1200)

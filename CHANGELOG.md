@@ -14,6 +14,99 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-21
+
+Adds the module's first destructive call, and repairs three methods that
+1.1.0 broke.
+
+**Anyone on 1.1.0 should take this.** Moving the password into a POST body
+made every `api-script` call hang, so `get_device_by_ip()`,
+`set_group_membership()` and `delete_device()` have been unusable since
+2026-08-13. Nothing about the symptom names the cause.
+
+### Added
+
+- `delete_device()`, the module's first destructive call. It removes one device
+  and cannot be undone. Whether the samples, events and availability held
+  against it go too is decided by AKiPS's `config_delete_device` built-in,
+  which the site script calls and which this module cannot see into, so treat
+  the whole record as lost.
+
+  It needs `web_delete_device` from AKiPS's site scripts page, which is not
+  installed by default. See [akips_setup/README.md](akips_setup/README.md).
+
+  The safety is most of the method. It takes one exact name and refuses a
+  pattern, an asterisk, or a name containing a comma — the site script reads
+  `device_names` as one parameter and splits it on commas itself, so a comma
+  is a second device rather than an odd name, and an oversized delete cannot
+  be walked back. A missing `rw_password` is refused before anything is looked
+  up.
+
+  The script prints nothing whether it worked or not, so the method confirms
+  the outcome instead of trusting the silence: it checks the device is there
+  first and that it is gone afterwards. That is two extra requests, which is
+  the right trade for an operation with no undo. It returns `True` when a
+  device was deleted and `False` when there was no such device, so a caller
+  does not report success for a name that never existed, and raises
+  `AkipsError` if the device survives the call.
+
+  There is no merge. Where one box is registered twice under two names,
+  whatever the surviving record should keep has to be copied across before the
+  other is deleted.
+
+  It waits `SCRIPT_TIMEOUT` seconds, 300 by default, rather than the
+  client's timeout, and takes a `timeout` argument of its own. A timeout part
+  way through a destructive call leaves the outcome unreadable, and waiting
+  longer costs only waiting. A client configured with something longer keeps
+  it — this is a floor, not a ceiling. The two lookups either side are
+  ordinary reads and use the client's timeout.
+
+  `SCRIPT_TIMEOUT` is deliberately not named for the delete. Every site
+  script that goes away and does work wants the same thing — more room than a
+  read gets — so discovery, rewalk and rename would use this rather than each
+  bringing a constant of its own. Site scripts that answer at once,
+  `get_device_by_ip()` and `set_group_membership()`, keep the client's
+  timeout, so a hung lookup still fails promptly. `_get()` takes a per-request
+  `timeout` as well.
+
+  **An exception from it does not mean nothing happened.** The confirmation
+  cannot run when the call itself fails, and AKiPS finishes the work whether
+  or not the client is still listening — the delete above raised `Read timed
+  out` and removed the device anyway. On any exception, ask AKiPS again rather
+  than recording a failure.
+
+### Fixed
+
+- **`api-script` is now sent as GET, so the three site script methods work
+  again.** That section does not answer a POST: it returns 200 headers, then
+  no body, and holds the connection open until the client gives up. Every call
+  to `get_device_by_ip()`, `set_group_membership()` and `delete_device()` has
+  hung since 1.1.0 moved the module to POST. Reported to AKiPS 2026-08-21.
+
+  `api-db` accepts a POST with the identical header, so this is `api-script`
+  specifically rather than anything wrong with the request.
+
+  **The cost is that those three calls put the password back in the query
+  string**, which is exactly what `use_post` exists to prevent, and it is the
+  `api-rw` password for two of them. There is no third option — the
+  alternative is a call that never returns — but anyone who moved to POST for
+  the security reason should know they are not getting it here.
+
+  The verb is chosen per section from `SECTION_METHODS`, a class attribute
+  beside `SECTION_USERS`. It is a class attribute so that a server behaving
+  differently from the ones seen here can be accommodated without waiting for
+  a release:
+
+  ```py
+  AKIPS.SECTION_METHODS['api-script'] = 'POST'   # if a server takes it
+  ```
+
+  Sending the password in a POST body is itself undocumented, given out by
+  AKiPS support rather than described in the API guide, so what a particular
+  server accepts is best treated as a property of that server.
+
+  `use_post=False` still sends everything as GET, as before.
+
 ## [1.1.0] - 2026-08-13
 
 ### Added
@@ -667,7 +760,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.1.0...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.2.0...develop
+[1.2.0]: https://github.com/unc-network/akips/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/unc-network/akips/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/unc-network/akips/compare/v0.5.1...v0.6.0

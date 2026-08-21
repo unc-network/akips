@@ -13,14 +13,21 @@ from akips.exceptions import AkipsCredentialError, AkipsError
 
 
 class CredentialTest(unittest.TestCase):
+    @patch("requests.Session.get")
     @patch("requests.Session.post")
-    def sent(self, api, call, session_mock: MagicMock):
+    def sent(self, api, call, post_mock: MagicMock, get_mock: MagicMock):
         """Run a call and return the credentials that reached the request."""
-        session_mock.return_value.text = ""
+        post_mock.return_value.text = ""
+        get_mock.return_value.text = ""
         call(api)
-        kwargs = session_mock.call_args.kwargs
-        # Username stays in the query string, password travels in the body
-        return kwargs["params"]["username"], kwargs["data"]["password"]
+        # Which verb carried it depends on the section: api-script cannot
+        # take a POST, so its password is in the query string instead.
+        mock = post_mock if post_mock.called else get_mock
+        kwargs = mock.call_args.kwargs
+        username = kwargs["params"]["username"]
+        if kwargs.get("data"):
+            return username, kwargs["data"]["password"]
+        return username, kwargs["params"]["password"]
 
     def test_read_only_sections_use_the_ro_account(self):
         api = AKIPS("127.0.0.1", ro_password="ro-secret", rw_password="rw-secret")
