@@ -14,6 +14,33 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+### Fixed
+
+- **`api-script` is now sent as GET, so the three site script methods work
+  again.** That section does not answer a POST: it returns 200 headers, then
+  no body, and holds the connection open until the client gives up. Every call
+  to `get_device_by_ip()`, `set_group_membership()` and `delete_device()` has
+  hung since 1.1.0 moved the module to POST. Reported to AKiPS 2026-08-21.
+
+  `api-db` accepts a POST with the identical header, so this is `api-script`
+  specifically rather than anything wrong with the request.
+
+  **The cost is that those three calls put the password back in the query
+  string**, which is exactly what `use_post` exists to prevent, and it is the
+  `api-rw` password for two of them. There is no third option — the
+  alternative is a call that never returns — but anyone who moved to POST for
+  the security reason should know they are not getting it here.
+
+  The verb is chosen per section from `SECTION_METHODS`, a class attribute
+  beside `SECTION_USERS`. On a server where AKiPS has fixed this, put it back
+  without waiting for a release:
+
+  ```py
+  AKIPS.SECTION_METHODS['api-script'] = 'POST'
+  ```
+
+  `use_post=False` still sends everything as GET, as before.
+
 ### Added
 
 - `delete_device()`, the module's first destructive call. It removes one device

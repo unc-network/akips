@@ -125,6 +125,18 @@ Nothing in the symptom names the cause. Mock both verbs, or pass
 `use_post=False` in the fixture if that suits better. Two separate consumers
 hit this on upgrading, including this project's own test suite.
 
+**`api-script` is the exception, and is sent as GET.** That section does not
+answer a POST — it returns headers, then no body, and holds the connection
+open until the client gives up — so `get_device_by_ip()`,
+`set_group_membership()` and `delete_device()` would hang. Their password
+therefore does travel in the query string. The verb comes from
+`SECTION_METHODS`, a class attribute, so a server where AKiPS has fixed this
+can have it back without waiting for a release:
+
+```py
+AKIPS.SECTION_METHODS['api-script'] = 'POST'
+```
+
 `verify` takes a path to a CA bundle as well as `True` or `False`. A path is
 how to trust a server whose certificate chain is missing an intermediate,
 which is common on an internal deployment, without turning verification off

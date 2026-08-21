@@ -103,6 +103,31 @@ class AKIPS:
     None marks a section taking either, where the read only account is
     preferred.  Also the list of sections known to exist."""
 
+    SECTION_METHODS: dict[str, str] = {
+        "api-script": "GET",
+    }
+    """HTTP method to use per section, for the sections that cannot take the
+    default.  Anything absent here is sent as POST when use_post is on.
+
+    **api-script does not answer a POST.**  The server returns 200 headers in
+    about a quarter of a second, then sends no body and holds the connection
+    open until the client gives up, so every site script call hangs.  The same
+    call as GET returns normally, and api-db takes a POST with the identical
+    header, so it is api-script specifically.  Reported to AKiPS 2026-08-21.
+
+    **The cost of the workaround is that those calls put the password back in
+    the query string**, which is what use_post exists to prevent.  It applies
+    to get_device_by_ip(), set_group_membership() and delete_device(), and it
+    is api-rw for two of them.  There is no third option: the alternative is
+    a call that never returns.
+
+    This is a class attribute so it can be changed without waiting for a
+    release.  On a server where AKiPS has fixed it:
+
+        AKIPS.SECTION_METHODS["api-script"] = "POST"
+
+    That is class wide and affects every client in the process."""
+
     def __init__(
         self,
         server: str,
@@ -154,6 +179,9 @@ class AKIPS:
         # section this release does not know about is told once rather
         # than on every call
         self._unknown_sections: set[str] = set()
+        # Sections already warned about for falling back to GET, so a poll
+        # loop is told once rather than on every call
+        self._method_warned: set[str] = set()
 
         # A username other than the two built in accounts is used for every
         # section.  AKiPS does not offer custom API accounts yet, but this is
@@ -1179,6 +1207,11 @@ class AKIPS:
         AkipsCredentialError rather than returning None, so a caller building
         on it should not plan for a read only deployment.
 
+        **This call is sent as GET, not POST**, so its password travels in
+        the query string.  api-script does not answer a POST: the server sends
+        no body and holds the connection open until the client gives up.  See
+        SECTION_METHODS, which is where to put it back on a fixed server.
+
         Supporting AKiPS site script function (which requires the api-rw user):
 
             web_find_device_by_ip(ipaddr)
@@ -1217,6 +1250,11 @@ class AKIPS:
         """
         Update manual grouping rules for a device, including the special 'maintenance_mode'
         group.  The web api script fails silently if the device or group does not exist.
+
+        **This call is sent as GET, not POST**, so its password travels in
+        the query string.  api-script does not answer a POST: the server sends
+        no body and holds the connection open until the client gives up.  See
+        SECTION_METHODS, which is where to put it back on a fixed server.
 
         Supporting AKiPS site script function (which requires the api-rw user):
 
@@ -1278,6 +1316,11 @@ class AKIPS:
         registered twice under two names, copy whatever the surviving record
         should keep before deleting the other one, because nothing moves
         across on its own.
+
+        **This call is sent as GET, not POST**, so its password travels in
+        the query string.  api-script does not answer a POST: the server sends
+        no body and holds the connection open until the client gives up.  See
+        SECTION_METHODS, which is where to put it back on a fixed server.
 
         Supporting AKiPS site script function (which requires the api-rw user):
 
@@ -2438,9 +2481,28 @@ class AKIPS:
         # way, which is the form AKiPS documents and the only one older
         # servers accept.
         request_timeout = timeout if timeout is not None else self.timeout
-        method = "POST" if self.use_post else "GET"
+        # A section may refuse the default method, so the choice is per
+        # section rather than per client.  See SECTION_METHODS.
+        section_method = self.SECTION_METHODS.get(section, "POST")
+        post = self.use_post and section_method == "POST"
+        if self.use_post and not post and section not in self._method_warned:
+            self._method_warned.add(section)
+            # Logged at info, not warning.  It is worth being able to see,
+            # but an operator cannot act on it — the server is what refuses
+            # the POST — and a permanent warning on every client teaches
+            # people to ignore warnings, including the actionable ones this
+            # module raises about a missing site script.
+            logger.info(
+                "Sending {} as {} rather than POST, so its password travels "
+                "in the query string.  {} does not answer a POST on any "
+                "server seen so far.  Set AKIPS.SECTION_METHODS[{!r}] = "
+                "'POST' on a server where that is fixed.".format(
+                    section, section_method, section, section
+                )
+            )
+        method = "POST" if post else "GET"
         data: dict[str, str] | None = None
-        if self.use_post:
+        if post:
             data = {"password": password}
         else:
             params["password"] = password
@@ -2461,7 +2523,7 @@ class AKIPS:
                     warnings.simplefilter(
                         "ignore", urllib3.exceptions.InsecureRequestWarning
                     )
-                if self.use_post:
+                if post:
                     r = self.session.post(
                         server_url,
                         params=params,

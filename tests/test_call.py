@@ -164,11 +164,15 @@ class CallTest(unittest.TestCase):
 
         api = AKIPS("127.0.0.1", ro_password="ro-secret", rw_password="rw-secret")
         logger = logging.getLogger("akips")
-        with patch.object(logger, "warning") as warn:
-            for section in AKIPS.SECTION_USERS:
-                api.call(section=section, params={"a": "b"})
-            api.get_devices()
-            api.get_msg()
+        # api-script travels by GET, so both verbs have to be intercepted or
+        # that one section reaches the network
+        with patch("requests.Session.get") as get_mock:
+            get_mock.return_value.text = ""
+            with patch.object(logger, "warning") as warn:
+                for section in AKIPS.SECTION_USERS:
+                    api.call(section=section, params={"a": "b"})
+                api.get_devices()
+                api.get_msg()
         warn.assert_not_called()
 
 
