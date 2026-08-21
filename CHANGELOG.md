@@ -14,6 +14,36 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+### Added
+
+- `delete_device()`, the module's first destructive call. It removes one device
+  and cannot be undone. Whether the samples, events and availability held
+  against it go too is decided by AKiPS's `config_delete_device` built-in,
+  which the site script calls and which this module cannot see into, so treat
+  the whole record as lost.
+
+  It needs `web_delete_device` from AKiPS's site scripts page, which is not
+  installed by default. See [akips_setup/README.md](akips_setup/README.md).
+
+  The safety is most of the method. It takes one exact name and refuses a
+  pattern, an asterisk, or a name containing a comma — the site script reads
+  `device_names` as one parameter and splits it on commas itself, so a comma
+  is a second device rather than an odd name, and an oversized delete cannot
+  be walked back. A missing `rw_password` is refused before anything is looked
+  up.
+
+  The script prints nothing whether it worked or not, so the method confirms
+  the outcome instead of trusting the silence: it checks the device is there
+  first and that it is gone afterwards. That is two extra requests, which is
+  the right trade for an operation with no undo. It returns `True` when a
+  device was deleted and `False` when there was no such device, so a caller
+  does not report success for a name that never existed, and raises
+  `AkipsError` if the device survives the call.
+
+  There is no merge. Where one box is registered twice under two names,
+  whatever the surviving record should keep has to be copied across before the
+  other is deleted.
+
 ## [1.1.0] - 2026-08-13
 
 ### Added

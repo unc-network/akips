@@ -1,6 +1,6 @@
 """
 Tests for the api-script section, which is backed by the site scripts
-in akips_setup/site_scripting.pl and requires the api-rw user.
+in akips_setup/ and require the api-rw user.
 """
 
 import logging
@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from akips import AKIPS, AkipsError
+from akips.exceptions import AkipsCredentialError
 
 
 class ApiScriptTest(unittest.TestCase):
@@ -132,3 +133,95 @@ class SiteScriptMissingTest(unittest.TestCase):
         api = AKIPS("127.0.0.1", rw_password="rw-secret")
         with self.assertRaises(AkipsError):
             api.get_device_by_ip(ipaddr="192.0.2.65")
+
+
+class DeleteDeviceTest(unittest.TestCase):
+    """Deleting is irreversible, so most of this is about refusing to."""
+
+    def _api(self):
+        return AKIPS("akips.example.com", ro_password="ro-secret", rw_password="rw")
+
+    @patch("requests.Session.post")
+    def test_a_device_is_looked_up_deleted_and_confirmed_gone(
+        self, session_mock: MagicMock
+    ):
+        # present, then the script says nothing, then absent
+        session_mock.return_value.text = ""
+        session_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+            MagicMock(text=""),
+        ]
+
+        self.assertTrue(self._api().delete_device("dev1"))
+        # look up, delete, look up again: the last call is the confirmation,
+        # so the delete is the middle one
+        self.assertEqual(session_mock.call_count, 3)
+        sent = session_mock.call_args_list[1].kwargs["params"]
+        self.assertEqual(sent["function"], "web_delete_device")
+        self.assertEqual(sent["device_names"], "dev1")
+
+    @patch("requests.Session.post")
+    def test_a_name_that_does_not_exist_returns_false_without_deleting(
+        self, session_mock: MagicMock
+    ):
+        # A UI reporting success for a name that was never there teaches
+        # nothing, so the two outcomes stay distinguishable
+        session_mock.return_value.text = ""
+
+        self.assertFalse(self._api().delete_device("never-existed"))
+        self.assertEqual(session_mock.call_count, 1)
+        self.assertNotIn(
+            "web_delete_device", str(session_mock.call_args.kwargs["params"])
+        )
+
+    @patch("requests.Session.post")
+    def test_a_device_still_present_afterwards_raises(self, session_mock: MagicMock):
+        # The script prints nothing whether it worked or not, so silence is
+        # not evidence that anything happened
+        session_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+        ]
+
+        with self.assertRaises(AkipsError) as caught:
+            self._api().delete_device("dev1")
+        self.assertIn("still holds", str(caught.exception))
+
+    @patch("requests.Session.post")
+    def test_a_comma_is_refused_because_the_script_splits_on_it(
+        self, session_mock: MagicMock
+    ):
+        # This is the dangerous one: the site script splits device_names on
+        # commas, so a comma is a second device rather than an odd name
+        with self.assertRaises(ValueError) as caught:
+            self._api().delete_device("dev1,dev2")
+        self.assertIn("more than one device", str(caught.exception))
+        self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.post")
+    def test_a_wildcard_is_refused(self, session_mock: MagicMock):
+        with self.assertRaises(ValueError):
+            self._api().delete_device("*")
+        self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.post")
+    def test_a_pattern_is_refused(self, session_mock: MagicMock):
+        with self.assertRaises(ValueError) as caught:
+            self._api().delete_device("/^dev/")
+        self.assertIn("not a pattern", str(caught.exception))
+        self.assertFalse(session_mock.called)
+
+    @patch("requests.Session.post")
+    def test_an_empty_name_is_refused(self, session_mock: MagicMock):
+        with self.assertRaises(ValueError):
+            self._api().delete_device("")
+        self.assertFalse(session_mock.called)
+
+    def test_it_needs_the_rw_account(self):
+        # api-script is routed to api-rw by SECTION_USERS, so a client with
+        # only a read password is refused before anything is sent
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        with self.assertRaises(AkipsCredentialError):
+            api.delete_device("dev1")

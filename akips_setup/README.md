@@ -1,13 +1,14 @@
 # Site scripts
 
-AKiPS can be extended with Perl functions that run on the server, and two of
-this module's methods depend on one each. They are reproduced here so both can
-be installed without hunting through a catalogue.
+AKiPS can be extended with Perl functions that run on the server, and three of
+this module's methods depend on one each. They are reproduced here so all three
+can be installed without hunting through a catalogue.
 
 | File | Used by | Where it came from |
 | --- | --- | --- |
 | [web_manual_grouping.pl](web_manual_grouping.pl) | `set_group_membership()` | AKiPS's site scripts page, listed as "Web API to Add/Delete Manual group" |
 | [web_find_device_by_ip.pl](web_find_device_by_ip.pl) | `get_device_by_ip()` | AKiPS support directly — **not published** |
+| [web_delete_device.pl](web_delete_device.pl) | `delete_device()` | AKiPS's site scripts page |
 
 ## These are AKiPS's, not ours
 
@@ -58,8 +59,8 @@ will raise with whatever the server said.
 
 ## Other scripts
 
-AKiPS publishes many more on the same page, including device discovery,
-rewalk, rename and delete, which this module may wrap in future. Two things
+AKiPS publishes more on the same page, including device discovery,
+rewalk and rename, which this module may wrap in future. Two things
 are worth knowing before adopting any of them:
 
 - Prefer forms that read SNMP parameters from the server's own configuration

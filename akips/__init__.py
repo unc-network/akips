@@ -1258,6 +1258,99 @@ class AKIPS:
             raise AkipsError(message=text)
         return None
 
+    def delete_device(self, device: str) -> bool:
+        """
+        Delete one device from AKiPS.
+
+        **This cannot be undone.**  Whether the samples, events and
+        availability held against the device go with it is a property of
+        AKiPS's own config_delete_device built in, which the site script calls
+        and this module cannot see into, so treat the whole record as lost
+        until AKiPS says otherwise.  There is no merge: where the same box is
+        registered twice under two names, copy whatever the surviving record
+        should keep before deleting the other one, because nothing moves
+        across on its own.
+
+        Supporting AKiPS site script function (which requires the api-rw user):
+
+            web_delete_device(device_names)
+
+        AKiPS publishes that script and does not install it by default; see
+        akips_setup/README.md.  It prints nothing whether it worked or not, so
+        this method confirms the outcome rather than trusting the silence.  It
+        checks the device is there first, which is how a name that never
+        existed is told apart from one that was removed, and checks it is gone
+        afterwards, which is how a script that quietly did nothing is caught.
+        That costs two extra requests, which is the right trade for an
+        operation with no undo.
+
+        Args:
+            device (str): the AKiPS name of one device, exactly.  This takes
+                no pattern and no list.  A name holding a comma or an asterisk
+                is refused: the site script splits its argument on commas, so
+                such a name would delete more than was asked for, and a
+                partial or oversized delete cannot be walked back.
+        Returns:
+            True if the device was deleted, False if there was no such device.
+            The two are distinguishable on purpose, so a caller does not
+            report success for a name that was never there.
+        Raises:
+            ValueError: if device is empty, is a pattern, or could name more
+                than one device
+            AkipsCredentialError: if no rw_password was given to AKIPS()
+            AkipsError: if AKiPS returns an error, or if the device is still
+                present afterwards
+        """
+        if not device:
+            raise ValueError("a device name must be provided to delete a device")
+        if device.startswith("/") and device.endswith("/") and len(device) > 1:
+            raise ValueError(
+                "delete_device takes one device name, not a pattern.  Got "
+                "{!r}".format(device)
+            )
+        for char in (",", "*"):
+            if char in device:
+                # web_delete_device does cgi_param("device_names") in scalar
+                # context and splits on commas itself, so a comma here is not
+                # an odd name but a second device.  Refused rather than
+                # escaped, because there is no undo to fall back on.
+                raise ValueError(
+                    "refusing to delete {!r}: a name containing {!r} can match "
+                    "more than one device, and this cannot be undone".format(
+                        device, char
+                    )
+                )
+
+        # Checked before anything is looked up, so a client with no rw
+        # password fails on the credential rather than after spending a
+        # request on a delete it could never have made.
+        self._credentials_for("api-script")
+
+        if self.get_device(device) is None:
+            logger.info("No AKiPS device named {!r}, nothing to delete".format(device))
+            return False
+
+        params = {
+            "function": "web_delete_device",
+            "device_names": device,  # one name; the script splits on commas
+        }
+        text = self._get(section="api-script", params=params)
+        if text:
+            logger.error("Web API request failed: {}".format(text))
+            raise AkipsError(message=text)
+
+        if self.get_device(device) is not None:
+            raise AkipsError(
+                message=(
+                    "AKiPS still holds a device named {!r} after "
+                    "web_delete_device returned nothing.  Check that the site "
+                    "script is installed and that api-rw is allowed to run "
+                    "it".format(device)
+                )
+            )
+        logger.info("Deleted AKiPS device {!r} and its history".format(device))
+        return True
+
     # ---------------------------------------------------------------------------
     # api-msg methods, these require the 'api-ro' user
 
