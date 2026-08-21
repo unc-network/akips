@@ -44,6 +44,19 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
   whatever the surviving record should keep has to be copied across before the
   other is deleted.
 
+  It waits `DELETE_DEVICE_TIMEOUT` seconds, 300 by default, rather than the
+  client's timeout, and takes a `timeout` argument of its own. A delete
+  observed against a device AKiPS had held for over a year took slightly more
+  than 30 seconds, just past the 30 second default. A client configured with
+  something longer keeps it — this is a floor, not a ceiling. The two lookups
+  either side are ordinary reads and use the client's timeout.
+
+  **An exception from it does not mean nothing happened.** The confirmation
+  cannot run when the call itself fails, and AKiPS finishes the work whether
+  or not the client is still listening — the delete above raised `Read timed
+  out` and removed the device anyway. On any exception, ask AKiPS again rather
+  than recording a failure.
+
 ## [1.1.0] - 2026-08-13
 
 ### Added

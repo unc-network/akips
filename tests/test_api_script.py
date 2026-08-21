@@ -225,3 +225,52 @@ class DeleteDeviceTest(unittest.TestCase):
         api = AKIPS("akips.example.com", ro_password="ro-secret")
         with self.assertRaises(AkipsCredentialError):
             api.delete_device("dev1")
+
+    @patch("requests.Session.post")
+    def test_the_delete_gets_longer_than_the_client_timeout(
+        self, session_mock: MagicMock
+    ):
+        # A delete observed against a device held for over a year ran
+        # slightly past the 30s default, so this call gets its own floor.
+        session_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+            MagicMock(text=""),
+        ]
+
+        self._api().delete_device("dev1")
+        calls = session_mock.call_args_list
+        self.assertEqual(calls[1].kwargs["timeout"], AKIPS.DELETE_DEVICE_TIMEOUT)
+        # the lookups either side are ordinary reads
+        self.assertEqual(calls[0].kwargs["timeout"], 30)
+        self.assertEqual(calls[2].kwargs["timeout"], 30)
+
+    @patch("requests.Session.post")
+    def test_an_explicit_timeout_wins(self, session_mock: MagicMock):
+        session_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+            MagicMock(text=""),
+        ]
+
+        self._api().delete_device("dev1", timeout=900)
+        self.assertEqual(session_mock.call_args_list[1].kwargs["timeout"], 900)
+
+    @patch("requests.Session.post")
+    def test_a_longer_client_timeout_is_kept(self, session_mock: MagicMock):
+        # The default is a floor, not a replacement: a client deliberately
+        # given longer than this must not be shortened by it
+        session_mock.side_effect = [
+            MagicMock(text="dev1 sys ip4addr = 192.0.2.10\n"),
+            MagicMock(text=""),
+            MagicMock(text=""),
+        ]
+
+        api = AKIPS(
+            "akips.example.com",
+            ro_password="ro-secret",
+            rw_password="rw",
+            timeout=1200,
+        )
+        api.delete_device("dev1")
+        self.assertEqual(session_mock.call_args_list[1].kwargs["timeout"], 1200)

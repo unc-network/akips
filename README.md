@@ -576,6 +576,24 @@ refused with a `ValueError` before anything is sent — the site script reads it
 argument as one parameter and splits it on commas itself, so a comma names a
 second device rather than an odd one.
 
+A delete observed against a device AKiPS had held for over a year took
+slightly more than 30 seconds. It therefore waits `DELETE_DEVICE_TIMEOUT`
+seconds, 300 by default, rather than the client's timeout, and takes a
+`timeout` of its own. A client already configured with something longer keeps
+it.
+
+**An exception does not mean nothing happened.** The confirmation cannot run
+when the call itself fails, and AKiPS finishes the work whether or not the
+client is still listening. Ask AKiPS again rather than recording a failure:
+
+```py
+try:
+    deleted = api.delete_device(name)
+except Exception:
+    # gone, still there, and could not tell are three different outcomes
+    still_there = api.get_device(name) is not None
+```
+
 There is no merge. Where the same device is registered twice under two names,
 copy whatever the survivor should keep — group membership in particular —
 before deleting the other, because nothing moves across on its own.

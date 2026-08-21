@@ -1258,7 +1258,15 @@ class AKIPS:
             raise AkipsError(message=text)
         return None
 
-    def delete_device(self, device: str) -> bool:
+    DELETE_DEVICE_TIMEOUT = 300
+    """Seconds delete_device() waits by default, in place of the client's
+    timeout.  A delete observed against a device AKiPS had held for over a
+    year took slightly more than 30 seconds, just past the 30 second default,
+    and the client gave up before the server finished while the delete went
+    through anyway.  A client configured with a longer timeout than this
+    keeps it; this is a floor, not a ceiling."""
+
+    def delete_device(self, device: str, timeout: int | None = None) -> bool:
         """
         Delete one device from AKiPS.
 
@@ -1284,12 +1292,25 @@ class AKIPS:
         That costs two extra requests, which is the right trade for an
         operation with no undo.
 
+        **An exception does not mean nothing happened.**  The confirmation
+        below cannot run when the call itself fails, and AKiPS finishes the
+        work whether or not the client is still listening: a delete that ran
+        just past a 30 second timeout removed the device and raised anyway,
+        so the caller recorded a failure against a device already gone.  On any exception, ask AKiPS again rather than
+        recording a failure.  Gone, still there, and could not tell are three
+        different outcomes and only the first two are knowable from here.
+
         Args:
             device (str): the AKiPS name of one device, exactly.  This takes
                 no pattern and no list.  A name holding a comma or an asterisk
                 is refused: the site script splits its argument on commas, so
                 such a name would delete more than was asked for, and a
                 partial or oversized delete cannot be walked back.
+            timeout (int): seconds to wait for the delete itself.  Defaults
+                to DELETE_DEVICE_TIMEOUT, or the client's timeout if that is
+                longer, because this call has been seen to run well past the
+                usual default.  The two lookups either side are ordinary
+                reads and use the client's timeout.
         Returns:
             True if the device was deleted, False if there was no such device.
             The two are distinguishable on purpose, so a caller does not
@@ -1334,7 +1355,11 @@ class AKIPS:
             "function": "web_delete_device",
             "device_names": device,  # one name; the script splits on commas
         }
-        text = self._get(section="api-script", params=params)
+        if timeout is None:
+            # A floor rather than a replacement: a client deliberately given
+            # longer than this keeps it.
+            timeout = max(self.timeout, self.DELETE_DEVICE_TIMEOUT)
+        text = self._get(section="api-script", params=params, timeout=timeout)
         if text:
             logger.error("Web API request failed: {}".format(text))
             raise AkipsError(message=text)
@@ -2342,6 +2367,7 @@ class AKIPS:
         section: str = "api-db",
         params: dict[str, Any] | None = None,
         user: str | None = None,
+        timeout: int | None = None,
     ) -> str:
         """
         Base HTTP request against the AKiPS server for web API calls.
@@ -2368,6 +2394,9 @@ class AKIPS:
             section (str): API section to call (default: 'api-db')
             params (dict): dictionary of parameters to pass to the server
             user (str): force the 'ro' or 'rw' account for this request
+            timeout (int): seconds to wait for this one request, overriding
+                the client's timeout.  For a call whose cost does not depend
+                on the client's usual work, such as a delete
         Returns:
             text output from the server
         Raises:
@@ -2408,6 +2437,7 @@ class AKIPS:
         # that records one.  Everything else stays in the query string either
         # way, which is the form AKiPS documents and the only one older
         # servers accept.
+        request_timeout = timeout if timeout is not None else self.timeout
         method = "POST" if self.use_post else "GET"
         data: dict[str, str] | None = None
         if self.use_post:
@@ -2437,14 +2467,14 @@ class AKIPS:
                         params=params,
                         data=data,
                         verify=self.verify,
-                        timeout=self.timeout,
+                        timeout=request_timeout,
                     )
                 else:
                     r = self.session.get(
                         server_url,
                         params=params,
                         verify=self.verify,
-                        timeout=self.timeout,
+                        timeout=request_timeout,
                     )
             r.raise_for_status()
         except requests.exceptions.RequestException as err:
