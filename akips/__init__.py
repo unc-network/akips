@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 import csv
 import io
@@ -478,6 +478,59 @@ class AKIPS:
             return data
         return None
 
+    def get_ping_state(
+        self,
+        states: tuple[str, ...] | list[str] | None = None,
+        child: str = "ping4",
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, Any]] | None:
+        """
+        Pull the ping state of every device, with when it last changed.
+
+        get_unreachable() answers 'what is broken now' and so asks only for
+        the devices that are down.  This asks the same record without that
+        filter, which is what to call for a device that is up: its state, and
+        both of the epochs the enum carries.
+
+        **The two epochs are the useful part and their names undersell them.**
+        'created' is when AKiPS started polling the device, so it is the date
+        the device was added to AKiPS, and it is not otherwise reachable for a
+        device that is healthy.  'modified' is the instant the state last
+        changed, not a row-touched timestamp.  Both arrive as aware datetimes
+        in the server's timezone rather than as the integers the raw attribute
+        holds, so nothing needs converting.
+
+        Those two answer the column AKiPS shows on its own device dashboard,
+        the one reading Uptime on a device that is up and Downtime on a device
+        that is down.  It is not sysUpTime: the figure is now minus 'modified'
+        and 'value' decides which word.  sysUpTime counts from the last boot
+        and keeps counting through an outage, so the two disagree on exactly
+        the devices somebody is looking at.
+
+        Args:
+            states (list): only report these states, e.g. ('down',), or None
+                for every device whatever its state, which is the default
+            child (str): which ping child to read (default: 'ping4').  Pass
+                'ping4|ping6' for both, though a device answering on both
+                keeps only one entry and warns, since this is keyed by device
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to the parsed state, or None if no
+            device matched.  Each entry carries the enum fields described on
+            _parse_enum, plus the device 'name' and 'child'
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        return self._get_enum_attribute(
+            "PING.icmpState",
+            child=child,
+            values=states,
+            group_filter=group_filter,
+            groups=groups,
+        )
+
     def get_attributes(
         self,
         device: str = "*",
@@ -500,10 +553,19 @@ class AKIPS:
                 [descr {/regex/}] [value {text|integer|/regex/}]
                 [profile {profile name}] [any|all|not group {group name} ...]
 
+        **A bare attribute name matches exactly and matches nothing.**  AKiPS
+        qualifies most attributes with their MIB, so 'sysUpTime' matches no
+        attribute anywhere while 'SNMPv2-MIB.sysUpTime' matches on every
+        device that reports it.  The unqualified form is not an error: it
+        returns an empty result, which looks exactly like a fleet where
+        nothing reports that attribute.  Use a pattern, '/sysUpTime/', when
+        the qualified name is not known.
+
         Args:
             device (str): device name or pattern to match (default: '*')
             child (str): child name or pattern to match (default: '*')
-            attribute (str): attribute name or pattern to match (default: '*')
+            attribute (str): attribute name or pattern to match (default: '*').
+                A bare name must match exactly, MIB prefix included; see above
             value (str): value or pattern to match (default: None)
             group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
             groups (list): list of group names to filter by (if any)

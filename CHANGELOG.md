@@ -14,6 +14,37 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-23
+
+### Added
+
+- `get_ping_state()`, the ping enum for every device rather than only the ones
+  that are down. `get_unreachable()` answers "what is broken now" and filters
+  to `down`, which left the same record unreachable for a healthy device —
+  0.3% of a campus, and the least interesting 0.3%. This is the same query
+  without the filter, and returns the whole fleet in about a second.
+
+  **The two epochs it carries are the point, and their names undersell them.**
+  `created` is when AKiPS started polling, so it is the date the device was
+  added and is not otherwise available for a device that is up. `modified` is
+  the instant the state last changed, not a row-touched timestamp. Both arrive
+  as aware datetimes in the server's timezone rather than as the integers the
+  raw attribute holds.
+
+  Together they answer the column AKiPS shows on its own device dashboard, the
+  one reading Uptime on a device that is up and Downtime on one that is down:
+  the figure is now minus `modified`, and the state decides the word. That is
+  not `sysUpTime`, which counts from the last boot and keeps counting through
+  an outage, so the two disagree on exactly the devices somebody is looking at.
+
+### Documentation
+
+- `get_attributes()` says that a bare attribute name matches exactly and so
+  usually matches nothing: AKiPS qualifies most attributes with their MIB, and
+  `sysUpTime` finds none of the devices `SNMPv2-MIB.sysUpTime` does. The
+  unqualified form is not an error — it returns an empty result, which reads
+  as a fleet where nothing reports that attribute.
+
 ## [1.2.0] - 2026-08-21
 
 Adds the module's first destructive call, and repairs three methods that
@@ -760,7 +791,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.2.0...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.3.0...develop
+[1.3.0]: https://github.com/unc-network/akips/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/unc-network/akips/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/unc-network/akips/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/unc-network/akips/compare/v0.6.0...v1.0.0

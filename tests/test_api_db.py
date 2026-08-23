@@ -642,3 +642,50 @@ class InventoryAttributesTest(unittest.TestCase):
         cmds = session_mock.call_args.kwargs["params"]["cmds"]
         for secret in ("community", "auth_password", "priv_password", "SNMP.user"):
             self.assertNotIn(secret, cmds)
+
+
+class PingStateTest(unittest.TestCase):
+    """The ping enum for every device, not only the ones that are down."""
+
+    R_TEXT = (
+        "dev-up sys PING.icmpState = 2,up,1560316757,1783095098,\n"
+        "dev-down sys PING.icmpState = 1,down,1531240705,1787339442,\n"
+    )
+
+    @patch("requests.Session.post")
+    def test_it_asks_for_every_state_by_default(self, session_mock: MagicMock):
+        # get_unreachable filters to down; this one must not, or it cannot
+        # answer anything about a healthy device
+        session_mock.return_value.text = self.R_TEXT
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        result = api.get_ping_state()
+        sent = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertNotIn("value", sent)
+        self.assertIn("PING.icmpState", sent)
+        self.assertIn("ping4", sent)
+        self.assertEqual(set(result), {"dev-up", "dev-down"})
+
+    @patch("requests.Session.post")
+    def test_both_epochs_are_parsed_datetimes(self, session_mock: MagicMock):
+        # The raw attribute holds two integers; a caller should not have to
+        # know that, nor which epoch is which
+        session_mock.return_value.text = self.R_TEXT
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        entry = api.get_ping_state()["dev-up"]
+        self.assertEqual(entry["value"], "up")
+        # 'created' is when AKiPS started polling, so the device was added
+        self.assertEqual(entry["created"].year, 2019)
+        # 'modified' is when the state last changed
+        self.assertEqual(entry["modified"].year, 2026)
+        self.assertIsNotNone(entry["created"].tzinfo)
+        self.assertIsNotNone(entry["modified"].tzinfo)
+
+    @patch("requests.Session.post")
+    def test_states_can_still_be_filtered(self, session_mock: MagicMock):
+        session_mock.return_value.text = self.R_TEXT
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        api.get_ping_state(states=("down",))
+        self.assertIn("value /down/", session_mock.call_args.kwargs["params"]["cmds"])
