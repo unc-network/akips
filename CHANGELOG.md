@@ -14,6 +14,30 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-23
+
+### Added
+
+- `get_snmp_state()`, the SNMP counterpart to `get_ping_state()`. Same record,
+  same shape: the agent's state, when the device was added, and when the state
+  last changed.
+
+  **It answers for far fewer devices, and that is the point of the docstring.**
+  AKiPS pings everything it holds but polls SNMP only where SNMP is
+  configured. Measured on one fleet, 5,821 devices of 16,785 appeared here and
+  the rest were ICMP only — so a caller assuming the same denominator as the
+  ping call reads two thirds of the fleet as broken. Absence means not polled,
+  not down.
+
+### Documentation
+
+- `get_unreachable()` records that asking only for what is broken is not
+  necessarily the cheap way. On one fleet it took roughly three times as long
+  as `get_ping_state()` while returning 289 times fewer rows. Whether that
+  holds elsewhere is unknown and it may be a property of that server's data,
+  so the note says to measure rather than to switch — but the opposite is the
+  natural assumption, which is why it is written down.
+
 ## [1.3.0] - 2026-08-23
 
 ### Added
@@ -791,7 +815,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.3.0...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.4.0...develop
+[1.4.0]: https://github.com/unc-network/akips/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/unc-network/akips/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/unc-network/akips/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/unc-network/akips/compare/v1.0.0...v1.1.0

@@ -689,3 +689,47 @@ class PingStateTest(unittest.TestCase):
         api = AKIPS("akips.example.com", ro_password="ro-secret")
         api.get_ping_state(states=("down",))
         self.assertIn("value /down/", session_mock.call_args.kwargs["params"]["cmds"])
+
+
+class SnmpStateTest(unittest.TestCase):
+    """The SNMP agent enum, which answers for fewer devices than ping does."""
+
+    R_TEXT = (
+        "dev-up sys SNMP.snmpState = 2,up,1560316757,1783095098,\n"
+        "dev-down sys SNMP.snmpState = 1,down,1531240705,1787339442,\n"
+    )
+
+    @patch("requests.Session.post")
+    def test_it_reads_the_snmp_enum_off_the_sys_child(self, session_mock: MagicMock):
+        session_mock.return_value.text = self.R_TEXT
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        result = api.get_snmp_state()
+        sent = session_mock.call_args.kwargs["params"]["cmds"]
+        self.assertIn("SNMP.snmpState", sent)
+        self.assertIn("sys", sent)
+        self.assertNotIn("value", sent)
+        self.assertEqual(result["dev-down"]["value"], "down")
+        self.assertEqual(result["dev-up"]["created"].year, 2019)
+
+    @patch("requests.Session.post")
+    def test_states_can_still_be_filtered(self, session_mock: MagicMock):
+        session_mock.return_value.text = self.R_TEXT
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        api.get_snmp_state(states=("down",))
+        self.assertIn("value /down/", session_mock.call_args.kwargs["params"]["cmds"])
+
+    @patch("requests.Session.post")
+    def test_a_device_absent_here_is_not_reported_as_down(
+        self, session_mock: MagicMock
+    ):
+        # AKiPS pings everything but polls SNMP only where it is configured,
+        # so absence means not polled rather than broken.  Nothing may invent
+        # an entry for a device that did not answer.
+        session_mock.return_value.text = self.R_TEXT
+
+        api = AKIPS("akips.example.com", ro_password="ro-secret")
+        result = api.get_snmp_state()
+        self.assertNotIn("icmp-only-device", result)
+        self.assertEqual(len(result), 2)
