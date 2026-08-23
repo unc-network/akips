@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 import csv
 import io
@@ -389,6 +389,16 @@ class AKIPS:
         narrowing with 'mget text' returns no rows at all rather than an
         error, even though it is the obvious thing to reach for.
 
+        **Asking only for what is broken is not necessarily the cheap way.**
+        On one fleet this call took roughly three times as long as
+        get_ping_state(), while returning 289 times fewer rows: filtering on
+        value makes AKiPS match every device's enum rather than dump the
+        attribute, and this asks for two attributes where that asks for one.
+        Whether that holds elsewhere is unknown, and it may be a property of
+        that server's data rather than of the query.  It is recorded because
+        the opposite is the natural assumption: if this call is hot, measure
+        it against reading the state outright and filtering here.
+
         Args:
             children (str): regex of children to search, defaulting to the
                 ones AKiPS reports these attributes under.  Pass '*' for
@@ -508,6 +518,10 @@ class AKIPS:
         and keeps counting through an outage, so the two disagree on exactly
         the devices somebody is looking at.
 
+        get_snmp_state() is the same record for the SNMP agent.  It answers
+        for far fewer devices, because AKiPS pings everything it holds and
+        polls SNMP only where SNMP is configured.
+
         Args:
             states (list): only report these states, e.g. ('down',), or None
                 for every device whatever its state, which is the default
@@ -525,6 +539,54 @@ class AKIPS:
         """
         return self._get_enum_attribute(
             "PING.icmpState",
+            child=child,
+            values=states,
+            group_filter=group_filter,
+            groups=groups,
+        )
+
+    def get_snmp_state(
+        self,
+        states: tuple[str, ...] | list[str] | None = None,
+        child: str = "sys",
+        group_filter: str = "any",
+        groups: list[str] | None = None,
+    ) -> dict[str, dict[str, Any]] | None:
+        """
+        Pull the SNMP agent state of every SNMP polled device.
+
+        The SNMP counterpart to get_ping_state(), reading the same kind of
+        record with the same fields: the state, when the device was added,
+        and when the state last changed.
+
+        **It answers for fewer devices than get_ping_state() does, and the
+        difference is large.**  AKiPS pings everything it holds but polls SNMP
+        only where SNMP is configured, so a device absent from this result is
+        usually one that is not SNMP polled rather than one whose agent has
+        stopped answering.  Measured on one fleet, 5,821 devices of 16,785
+        appeared here and the rest were ICMP only.  A caller that assumes the
+        same denominator as the ping call reads two thirds of the fleet as
+        broken.
+
+        Absence therefore means unknown, not down.  The devices answering here
+        are the same ones answering SNMPv2-MIB.sysUpTime, which is a way to
+        confirm the denominator on a given server.
+
+        Args:
+            states (list): only report these states, e.g. ('down',), or None
+                for every SNMP polled device, which is the default
+            child (str): which child holds the agent state (default: 'sys')
+            group_filter (str): 'any', 'all', or 'not' operators for group filtering (default: 'any')
+            groups (list): list of group names to filter by (if any)
+        Returns:
+            A dictionary of device names to the parsed state, or None if no
+            device matched.  Each entry carries the enum fields described on
+            _parse_enum, plus the device 'name' and 'child'
+        Raises:
+            AkipsError: if the AKiPS server returns an error
+        """
+        return self._get_enum_attribute(
+            "SNMP.snmpState",
             child=child,
             values=states,
             group_filter=group_filter,
