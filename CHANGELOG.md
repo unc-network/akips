@@ -14,6 +14,23 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+### Security
+
+- Require `urllib3>=2.8.0,<3` to fix unbounded chunk-size buffering,
+  an infinite loop in chunked Deflate decoding, and HTTPS proxy TLS
+  configuration being ignored or overridden.
+- Require `certifi>=2026.10.19` to remove trust in the emSign root whose
+  intermediate CA private keys were compromised.
+- Raise the Requests minimum to `2.34.2`, the version already used in the
+  lock file. Declare the urllib3 and certifi minimums as runtime dependencies
+  so they are enforced for PyPI users as well as Poetry installations.
+- Update Black to `26.10.1` or later, fixing its bundled GitHub Action's
+  unvalidated `required-version`. This project's CI uses the Black CLI and
+  does not use the affected Action configuration.
+- Correct CI's dependency audit to scan the environment's `site-packages`
+  directory. Passing the virtual environment root previously scanned zero
+  packages.
+
 ## [1.4.0] - 2026-08-23
 
 ### Added
