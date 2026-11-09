@@ -14,6 +14,8 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-09
+
 ### Security
 
 - Require `urllib3>=2.8.0,<3` to fix unbounded chunk-size buffering,
@@ -832,7 +834,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.4.0...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.4.1...develop
+[1.4.1]: https://github.com/unc-network/akips/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/unc-network/akips/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/unc-network/akips/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/unc-network/akips/compare/v1.1.0...v1.2.0
