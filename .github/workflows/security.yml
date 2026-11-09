@@ -58,4 +58,6 @@ jobs:
 
       - name: Audit the resolved environment
         run: |
-          pip-audit --path "$(poetry env info --path)"
+          # pip-audit expects the installed packages directory, not the
+          # virtual environment root, which would audit zero packages.
+          pip-audit --path "$(poetry run python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"

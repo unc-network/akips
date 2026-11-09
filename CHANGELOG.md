@@ -14,6 +14,25 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-09
+
+### Security
+
+- Require `urllib3>=2.8.0,<3` to fix unbounded chunk-size buffering,
+  an infinite loop in chunked Deflate decoding, and HTTPS proxy TLS
+  configuration being ignored or overridden.
+- Require `certifi>=2026.10.19` to remove trust in the emSign root whose
+  intermediate CA private keys were compromised.
+- Raise the Requests minimum to `2.34.2`, the version already used in the
+  lock file. Declare the urllib3 and certifi minimums as runtime dependencies
+  so they are enforced for PyPI users as well as Poetry installations.
+- Update Black to `26.10.1` or later, fixing its bundled GitHub Action's
+  unvalidated `required-version`. This project's CI uses the Black CLI and
+  does not use the affected Action configuration.
+- Correct CI's dependency audit to scan the environment's `site-packages`
+  directory. Passing the virtual environment root previously scanned zero
+  packages.
+
 ## [1.4.0] - 2026-08-23
 
 ### Added
@@ -815,7 +834,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.4.0...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.4.1...develop
+[1.4.1]: https://github.com/unc-network/akips/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/unc-network/akips/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/unc-network/akips/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/unc-network/akips/compare/v1.1.0...v1.2.0

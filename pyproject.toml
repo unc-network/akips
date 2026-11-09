@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "akips"
-version = "1.4.0"
+version = "1.4.1"
 description = "Module to interact with the AKiPS Network Monitoring Software API interface"
 authors = ["William E Whitaker <will.whitaker@unc.edu>"]
 readme = "README.md"
@@ -21,11 +21,14 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-requests = ">=2.31"
+requests = ">=2.34.2"
+# These minimums also apply to PyPI installs, which do not use poetry.lock.
+urllib3 = ">=2.8.0,<3"
+certifi = ">=2026.10.19"
 pytz = "*"
 
 [tool.poetry.group.dev.dependencies]
-black = "^26.3.1"
+black = "^26.10.1"
 pytest = "^9.0.3"
 ruff = "^0.16.1"
 pdoc = "^16.0.0"
