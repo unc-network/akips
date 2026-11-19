@@ -13,13 +13,20 @@ the [AKiPS Network Monitoring Software](http://akips.com) API interface.
 Developed and validated against **AKiPS v26.5**. No lower bound is claimed:
 earlier releases may work, but nothing here is tested against them.
 
-AKiPS publishes an API reference guide. The current edition, 17, covers
-release 22.10 of December 2022 and has not been revised across the twenty five
-releases since. Some behavior this module depends on is therefore observed
-against a running server rather than documented — the `entity` parameter the
-availability calls use appears in no published syntax, for instance, and the
-guide's own description of `last1d` contradicts its example output. Where the
-two disagree, this module follows the server and says so in the docstring.
+Application token authentication follows the **AKiPS v26.6** documentation.
+Read-only live checks verified time-window queries and single-attribute
+inventory through ADB Query, and a limited syslog query through Syslog and
+Traps. A live invalid-token check also verified `AkipsAuthenticationError`
+from the documented HTTP 200 error reply. Other APIs, write operations,
+expired tokens and permission failures remain covered by unit tests rather
+than live checks.
+
+The legacy client was developed using API reference edition 17, covering
+AKiPS 22.10. Some behavior was established against a running server where
+that guide was incomplete or inconsistent, including the availability
+`entity` parameter and calendar-relative time filters. Those observations
+are recorded in the docstrings. Application authentication follows the newer
+26.6 Applications documentation.
 
 ## Installation
 
@@ -56,6 +63,46 @@ AKiPS rather than in a file on disk.
 ## Usage Examples
 
 ### Connect to AKiPS
+
+On AKiPS 26.6, create an application under **Admin > API > Applications**,
+choose its expiry and the permissions for each API you need, then copy its
+token. The token is shown once and cannot be retrieved later. The permissions
+cannot be changed after creation; create a new application to change them.
+
+```py
+import os
+from akips import AKIPS
+
+api = AKIPS('akips.example.com', token=os.environ['AKIPS_TOKEN'])
+```
+
+The client sends `Authorization: Bearer <token>` with every request. Options
+stay in the query string, and token calls use GET on every section, including
+site scripts. `use_post` applies only to legacy password authentication.
+Tests mocking token requests should patch `requests.Session.get`.
+
+AKiPS enforces the application's permissions. **ADB Query** (`api-db`) needs
+Read Only for reads or Read/Write for write commands; **Site Scripts**
+(`api-script`) needs Read/Write, even for `get_device_by_ip()`. Other APIs
+offer Read Only. `delete_device()` needs access to both ADB Query and Site
+Scripts because it checks the device before and after deleting it. The
+switches on **Web API Settings** control the legacy accounts, not applications.
+
+An invalid, revoked or expired token raises `AkipsAuthenticationError`.
+A token lacking API access or write permission raises `AkipsPermissionError`.
+Both subclass `AkipsError` and carry the API `section`; the authentication
+error's `username` is `None` for tokens.
+
+Choose either `token` or password credentials when constructing a client.
+`call(user='ro')` and `call(user='rw')` select legacy accounts and are refused
+for a token, whose permissions are fixed. Token requests are never retried
+with legacy credentials. To rotate the credential of an existing client,
+assign the replacement to `api.token`.
+
+### Legacy password authentication
+
+AKiPS has deprecated username/password Web API authentication and says it will
+be removed in **AKiPS 28.1**. This module retains it for older deployments.
 
 AKiPS ships two API accounts, `api-ro` and `api-rw`, and its API sections do
 not all accept the same one. Give the client the passwords for whichever
@@ -103,7 +150,7 @@ api = AKIPS(
 
 `timeout` can also be changed later with `api.timeout = 60`.
 
-### Where the password travels
+### Where the legacy password travels
 
 The password is sent in a POST body, so it never appears in the request URI.
 URLs are recorded by web servers, proxies and load balancers in their access

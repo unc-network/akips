@@ -14,6 +14,25 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.5.0.dev1] - 2026-11-19
+
+Development build for evaluating application authentication through TestPyPI.
+
+### Added
+
+- Support AKiPS 26.6 application authentication with `AKIPS(..., token=...)`.
+  Calls use GET with an Authorization bearer header and the application's
+  fixed API permissions, without legacy credentials or authentication retries.
+- Raise `AkipsAuthenticationError` for invalid, revoked or expired tokens and
+  `AkipsPermissionError` for denied API or write access. Both remain catchable
+  as `AkipsError` and identify the section that rejected the call.
+
+### Security
+
+- Redact bearer tokens and the documented `tok` parameter from diagnostics,
+  including request Authorization headers attached to transport exceptions.
+- Redact unexpected site-script replies before logging or raising them.
+
 ## [1.4.1] - 2026-11-09
 
 ### Security
@@ -835,6 +854,7 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 Releases before this one are not tagged in git and are not recorded here.
 
 [Unreleased]: https://github.com/unc-network/akips/compare/v1.4.1...develop
+[1.5.0.dev1]: https://github.com/unc-network/akips/compare/v1.4.1...develop
 [1.4.1]: https://github.com/unc-network/akips/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/unc-network/akips/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/unc-network/akips/compare/v1.2.0...v1.3.0

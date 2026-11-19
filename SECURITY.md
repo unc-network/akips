@@ -56,9 +56,11 @@ offered in the changelog unless you would rather not be named.
 
 Worth stating plainly, because it shapes what counts as a vulnerability here.
 
-AKiPS authenticates web API calls with a password sent as a request parameter.
-That is the only authentication the API offers, so this package has no
-alternative to using it. Credentials are held in memory on the client for the
+AKiPS 26.6 applications authenticate with bearer tokens. This package sends
+them in the Authorization header, keeping them out of request URLs. Older
+deployments can still use passwords sent as request parameters; that legacy
+authentication is deprecated by AKiPS and scheduled for removal in 28.1.
+Credentials are held in memory on the client for the
 lifetime of an `AKIPS` instance and are never written to disk by this package.
 
 Because those credentials travel in requests, and because AKiPS stores SNMP
@@ -69,7 +71,7 @@ parameters and sensitive attribute values from:
 - its own log output, at every level
 - exception messages, including the whole `__cause__` and `__context__` chain
   rather than only the exception raised
-- the response URL attached to HTTP errors
+- the response URL and Authorization headers on requests attached to HTTP errors
 
 **A failure of any of that is a vulnerability in this package.** If you can
 make `akips` write a credential to a log, an exception, or a traceback, please

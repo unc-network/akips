@@ -3,7 +3,7 @@ This akips python module provides a simple way for python scripts to interact wi
 the AKiPS Network Monitoring Software Web API interface.
 """
 
-__version__ = "1.4.1"
+__version__ = "1.5.0.dev1"
 
 import csv
 import io
@@ -21,6 +21,7 @@ from akips.exceptions import (
     AkipsAuthenticationError,
     AkipsCredentialError,
     AkipsError,
+    AkipsPermissionError,
     AkipsSectionDisabledError,
 )
 
@@ -28,14 +29,27 @@ from akips.exceptions import (
 logger = logging.getLogger(__name__)
 
 
+class _HeaderAuth(requests.auth.AuthBase):
+    """Preserve the bearer header instead of using Session or .netrc auth."""
+
+    def __call__(self, request: requests.PreparedRequest) -> requests.PreparedRequest:
+        return request
+
+
 class AKIPS:
     """
     A class to handle interactions with the AKiPS Web API
 
-    AKiPS ships two API accounts, api-ro and api-rw, and its sections do not
-    all accept the same one.  Supply the passwords for whichever accounts you
-    need and each call uses the right one; see SECTION_USERS below for the
-    mapping.  A caller only reading data needs ro_password alone.
+    AKiPS 26.6 applications authenticate with a bearer token whose API
+    permissions are chosen at creation and enforced by the server:
+
+        api = AKIPS('akips.example.com', token='...')
+
+    For legacy authentication, AKiPS ships two accounts, api-ro and api-rw,
+    and its sections do not all accept the same one. Supply the passwords for
+    whichever accounts you need and each call uses the right one; see
+    SECTION_USERS below for the mapping. A caller only reading data needs
+    ro_password alone.
 
         api = AKIPS('akips.example.com', ro_password='...', rw_password='...')
 
@@ -99,15 +113,16 @@ class AKIPS:
         "api-spm": "api-ro",
         "api-unused-interfaces": "api-ro",
     }
-    """Every API section AKiPS publishes, mapped to the account it accepts.
+    """Every API section AKiPS publishes, mapped to its legacy account.
     None marks a section taking either, where the read only account is
     preferred.  Also the list of sections known to exist."""
 
     SECTION_METHODS: dict[str, str] = {
         "api-script": "GET",
     }
-    """HTTP method to use per section, for the sections that cannot take the
-    default.  Anything absent here is sent as POST when use_post is on.
+    """HTTP method to use per section for legacy password authentication.
+    Anything absent here is sent as POST when use_post is on.  Token calls
+    use GET with an Authorization header on every section.
 
     **api-script does not answer a POST.**  The server returns 200 headers in
     about a quarter of a second, then sends no body and holds the connection
@@ -144,9 +159,29 @@ class AKIPS:
         ro_password: str | None = None,
         rw_password: str | None = None,
         use_post: bool = True,
+        token: str | None = None,
     ) -> None:
+        if token is not None:
+            if not isinstance(token, str) or not token or re.search(r"\s", token):
+                raise AkipsCredentialError(
+                    "Pass a non-empty AKiPS application token without whitespace."
+                )
+            if username != "api-ro" or any(
+                credential is not None
+                for credential in (password, ro_password, rw_password)
+            ):
+                raise ValueError(
+                    "Choose token authentication or legacy username/password "
+                    "authentication, not both."
+                )
         self.server = server
         """The AKiPS server hostname or IP address."""
+        self.token = token
+        """AKiPS application bearer token, sent in the Authorization header.
+        Its API permissions and expiry are configured in AKiPS.  Permissions
+        cannot be changed after creation; create a new application to change
+        them.  Assign a new token here to rotate this client's credential.
+        Token authentication cannot be combined with legacy credentials."""
         self.username = username
         """Kept for callers who set it directly.  With 'api-ro' or 'api-rw'
         the password given alongside fills that account; with any other name
@@ -168,8 +203,8 @@ class AKIPS:
         """HTTP timeout in seconds applied to every call.  Assign to it to
         change the timeout of an existing client, e.g. api.timeout = 60."""
         self.use_post = use_post
-        """Whether to send the password in a POST body instead of the query
-        string.  True by default, and it should stay that way: URLs are
+        """For legacy authentication, whether to send the password in a POST
+        body instead of the query string.  True by default: URLs are
         recorded by web servers, proxies and load balancers in their access
         logs, and appear in exception messages and client history.  A request
         body is not logged that way, and a credential does not belong in a URL.
@@ -177,7 +212,9 @@ class AKIPS:
         Set it to False only for a server that will not accept the POST form,
         which puts the password back in the URL.  Nothing falls back on its
         own, because a silent retry over GET would leak the password at
-        exactly the moment the server turned out not to support this."""
+        exactly the moment the server turned out not to support this.
+        Token calls always use GET and keep the token in the Authorization
+        header, regardless of this setting."""
         self.session = requests.Session()
         """The requests session every call is made through."""
         # Sections warned about already, so a caller legitimately using a
@@ -202,12 +239,13 @@ class AKIPS:
                 self._account_override = (username, password)
 
         if (
-            self._account_override is None
+            self.token is None
+            and self._account_override is None
             and self.ro_password is None
             and self.rw_password is None
         ):
             raise AkipsCredentialError(
-                "No AKiPS password provided.  Pass ro_password, rw_password, "
+                "No AKiPS credential provided.  Pass token, ro_password, rw_password, "
                 "or a username and password pair."
             )
 
@@ -477,7 +515,9 @@ class AKIPS:
                 logger.warning(
                     "Could not parse {} of {} unreachable lines from akips, "
                     "those devices are missing from the result.  First: {}".format(
-                        len(unparsed), len(unparsed) + len(data), unparsed[0][:200]
+                        len(unparsed),
+                        len(unparsed) + len(data),
+                        self._redact_text(unparsed[0], literals=False)[:200],
                     )
                 )
             # A reply that parses to nothing is nothing found, the same
@@ -1115,7 +1155,7 @@ class AKIPS:
                     len(unreadable),
                     len(unreadable) + len(rows),
                     attribute,
-                    unreadable[0],
+                    self._redact_text(unreadable[0], literals=False),
                 )
             )
         if not data:
@@ -1274,7 +1314,9 @@ class AKIPS:
             logger.warning(
                 "Could not read {} of {} aggregate values as numbers, those "
                 "points are kept with a value of None.  First: {!r}".format(
-                    len(unreadable), len(values), unreadable[0][:100]
+                    len(unreadable),
+                    len(values),
+                    self._redact_text(unreadable[0], literals=False)[:100],
                 )
             )
         return labeled
@@ -1329,16 +1371,16 @@ class AKIPS:
         address resolved here to a device whose entire attribute tree contained
         no mention of it.
 
-        This is the one read in this module that a read only deployment cannot
-        perform.  AKiPS exposes it as a site script rather than a database
-        query, so it lives in api-script and needs rw_password even though it
-        changes nothing.  A client holding only ro_password raises
-        AkipsCredentialError rather than returning None, so a caller building
-        on it should not plan for a read only deployment.
+        This is the one read in this module that needs Site Scripts:
+        Read/Write on an application token, even though it changes nothing.
+        With legacy authentication it needs rw_password; a client holding
+        only ro_password raises AkipsCredentialError rather than returning
+        None.
 
-        **This call is sent as GET, not POST**, so its password travels in
-        the query string.  api-script does not answer a POST: the server sends
-        no body and holds the connection open until the client gives up.  See
+        **This call is sent as GET.** Tokens stay in the Authorization header;
+        legacy passwords travel in the query string. With legacy calls,
+        api-script does not answer a POST: the server sends no body and holds
+        the connection open until the client gives up. See
         SECTION_METHODS, which is where to say so if a server of yours does
         take a POST on this section.
 
@@ -1372,7 +1414,7 @@ class AKIPS:
             logger.warning(
                 "web_find_device_by_ip returned something unexpected; check "
                 "that the site script is installed on this AKiPS server.  "
-                "Reply: {}".format(self._redact_text(text.strip()[:200]))
+                "Reply: {}".format(self._redact_text(text.strip())[:200])
             )
         return None
 
@@ -1381,9 +1423,10 @@ class AKIPS:
         Update manual grouping rules for a device, including the special 'maintenance_mode'
         group.  The web api script fails silently if the device or group does not exist.
 
-        **This call is sent as GET, not POST**, so its password travels in
-        the query string.  api-script does not answer a POST: the server sends
-        no body and holds the connection open until the client gives up.  See
+        **This call is sent as GET.** Tokens stay in the Authorization header;
+        legacy passwords travel in the query string. With legacy calls,
+        api-script does not answer a POST: the server sends no body and holds
+        the connection open until the client gives up. See
         SECTION_METHODS, which is where to say so if a server of yours does
         take a POST on this section.
 
@@ -1423,8 +1466,9 @@ class AKIPS:
         }
         text = self._get(section="api-script", params=params)
         if text:
-            logger.error("Web API request failed: {}".format(text))
-            raise AkipsError(message=text)
+            message = self._redact_text(text)
+            logger.error("Web API request failed: {}".format(message))
+            raise AkipsError(message=message)
         return None
 
     SCRIPT_TIMEOUT = 300
@@ -1469,9 +1513,11 @@ class AKIPS:
         should keep before deleting the other one, because nothing moves
         across on its own.
 
-        **This call is sent as GET, not POST**, so its password travels in
-        the query string.  api-script does not answer a POST: the server sends
-        no body and holds the connection open until the client gives up.  See
+        **This call is sent as GET.**  With a token the credential stays in
+        the Authorization header; with legacy authentication the password
+        travels in the query string.  With legacy calls api-script does not
+        answer a POST: the server sends no body and holds the connection open
+        until the client gives up.  See
         SECTION_METHODS, which is where to say so if a server of yours does
         take a POST on this section.
 
@@ -1514,7 +1560,8 @@ class AKIPS:
         Raises:
             ValueError: if device is empty, is a pattern, or could name more
                 than one device
-            AkipsCredentialError: if no rw_password was given to AKIPS()
+            AkipsCredentialError: if using legacy authentication and no
+                rw_password was given to AKIPS()
             AkipsError: if AKiPS returns an error, or if the device is still
                 present afterwards
         """
@@ -1541,7 +1588,8 @@ class AKIPS:
         # Checked before anything is looked up, so a client with no rw
         # password fails on the credential rather than after spending a
         # request on a delete it could never have made.
-        self._credentials_for("api-script")
+        if self.token is None:
+            self._credentials_for("api-script")
 
         if self.get_device(device) is None:
             logger.info("No AKiPS device named {!r}, nothing to delete".format(device))
@@ -1557,15 +1605,16 @@ class AKIPS:
             timeout = max(self.timeout, self.SCRIPT_TIMEOUT)
         text = self._get(section="api-script", params=params, timeout=timeout)
         if text:
-            logger.error("Web API request failed: {}".format(text))
-            raise AkipsError(message=text)
+            message = self._redact_text(text)
+            logger.error("Web API request failed: {}".format(message))
+            raise AkipsError(message=message)
 
         if self.get_device(device) is not None:
             raise AkipsError(
                 message=(
                     "AKiPS still holds a device named {!r} after "
                     "web_delete_device returned nothing.  Check that the site "
-                    "script is installed and that api-rw is allowed to run "
+                    "script is installed and that the credential is allowed to run "
                     "it".format(device)
                 )
             )
@@ -1595,10 +1644,12 @@ class AKIPS:
         limit: int | None = None,
     ) -> list[dict[str, str]] | None:
         """
-        Retrieve syslog or trap messages from the AKiPS api-msg database. The api-msg
-        access requires username to be 'api-ro'.
+        Retrieve syslog or trap messages from the AKiPS api-msg database.
+        Requires Syslog and Traps: Read Only on an application token, or
+        api-ro with legacy authentication.
 
-        Supporting AKiPS web API syntax:
+        Supporting legacy AKiPS web API syntax (tokens use the same options
+        with an Authorization header and no password parameter):
 
             https://{server}/api-msg?password={pw};time={time filter};
                 [addr={ip filter}];[type=syslog|trap];[device={name}|{regex}];
@@ -2136,7 +2187,9 @@ class AKIPS:
             output (str): one of the formats listed above (default: 'raw')
             user (str): force the 'ro' or 'rw' account, for a section
                 whose requirement is not in SECTION_USERS, or a command
-                needing more rights than its section usually does
+                needing more rights than its section usually does.  Legacy
+                authentication only; tokens have fixed permissions, so this
+                argument is refused when using a token
         Returns:
             The reply in the requested shape, or None if the server returned
             nothing
@@ -2212,8 +2265,9 @@ class AKIPS:
                 data[match.group(1)] = match.group(2)
         return data
 
-    @staticmethod
-    def _parse_attributes(text: str) -> dict[str, dict[str, dict[str, str | None]]]:
+    def _parse_attributes(
+        self, text: str
+    ) -> dict[str, dict[str, dict[str, str | None]]]:
         """
         Parse lines of '{parent} {child} {attribute} = {value}', the shape
         mget replies in.  An attribute with nothing after the equals has no
@@ -2256,7 +2310,7 @@ class AKIPS:
                         for children in data.values()
                         for attributes in children.values()
                     ),
-                    unparsed[0][:200],
+                    self._redact_text(unparsed[0], literals=False)[:200],
                 )
             )
         return data
@@ -2395,7 +2449,10 @@ class AKIPS:
             logger.warning(
                 "Could not parse {} of {} {} values from akips, those devices "
                 "are missing from the result.  First: {}".format(
-                    len(unparsed), len(unparsed) + len(data), attribute, unparsed[0]
+                    len(unparsed),
+                    len(unparsed) + len(data),
+                    attribute,
+                    self._redact_text(unparsed[0], literals=False),
                 )
             )
         if not data:
@@ -2451,7 +2508,7 @@ class AKIPS:
     # Substrings that mark a name as holding a credential, whether it is a
     # query parameter or an AKiPS attribute.  Matching loosely is deliberate:
     # over redacting costs a value in a debug log, under redacting leaks one.
-    SENSITIVE_KEYS = ("password", "pass", "token", "secret", "key", "community")
+    SENSITIVE_KEYS = ("password", "pass", "tok", "secret", "key", "community")
     """Substrings marking a request parameter or AKiPS attribute whose value
     is redacted from log output.  Extend it to redact more."""
 
@@ -2475,7 +2532,8 @@ class AKIPS:
         catches them appearing outside a query string, but is unsafe for text
         that carries device data: a short password would rewrite every
         innocent occurrence of the same characters.  Pass literals=False for
-        anything that is not a URL or an error message.
+        anything that is not a URL or an error message. The configured token
+        and explicit bearer headers are always redacted.
 
         Args:
             text (str): text that may contain credentials
@@ -2484,7 +2542,18 @@ class AKIPS:
         Returns:
             The text with any credential replaced by '****'
         """
-        text = re.sub(r"((?:password|passwd|pass)=)[^&\s]*", r"\1****", text)
+        text = re.sub(
+            r"((?:password|passwd|pass|tok|token)=)[^;&\s]*",
+            r"\1****",
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(
+            r"(Authorization\s*:\s*Bearer\s+)[^\s\"'<>]+",
+            r"\1****",
+            text,
+            flags=re.IGNORECASE,
+        )
 
         # AKiPS keeps SNMP credentials as ordinary device attributes, so a
         # reply to something as innocent as get_device carries the community
@@ -2495,6 +2564,12 @@ class AKIPS:
             return match.group(0)
 
         text = re.sub(r"^(\S+\s\S+\s(\S+)\s=\s).*$", redact_attribute, text, flags=re.M)
+
+        # A bearer token is a long opaque value, unlike a legacy password.
+        # Scrub it from all diagnostic text, even when preserving innocent
+        # occurrences of short passwords in a device reply.
+        if self.token:
+            text = text.replace(self.token, "****")
 
         if literals:
             for secret in (self.password, self.ro_password, self.rw_password):
@@ -2555,6 +2630,21 @@ class AKIPS:
                 except AttributeError:
                     pass
 
+            # Error reporters can inspect attached request headers separately
+            # from an exception's already scrubbed message.
+            for request in (
+                getattr(node, "request", None),
+                getattr(response, "request", None),
+            ):
+                if isinstance(request, requests.PreparedRequest):
+                    if request.url is not None:
+                        request.url = self._redact_text(request.url)
+                    for name in request.headers:
+                        if name.lower() == "authorization" or self._is_sensitive_key(
+                            name
+                        ):
+                            request.headers[name] = "****"
+
             pending.append(node.__cause__)
             pending.append(node.__context__)
 
@@ -2568,13 +2658,15 @@ class AKIPS:
         """
         Base HTTP request against the AKiPS server for web API calls.
 
-        Sent as a POST with the password in the body, so it never appears in
-        the request URI.  Set use_post=False on the client to send the older
+        Token calls use GET with the token in the Authorization header.
+        Legacy calls are sent as a POST with the password in the body, so it
+        never appears in the request URI.  Set use_post=False to send the older
         GET form instead, which puts the password in the query string.  The
         name is kept from when this only did GET, because it is called in
         two dozen places and is not part of the public API.
 
-        Section options are individually enabled via the AKiPS Web API Settings page.
+        Legacy sections are individually enabled via Web API Settings.
+        Token access is controlled by the application's API permissions.
             api-availability      : Availability, default off
             api-db                : Config and Events, default off
             api-config-viewer     : Config Viewer, default off
@@ -2598,7 +2690,9 @@ class AKIPS:
         Raises:
             AkipsCredentialError: if the account this section needs has no
                 password
-            AkipsAuthenticationError: if AKiPS rejects the credentials
+            AkipsAuthenticationError: if AKiPS rejects the credentials or
+                the token has expired
+            AkipsPermissionError: if the token lacks API or write access
             AkipsSectionDisabledError: if the section is not enabled on the
                 server
             AkipsError: for any other error the AKiPS server returns
@@ -2625,8 +2719,25 @@ class AKIPS:
         # Work on a copy so credentials are never written into the dictionary
         # the caller passed in, and so params is optional as documented
         params = dict(params or {})
-        username, password = self._credentials_for(section, user)
-        params["username"] = username
+        username: str | None = None
+        password: str | None = None
+        auth_options: dict[str, Any] = {}
+        if self.token is not None:
+            if user is not None:
+                raise ValueError(
+                    "user applies only to legacy authentication.  An AKiPS "
+                    "application token has fixed permissions."
+                )
+            if any(name.lower() in ("username", "password", "tok") for name in params):
+                raise ValueError(
+                    "Token authentication cannot be combined with username, "
+                    "password or tok request parameters."
+                )
+            auth_options["headers"] = {"Authorization": f"Bearer {self.token}"}
+            auth_options["auth"] = _HeaderAuth()
+        else:
+            username, password = self._credentials_for(section, user)
+            params["username"] = username
 
         # The password travels in a POST body unless the caller has turned
         # that off, so it stays out of the request URI and out of everything
@@ -2637,8 +2748,13 @@ class AKIPS:
         # A section may refuse the default method, so the choice is per
         # section rather than per client.  See SECTION_METHODS.
         section_method = self.SECTION_METHODS.get(section, "POST")
-        post = self.use_post and section_method == "POST"
-        if self.use_post and not post and section not in self._method_warned:
+        post = self.token is None and self.use_post and section_method == "POST"
+        if (
+            self.token is None
+            and self.use_post
+            and not post
+            and section not in self._method_warned
+        ):
             self._method_warned.add(section)
             # Logged at info, not warning.  It is worth being able to see,
             # but an operator cannot act on it — the server is what refuses
@@ -2655,14 +2771,20 @@ class AKIPS:
             )
         method = "POST" if post else "GET"
         data: dict[str, str] | None = None
-        if post:
-            data = {"password": password}
-        else:
-            params["password"] = password
+        if password is not None:
+            if post:
+                data = {"password": password}
+            else:
+                params["password"] = password
 
         logger.debug("{} url: {}".format(method, server_url))
         logger.debug(
-            "{} params: {}".format(method, self._redact_sensitive_params(params))
+            "{} params: {}".format(
+                method,
+                self._redact_text(
+                    str(self._redact_sensitive_params(params)), literals=False
+                ),
+            )
         )
 
         try:
@@ -2683,6 +2805,7 @@ class AKIPS:
                         data=data,
                         verify=self.verify,
                         timeout=request_timeout,
+                        **auth_options,
                     )
                 else:
                     r = self.session.get(
@@ -2690,6 +2813,7 @@ class AKIPS:
                         params=params,
                         verify=self.verify,
                         timeout=request_timeout,
+                        **auth_options,
                     )
             r.raise_for_status()
         except requests.exceptions.RequestException as err:
@@ -2711,25 +2835,27 @@ class AKIPS:
             # anywhere in the reply.
             message = self._redact_text(r.text, literals=False)
             logger.error("Web API request failed: {}".format(message))
-            # The two failures worth naming are the two that are nothing to do
-            # with the call: the wrong password, and a section left switched
-            # off.  Both are ordinary first-run mistakes and both used to
-            # arrive as an AkipsError saying only what AKiPS said.
-            #
-            # Matched loosely and on the distinctive phrase alone.  AKiPS
-            # prefixes the section name ('ERROR: api-db invalid
-            # username/password') but that is not documented anywhere and
-            # neither is the wording, so anything unrecognized has to keep
-            # falling through to AkipsError rather than being forced into a
-            # category.  Both subclass AkipsError, so callers catching that
-            # are unaffected.
-            # Both carry what the call already knew, so a caller can act on
-            # the section or the account without parsing AKiPS's prose.
-            if re.search(r"invalid username/password", message, re.IGNORECASE):
+            # Token failures use the phrases in the AKiPS 26.6 Applications
+            # guide.  Legacy error wording is observed rather than documented.
+            # Match the original reply, since redacting a malformed token
+            # could replace words in the error itself. Only the sanitized
+            # message leaves this method. Unfamiliar errors remain generic.
+            if re.search(
+                r"invalid username/password|invalid token|token has expired",
+                r.text,
+                re.IGNORECASE,
+            ):
                 raise AkipsAuthenticationError(
                     message=message, section=section, username=username
                 )
-            if re.search(r"access is turned off", message, re.IGNORECASE):
+            if re.search(
+                r"token does not grant access to this api|"
+                r"token grants read-only access;\s*write access required",
+                r.text,
+                re.IGNORECASE,
+            ):
+                raise AkipsPermissionError(message=message, section=section)
+            if re.search(r"access is turned off", r.text, re.IGNORECASE):
                 raise AkipsSectionDisabledError(message=message, section=section)
             raise AkipsError(message=message)
         else:
