@@ -17,9 +17,16 @@ Application token authentication follows the **AKiPS v26.6** documentation.
 Read-only live checks verified time-window queries and single-attribute
 inventory through ADB Query, and a limited syslog query through Syslog and
 Traps. A live invalid-token check also verified `AkipsAuthenticationError`
-from the documented HTTP 200 error reply. Other APIs, write operations,
-expired tokens and permission failures remain covered by unit tests rather
-than live checks.
+from the documented HTTP 200 error reply. Downstream testing of the
+`1.5.0.dev1` TestPyPI build reported successful token reads for inventory,
+state, events, messages, availability, UPS values, and IP lookup with TLS
+verification enabled. Write operations, expired tokens and permission
+failures remain covered by tests rather than live checks.
+
+Read-only legacy `api-rw` ADB queries also passed live checks through POST,
+including both `username`/`password` and `rw_password` constructor forms and
+attribute parsing. Legacy `api-ro` and Site Scripts calls remain covered by
+unit tests without fresh live checks for this release.
 
 The legacy client was developed using API reference edition 17, covering
 AKiPS 22.10. Some behavior was established against a running server where

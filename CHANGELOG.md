@@ -14,9 +14,14 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
-## [1.5.0.dev1] - 2026-11-19
+## [1.5.0] - 2026-11-19
 
-Development build for evaluating application authentication through TestPyPI.
+Stable release of the application authentication support evaluated through
+TestPyPI as `1.5.0.dev1`. Downstream testing reported successful read-only
+token calls across inventory, state, events, messages, availability, UPS
+values, and IP lookup with TLS verification enabled. Live legacy `api-rw`
+ADB reads also passed through POST; write operations were tested with
+synthetic responses.
 
 ### Added
 
@@ -857,8 +862,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.4.1...develop
-[1.5.0.dev1]: https://github.com/unc-network/akips/compare/v1.4.1...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.5.0...develop
+[1.5.0]: https://github.com/unc-network/akips/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/unc-network/akips/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/unc-network/akips/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/unc-network/akips/compare/v1.2.0...v1.3.0
