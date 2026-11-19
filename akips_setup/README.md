@@ -49,11 +49,17 @@ file first.
 For each file:
 
 1. Paste the function into **Admin > Site Scripting** on the AKiPS server.
-2. Create the `api-rw` user under **Admin > Users / Profiles > User Settings**.
-3. Turn on **Site Script Functions** under **Admin > API > Web API Settings**.
+2. On AKiPS 26.6, create an application under **Admin > API > Applications**
+   with **Site Scripts: Read/Write** and use its token with the client. For
+   `delete_device()`, also grant **ADB Query** access for the checks before
+   and after deletion.
 
-Both are prerequisites rather than enhancements. Without them the two methods
-above cannot work, whatever credentials you hold — `get_device_by_ip()` will
+For legacy password authentication, create the `api-rw` user under **Admin >
+Users / Profiles > User Settings** and turn on **Site Script Functions**
+under **Admin > API > Web API Settings** instead.
+
+The scripts and API access are prerequisites. Without them these methods
+cannot work, whatever credentials you hold — `get_device_by_ip()` will
 warn that the site script may not be installed, and `set_group_membership()`
 will raise with whatever the server said.
 

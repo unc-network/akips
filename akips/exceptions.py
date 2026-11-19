@@ -11,7 +11,7 @@ class AkipsError(Exception):
 
 class AkipsCredentialError(AkipsError, ValueError):
     """
-    Exception raised when the AKiPS account a call needs has no password.
+    Exception raised when AKiPS credentials are missing or unusable.
 
     This is a configuration problem rather than a reply from AKiPS: it is
     raised before any request is made, so it can be caught at startup and
@@ -30,10 +30,10 @@ class AkipsAuthenticationError(AkipsError):
     """
     Exception raised when AKiPS itself rejects the username and password.
 
-    Distinct from AkipsCredentialError, which means no password was
-    configured and is raised without contacting the server.  This one means a
-    password was sent and AKiPS refused it, so the account may not exist, the
-    password may be wrong, or the section may need the other account.
+    Distinct from AkipsCredentialError, which means credentials were missing
+    or unusable and is raised without contacting the server. This one means a
+    credential was sent and AKiPS refused it: the password may be wrong, or
+    the application token may be invalid, revoked or expired.
 
     It subclasses AkipsError alone, deliberately not AkipsCredentialError:
     that one is also a ValueError, which suits a bad argument and not a
@@ -45,7 +45,8 @@ class AkipsAuthenticationError(AkipsError):
             which is usually the useful half — a section needing api-rw and
             given api-ro fails here rather than anywhere more obvious
 
-    Both are None when the exception is constructed without them.  There is
+    username is None for token authentication.  Both are None when the
+    exception is constructed without them.  There is
     no HTTP status worth carrying: AKiPS answers 200 to everything, errors
     included, which is why the reply body is what this library reads.
     """
@@ -61,11 +62,32 @@ class AkipsAuthenticationError(AkipsError):
         super().__init__(message)
 
 
+class AkipsPermissionError(AkipsError):
+    """The application token lacks access to the API or to a write command.
+
+    Distinct from AkipsAuthenticationError: the token was accepted, but its
+    fixed permissions do not allow this call.  Create a new application with
+    the required permissions in AKiPS to change that access.
+
+    Attributes:
+        section (str | None): the API section that refused access
+    """
+
+    def __init__(
+        self,
+        message: str = "The AKiPS application token lacks the required permission",
+        section: str | None = None,
+    ) -> None:
+        self.section = section
+        super().__init__(message)
+
+
 class AkipsSectionDisabledError(AkipsError):
     """
     Exception raised when the API section is switched off on the server.
 
-    Every section is disabled by default and each is enabled separately under
+    For legacy password authentication, every section is disabled by default
+    and each is enabled separately under
     Admin > API > Web API Settings.  The credentials were accepted, so this
     is a server configuration problem rather than anything wrong with the
     call, and it is the most common first-run failure.

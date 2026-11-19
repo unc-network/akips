@@ -14,6 +14,34 @@ From 1.0.0 onward, a breaking change requires a major release. Releases before
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-19
+
+Stable release of the application authentication support evaluated through
+TestPyPI as `1.5.0.dev1`. Downstream testing reported successful read-only
+token calls across inventory, state, events, messages, availability, UPS
+values, and IP lookup with TLS verification enabled. Live legacy `api-rw`
+ADB reads also passed through POST; write operations were tested with
+synthetic responses.
+
+### Added
+
+- Support AKiPS 26.6 application authentication with `AKIPS(..., token=...)`.
+  Calls use GET with an Authorization bearer header and the application's
+  fixed API permissions, without legacy credentials or authentication retries.
+- Raise `AkipsAuthenticationError` for invalid, revoked or expired tokens and
+  `AkipsPermissionError` for denied API or write access. Both remain catchable
+  as `AkipsError` and identify the section that rejected the call.
+
+### Security
+
+- Redact bearer tokens and the documented `tok` parameter from diagnostics,
+  including request Authorization headers attached to transport exceptions.
+- Redact unexpected site-script replies before logging or raising them.
+- Document the legacy HTTP Log credential exposure reported to AKiPS in
+  August 2026 and the role of bearer headers and per-application permissions
+  in addressing it. Include migration and log-cleanup timing for mixed
+  deployments, with a reference to AKiPS support for cleanup assistance.
+
 ## [1.4.1] - 2026-11-09
 
 ### Security
@@ -834,7 +862,8 @@ First tagged release. Provides the `AKIPS` client with `get_devices()`,
 
 Releases before this one are not tagged in git and are not recorded here.
 
-[Unreleased]: https://github.com/unc-network/akips/compare/v1.4.1...develop
+[Unreleased]: https://github.com/unc-network/akips/compare/v1.5.0...develop
+[1.5.0]: https://github.com/unc-network/akips/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/unc-network/akips/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/unc-network/akips/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/unc-network/akips/compare/v1.2.0...v1.3.0
