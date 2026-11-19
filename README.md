@@ -81,6 +81,18 @@ stay in the query string, and token calls use GET on every section, including
 site scripts. `use_post` applies only to legacy password authentication.
 Tests mocking token requests should patch `requests.Session.get`.
 
+In August 2026 we reported that AKiPS 26.5's legacy HTTP Log could expose
+`api-rw` passwords in request URLs to holders of `api-ro`. The earlier move
+to POST kept legacy passwords out of request URLs where AKiPS accepted it.
+Application authentication addresses this exposure by moving credentials into
+a bearer header and giving each application its own API permissions. This
+client uses the header form, and HTTP Log access can be granted separately to
+applications that need it. Before granting that access, restrict existing log readers,
+stop credential-bearing URLs, rotate exposed credentials, and clean retained
+logs. Contact AKiPS support for assistance with legacy password cleanup.
+See [SECURITY.md](SECURITY.md#migrating-authentication-and-cleaning-retained-logs)
+for the recommended sequence, including mixed legacy and token deployments.
+
 AKiPS enforces the application's permissions. **ADB Query** (`api-db`) needs
 Read Only for reads or Read/Write for write commands; **Site Scripts**
 (`api-script`) needs Read/Write, even for `get_device_by_ip()`. Other APIs

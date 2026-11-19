@@ -32,6 +32,10 @@ Development build for evaluating application authentication through TestPyPI.
 - Redact bearer tokens and the documented `tok` parameter from diagnostics,
   including request Authorization headers attached to transport exceptions.
 - Redact unexpected site-script replies before logging or raising them.
+- Document the legacy HTTP Log credential exposure reported to AKiPS in
+  August 2026 and the role of bearer headers and per-application permissions
+  in addressing it. Include migration and log-cleanup timing for mixed
+  deployments, with a reference to AKiPS support for cleanup assistance.
 
 ## [1.4.1] - 2026-11-09
 
